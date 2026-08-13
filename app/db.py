@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS extraction_results (
     value TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT 'mock'
 );
+
+CREATE TABLE IF NOT EXISTS extraction_groundings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    result_id INTEGER NOT NULL REFERENCES extraction_results(id),
+    page_number INTEGER NOT NULL,
+    text_position TEXT NOT NULL
+);
 """
 
 

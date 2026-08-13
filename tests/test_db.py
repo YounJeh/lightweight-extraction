@@ -11,7 +11,12 @@ def test_init_db_creates_expected_tables(tmp_path):
         row["name"]
         for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     }
-    assert {"fields", "extraction_runs", "extraction_results"} <= tables
+    assert {
+        "fields",
+        "extraction_runs",
+        "extraction_results",
+        "extraction_groundings",
+    } <= tables
     conn.close()
 
 
