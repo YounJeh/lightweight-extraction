@@ -13,14 +13,14 @@ l'upload — à vérifier), créer le squelette de dossiers (`app/`, `tests/`,
 base.
 
 **Acceptance criteria:**
-- [ ] `uv sync` installe l'environnement sans erreur
-- [ ] `uv run python -m app.main` démarre un serveur FastHTML local sans erreur
-- [ ] `.gitignore` exclut `data/*.db`, `__pycache__`, `.venv`
+- [x] `uv sync` installe l'environnement sans erreur
+- [x] `uv run python -m app.main` démarre un serveur FastHTML local sans erreur
+- [x] `.gitignore` exclut `data/*.db` (règle globale `*.db`), `__pycache__`, `.venv`
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v` (au moins un test de fumée sur l'app)
-- [ ] Build: `uv sync` réussit
-- [ ] Manuel: ouvrir l'URL locale du serveur dans un navigateur, la page répond
+- [x] Tests: `uv run pytest -v` (test de fumée `tests/test_app.py`)
+- [x] Build: `uv sync` réussit
+- [x] Manuel: `curl http://localhost:5001/` → HTTP 200 pendant que le serveur tourne
 
 **Dependencies:** None
 
@@ -45,16 +45,17 @@ une fixture pytest (`tests/conftest.py`) qui fournit une base SQLite temporaire
 isolée par test.
 
 **Acceptance criteria:**
-- [ ] Le schéma crée les 3 tables sans erreur sur une base vide
-- [ ] Les modèles Pydantic couvrent tous les champs listés dans la spec
+- [x] Le schéma crée les 3 tables sans erreur sur une base vide
+- [x] Les modèles Pydantic couvrent tous les champs listés dans la spec
   (`specs/mock-ui.md`, section Code Style)
-- [ ] La fixture de test ne touche jamais le fichier SQLite de dev (`data/app.db`)
+- [x] La fixture de test ne touche jamais le fichier SQLite de dev (`data/app.db`)
+  — `db_conn` utilise `tmp_path`, vérifié par un test dédié
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_db.py` (ou équivalent) vérifie la
-  création du schéma
-- [ ] Manuel: inspection de `data/app.db` après lancement de l'app (tables
-  présentes, ex. via `sqlite3 data/app.db .tables`)
+- [x] Tests: `uv run pytest -v tests/test_db.py` vérifie la création du schéma
+  (+ idempotence + isolation de la fixture)
+- [x] Manuel: inspection de `data/app.db` après lancement de l'app — tables
+  `fields`, `extraction_runs`, `extraction_results` présentes
 
 **Dependencies:** Task 1
 

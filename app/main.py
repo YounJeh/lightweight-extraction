@@ -1,6 +1,12 @@
 from fasthtml.common import Titled, fast_app, serve
 
+from app.db import DEFAULT_DB_PATH, get_connection, init_db
+
 app, rt = fast_app()
+
+_startup_conn = get_connection(DEFAULT_DB_PATH)
+init_db(_startup_conn)
+_startup_conn.close()
 
 
 @rt("/")
