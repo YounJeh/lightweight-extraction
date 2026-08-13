@@ -78,16 +78,18 @@ repository (Task 6).
 
 **Description:** Implémenter `PyMuPDF4LlmTextExtractor(PdfTextExtractor)`
 dans `app/tools/pdf_pymupdf4llm.py` : extrait le texte réel d'un PDF avec
-PyMuPDF4LLM, en insérant un séparateur sentinelle (`\f`) entre le texte de
-chaque page dans la chaîne retournée (voir Architecture Decisions du plan) —
+`pymupdf4llm.to_markdown(doc, page_separators=True)` (moteur layout désactivé
+via `pymupdf4llm.use_layout(False)`, voir Architecture Decisions du plan) —
 `extract_text` reste `(pdf_bytes: bytes) -> str`, aucune modification du
-`Protocol`. Vérifier l'API exacte de PyMuPDF4LLM pour l'accès par page (skill
-`source-driven-development`) plutôt que deviner.
+`Protocol`. Les séparateurs de page (`--- end of page=N ---`) sont natifs à
+la lib, vérifiés par un appel réel plutôt que devinés.
 
 **Acceptance criteria:**
 - [ ] `extract_text` sur un PDF réel multi-page retourne le texte réel de
-      chaque page, séparé par le marqueur `\f`
-- [ ] Sur un PDF d'une seule page, aucun marqueur superflu
+      chaque page, chacune terminée par un marqueur `--- end of page=N ---`
+      (N 0-based)
+- [ ] Sur un PDF d'une seule page, le marqueur de fin de page est bien
+      présent (comportement natif de la lib, pas de cas particulier à gérer)
 - [ ] Ne dépend d'aucune clé API (parsing PDF pur, pas d'appel réseau)
 
 **Verification:**

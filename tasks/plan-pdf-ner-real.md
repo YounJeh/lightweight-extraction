@@ -16,14 +16,23 @@ outil-par-outil, chacune testable et laissant `uv run pytest` vert.
 
 ## Architecture Decisions
 
-- **Marqueur de page dans le texte, pas de changement de `Protocol`.**
-  `PyMuPDF4LlmTextExtractor.extract_text` reste `(pdf_bytes) -> str` : les
-  sauts de page sont encodés comme un séparateur sentinelle (`\f`,
-  form-feed — absent d'un texte PDF normal) inséré entre le texte de chaque
-  page. `LangExtractNerExtractor` retrouve le numéro de page d'une extraction
-  en comptant les sentinelles avant l'offset renvoyé par LangExtract, puis les
-  retire avant de construire la citation `text_position`. Ça respecte la
-  contrainte "signature Protocol inchangée" de la spec sans magie cachée.
+- **Marqueur de page natif à PyMuPDF4LLM, pas de sentinelle inventée.**
+  `PyMuPDF4LlmTextExtractor.extract_text` reste `(pdf_bytes) -> str` :
+  PyMuPDF4LLM sait déjà encoder les sauts de page via son option native
+  `page_separators=True`, qui insère `\n\n--- end of page=N ---\n\n` (N
+  0-based) après le texte de chaque page — vérifié en Task 3 sur un PDF
+  généré en mémoire plutôt que deviné. Pas besoin de sentinelle `\f`
+  maison. `LangExtractNerExtractor` retrouvera le numéro de page d'une
+  extraction en repérant le dernier séparateur avant l'offset renvoyé par
+  LangExtract, puis les retirera avant de construire `text_position`. Ça
+  respecte la contrainte "signature Protocol inchangée" de la spec sans
+  magie cachée.
+- **Moteur de layout GNN désactivé (`pymupdf4llm.use_layout(False)`).**
+  PyMuPDF4LLM active par défaut un moteur de mise en page basé modèle (OCR,
+  détection de structure) — coûteux et non déterministe, inutile pour de
+  simples PDF texte. On force le chemin "rag" classique, plus léger et
+  reproductible, cohérent avec "le pipeline doit être le plus simple
+  possible" (CLAUDE.md).
 - **Le grounding transite par `ExtractionResult`, pas par un canal séparé.**
   `LangExtractNerExtractor.extract` pose `page_number`/`text_position`
   directement sur chaque `ExtractionResult` retourné (champs optionnels,
