@@ -106,17 +106,18 @@ vérifiés indépendamment).
 
 ### Phase 2: Outils réels
 
-- [ ] Task 3: `PyMuPDF4LlmTextExtractor` (texte réel + marqueurs de page) +
+- [x] Task 3: `PyMuPDF4LlmTextExtractor` (texte réel + marqueurs de page) +
       tests unitaires offline
-- [ ] Task 4: Helper de génération de dataset de test (PDF + valeurs
+- [x] Task 4: Helper de génération de dataset de test (PDF + valeurs
       attendues, construits en mémoire via `pymupdf`)
-- [ ] Task 5: `LangExtractNerExtractor` (vrai modèle Gemini + grounding) +
+- [x] Task 5: `LangExtractNerExtractor` (vrai modèle Gemini + grounding) +
       test opt-in `@pytest.mark.live`
 
 ### Checkpoint: Outils réels
-- [ ] `uv run pytest -m "not live"` passe sans réseau ni clé API
-- [ ] `uv run pytest -m live` passe manuellement avec une vraie clé API dans
-      `.env` (vérification par l'utilisateur — pas attendu en CI)
+- [x] `uv run pytest -m "not live"` passe sans réseau ni clé API (46 passed,
+      1 deselected)
+- [x] `uv run pytest -m live` passe avec la vraie clé API de l'utilisateur
+      (1 passed — vérifié pendant l'implémentation, pas seulement prévu)
 - [ ] Revue avec l'utilisateur avant de continuer
 
 ### Phase 3: Persistance + branchement

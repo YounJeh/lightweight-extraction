@@ -1,6 +1,9 @@
 import pytest
 
+from app.config import load_env
 from app.db import get_connection, init_db
+
+load_env()
 
 
 @pytest.fixture

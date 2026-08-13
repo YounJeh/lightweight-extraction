@@ -152,18 +152,18 @@ mappe les offsets/citations renvoyés par LangExtract vers `page_number`
 `GOOGLE_GENERATIVE_AI_API_KEY` absent de l'environnement.
 
 **Acceptance criteria:**
-- [ ] Sur le dataset de Task 4, extrait les valeurs attendues pour les champs
+- [x] Sur le dataset de Task 4, extrait les valeurs attendues pour les champs
       de test via un vrai appel Gemini
-- [ ] Chaque `ExtractionResult` retourné porte `page_number` et
+- [x] Chaque `ExtractionResult` retourné porte `page_number` et
       `text_position` cohérents avec le PDF source (marqueurs de Task 3
       correctement décodés)
-- [ ] `source="langextract"` sur les résultats réels (vs `"mock"`)
-- [ ] Le test live est skip (pas fail) quand la clé API est absente
+- [x] `source="langextract"` sur les résultats réels (vs `"mock"`)
+- [x] Le test live est skip (pas fail) quand la clé API est absente
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v -m "not live"` (le reste de la suite, sans
-      réseau) ; `uv run pytest -v -m live` manuellement avec une vraie clé
-      dans `.env` — vérification par l'utilisateur, pas attendue en CI
+- [x] Tests: `uv run pytest -v -m "not live"` (46 passed, 1 deselected) ;
+      `uv run pytest -v -m live` exécuté avec la vraie clé de l'utilisateur
+      (1 passed, voir note ci-dessous)
 
 **Dependencies:** Task 2 (champs grounding sur `ExtractionResult`), Task 3
 (convention des marqueurs de page), Task 4 (dataset de test)
@@ -171,8 +171,29 @@ mappe les offsets/citations renvoyés par LangExtract vers `page_number`
 **Files likely touched:**
 - `app/tools/ner_langextract.py`
 - `tests/test_ner_langextract_live.py`
+- `app/config.py` *(ajouté — voir note ci-dessous)*
+- `tests/conftest.py` *(idem)*
 
-**Estimated scope:** M (2 fichiers, logique de mapping non triviale)
+**Note découverte à l'implémentation :** rien ne chargeait `.env` dans
+`os.environ` (pas de `python-dotenv`, pas de parsing maison) — sans ça,
+`os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")` renvoie toujours `None`, y
+compris pour le skip du test live. Ajouté `app/config.py::load_env()` (parseur
+`.env` minimal, sans nouvelle dépendance) appelé depuis `tests/conftest.py`.
+Task 7 devra l'appeler aussi depuis `app/main.py` pour que l'app elle-même
+lise `.env` au démarrage. `LLM_MODEL` dans `.env`/`.env.example` a aussi été
+corrigé : la valeur `google/gemini-3.6-flash` saisie manuellement ne
+correspond pas au format attendu par LangExtract (pas de préfixe fournisseur)
+ni à un modèle connu ; remise à vide pour utiliser le défaut LangExtract
+vérifié (`gemini-3.5-flash`, confirmé par une lecture directe de la lib
+installée puis par un appel réel réussi).
+
+**Vérifié en live** (avec la vraie clé de l'utilisateur, hors CI) :
+`uv run pytest -v -m live` → 1 passed — extraction réelle des 3 valeurs
+connues du dataset Task 4, avec `page_number`/`text_position` cohérents.
+
+**Estimated scope:** M (2 fichiers, logique de mapping non triviale) — révisé
+à L une fois le chargement `.env` inclus, toujours dans un seul incrément
+cohérent (le test live ne peut pas être vérifié sans lui).
 
 ---
 
