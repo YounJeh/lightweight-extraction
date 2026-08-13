@@ -7,7 +7,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "langextract>=1.6.0",
     "pydantic>=2.13.4",
+    "pymupdf4llm>=1.28.2",
     "python-fasthtml>=0.14.11",
 ]
 
@@ -22,3 +24,6 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "live: appelle un vrai LLM (Gemini) via LangExtract, nécessite GOOGLE_GENERATIVE_AI_API_KEY dans l'environnement",
+]
