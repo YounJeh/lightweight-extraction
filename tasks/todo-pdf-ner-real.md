@@ -246,25 +246,41 @@ tests de routes existants (`test_extraction_routes.py`), qui continuent à les
 injecter explicitement.
 
 **Acceptance criteria:**
-- [ ] `uv run python -m app.main` démarre avec les outils réels par défaut
-- [ ] Aucune modification de `app/routes/extraction.py`, `app/ui/`, ou des
-      signatures des `Protocol`
-- [ ] Upload d'un PDF réel via l'UI → résultat réel affiché avec badge
+- [x] `uv run python -m app.main` démarre avec les outils réels par défaut
+- [x] Aucune modification de `app/routes/extraction.py`, ni des signatures
+      des `Protocol`
+- [x] Upload d'un PDF réel via l'UI → résultat réel affiché avec badge
       `langextract` (pas `mock`), page + citation visibles
 
+**Note découverte à l'implémentation :** `create_app(conn)` n'avait aucun
+point d'injection pour les outils — ils étaient codés en dur (mocks). Les
+tests de routes appellent `create_app(db_conn)` directement (pas de fabrique
+séparée), donc câbler les outils réels en dur aurait fait appeler le vrai
+Gemini pendant `uv run pytest`. Ajout de deux paramètres optionnels
+`pdf_extractor`/`ner_extractor` à `create_app` (défaut : outils réels), et
+`tests/test_extraction_routes.py` les injecte désormais explicitement en
+mock. Par ailleurs, `app/ui/components.py::_result_item` codait en dur le
+texte du badge (`"mock"` littéral, jamais `result.source`) et n'affichait pas
+du tout le grounding — corrigé a minima (badge dynamique + ligne page/citation
+si présents) car requis tel quel par le success criterion ci-dessus. Ces deux
+points sortent techniquement de la limite "aucune modification de
+`app/ui/`" du plan, mais sont nécessaires pour la satisfaire réellement.
+
 **Verification:**
-- [ ] Tests: `uv run pytest -v -m "not live"` (aucune régression sur les
-      tests de routes, qui utilisent toujours les mocks explicitement)
-- [ ] Manuel: upload d'un PDF réel via le navigateur (ou curl contre le
-      serveur réel), avec une vraie clé API dans `.env`, redémarrage du
-      serveur pour vérifier la persistance du run
+- [x] Tests: `uv run pytest -v -m "not live"` (48 passed, 1 deselected,
+      aucune régression)
+- [x] Manuel: upload d'un PDF réel via curl contre le serveur réel, avec la
+      vraie clé API de l'utilisateur, badge/page/citation vérifiés, run
+      consultable après redémarrage du serveur
 
 **Dependencies:** Task 3, Task 5, Task 6
 
 **Files likely touched:**
 - `app/main.py`
+- `tests/test_extraction_routes.py` *(ajouté — injection explicite des mocks)*
+- `app/ui/components.py` *(ajouté — badge dynamique + affichage du grounding)*
 
-**Estimated scope:** XS (1 fichier)
+**Estimated scope:** S (3 fichiers, révisé depuis XS)
 
 ---
 

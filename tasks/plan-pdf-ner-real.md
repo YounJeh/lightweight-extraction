@@ -122,15 +122,16 @@ vérifiés indépendamment).
 
 ### Phase 3: Persistance + branchement
 
-- [ ] Task 6: `ExtractionRunRepository` — persister/relire le grounding via
+- [x] Task 6: `ExtractionRunRepository` — persister/relire le grounding via
       `extraction_groundings` (FK)
-- [ ] Task 7: `app/main.py` — injection réelle par défaut (mocks conservés,
+- [x] Task 7: `app/main.py` — injection réelle par défaut (mocks conservés,
       disponibles pour les tests existants)
 
 ### Checkpoint: Extraction réelle bout-en-bout
-- [ ] Upload d'un PDF réel dans l'UI → résultat réel affiché avec page +
-      citation, persistant après redémarrage du serveur
-- [ ] `uv run pytest -m "not live"` passe intégralement
+- [x] Upload d'un PDF réel dans l'UI → résultat réel affiché avec page +
+      citation, persistant après redémarrage du serveur (vérifié via curl
+      contre le serveur réel, avec la vraie clé API de l'utilisateur)
+- [x] `uv run pytest -m "not live"` passe intégralement (48 passed, 1 deselected)
 - [ ] Revue avec l'utilisateur avant de continuer
 
 ### Phase 4: Polish
