@@ -103,3 +103,19 @@ def test_uploaded_pdf_bytes_are_never_persisted(client, field_repo, db_conn):
     for table in tables:
         columns = [r["name"] for r in db_conn.execute(f"PRAGMA table_info({table})")]
         assert "pdf" not in columns and "content" not in columns and "bytes" not in columns
+
+
+def test_post_extraction_rejects_non_pdf_file_without_crashing(client, run_repo):
+    files = {"pdf": ("doc.txt", b"not a pdf", "text/plain")}
+
+    response = client.post("/extraction", data={}, files=files)
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert run_repo.list_runs() == []
+
+
+def test_extraction_page_links_to_fields_page(client):
+    response = client.get("/extraction")
+
+    assert 'href="/fields"' in response.text

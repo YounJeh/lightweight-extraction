@@ -14,6 +14,14 @@ def register_extraction_routes(
     pdf_extractor: PdfTextExtractor,
     ner_extractor: NerExtractor,
 ):
+    def _extraction_page_with_error(message: str):
+        return page(
+            "Extraction",
+            P(f"Erreur : {message}"),
+            extraction_form(field_repo.list_all()),
+            extraction_runs_list(run_repo.list_runs()),
+        )
+
     # Route handlers are nested closures, so `.get`/`.post` are used
     # explicitly (see app/main.py for why bare `@rt(path)` name inference
     # doesn't apply here).
@@ -25,6 +33,9 @@ def register_extraction_routes(
 
     @app.post("/extraction")
     async def post(pdf: UploadFile, field_ids: list[int] = []):
+        if not pdf.filename or not pdf.filename.lower().endswith(".pdf"):
+            return _extraction_page_with_error("seuls les fichiers PDF sont acceptés.")
+
         pdf_bytes = await pdf.read()
         selected_fields = [f for f in field_repo.list_all() if f.id in field_ids]
 

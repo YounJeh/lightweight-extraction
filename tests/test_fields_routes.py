@@ -66,3 +66,33 @@ def test_post_fields_delete_removes_field(client, repo):
     client.post(f"/fields/{field.id}/delete")
 
     assert repo.get(field.id) is None
+
+
+def test_post_fields_with_blank_title_shows_error_without_crashing(client, repo):
+    response = client.post(
+        "/fields", data={"title": "   ", "definition": "d", "examples": ""}
+    )
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert repo.list_all() == []
+
+
+def test_post_fields_update_with_blank_title_shows_error_without_crashing(
+    client, repo
+):
+    field = repo.create(FieldCreate(title="A", definition="a", examples=[]))
+
+    response = client.post(
+        f"/fields/{field.id}/update", data={"title": " ", "definition": "d", "examples": ""}
+    )
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert repo.get(field.id).title == "A"  # unchanged
+
+
+def test_fields_page_links_to_extraction_page(client):
+    response = client.get("/fields")
+
+    assert 'href="/extraction"' in response.text

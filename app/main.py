@@ -1,6 +1,6 @@
 import sqlite3
 
-from fasthtml.common import Titled, fast_app, serve
+from fasthtml.common import RedirectResponse, fast_app, serve
 
 from app.db import DEFAULT_DB_PATH, get_connection, init_db
 from app.extraction_repository import ExtractionRunRepository
@@ -20,7 +20,7 @@ def create_app(conn: sqlite3.Connection):
     # `.get`/`.post` are used explicitly to pin the HTTP method instead.
     @app.get("/")
     def get():
-        return Titled("Lightweight Extraction")
+        return RedirectResponse("/fields", status_code=303)
 
     register_fields_routes(app, FieldRepository(conn))
     register_extraction_routes(

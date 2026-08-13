@@ -246,13 +246,16 @@ création ; aucun run d'extraction → message adapté) et les erreurs de
 validation (titre vide, fichier non-PDF) avec un retour visible à l'utilisateur.
 
 **Acceptance criteria:**
-- [ ] Navigation entre les deux pages fonctionne depuis n'importe quelle page
-- [ ] Un état sans champ n'empêche pas d'accéder à la page Extraction (juste aucune case à cocher, avec message clair)
-- [ ] Une erreur de validation s'affiche dans l'UI sans crash serveur (500)
+- [x] Navigation entre les deux pages fonctionne depuis n'importe quelle page
+  (`/` redirige vers `/fields` ; `/fields` et `/extraction` se linkent l'une l'autre)
+- [x] Un état sans champ n'empêche pas d'accéder à la page Extraction (juste aucune case à cocher, avec message clair)
+  — déjà couvert par Task 7
+- [x] Une erreur de validation s'affiche dans l'UI sans crash serveur (500)
+  — titre vide (create/update) et fichier non-PDF gérés, tous deux 200 avec message "Erreur"
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v` (cas d'erreur ajoutés aux suites de routes existantes)
-- [ ] Manuel: navigation croisée + tentative de soumission invalide sur les deux pages
+- [x] Tests: `uv run pytest -v` (38/38 passent, 5 nouveaux cas d'erreur/navigation)
+- [x] Manuel: navigation croisée + soumissions invalides vérifiées via curl contre le serveur réel
 
 **Dependencies:** Task 4, Task 7
 
