@@ -134,11 +134,18 @@ def extraction_form(fields: list[Field]):
 
 
 def _result_item(result: ExtractionResult):
-    return Div(
+    children = [
         Div(result.field_title, cls="result-label"),
-        Div(result.value, Span("mock", cls="badge"), cls="result-value"),
-        cls="result-row",
-    )
+        Div(result.value, Span(result.source, cls="badge"), cls="result-value"),
+    ]
+    if result.page_number is not None:
+        children.append(
+            Div(
+                f"Page {result.page_number} — {result.text_position}",
+                cls="result-grounding",
+            )
+        )
+    return Div(*children, cls="result-row")
 
 
 def extraction_result(run: ExtractionRun):

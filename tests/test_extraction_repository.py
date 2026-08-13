@@ -46,3 +46,34 @@ def test_list_runs_returns_all_runs_in_order(repo):
 def test_create_run_with_no_results(repo):
     run = repo.create_run("empty.pdf", [])
     assert run.results == []
+
+
+def test_grounding_round_trips_through_get_run(repo):
+    result = ExtractionResult(
+        field_title="Titre",
+        value="Contrat de bail",
+        source="langextract",
+        page_number=2,
+        text_position="...le Contrat de bail signé...",
+    )
+
+    created = repo.create_run("doc.pdf", [result])
+    fetched = repo.get_run(created.id)
+
+    assert fetched.results == [result]
+
+
+def test_mixed_grounded_and_ungrounded_results_round_trip(repo):
+    grounded = ExtractionResult(
+        field_title="Titre",
+        value="Contrat",
+        source="langextract",
+        page_number=1,
+        text_position="...Contrat...",
+    )
+    ungrounded = ExtractionResult(field_title="Nom", value="Jean", source="mock")
+
+    created = repo.create_run("doc.pdf", [grounded, ungrounded])
+    fetched = repo.get_run(created.id)
+
+    assert fetched.results == [grounded, ungrounded]

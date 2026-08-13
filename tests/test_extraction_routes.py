@@ -5,11 +5,15 @@ from app.extraction_repository import ExtractionRunRepository
 from app.main import create_app
 from app.models import FieldCreate
 from app.repository import FieldRepository
+from app.tools.mock_ner import MockNerExtractor
+from app.tools.mock_pdf import MockPdfTextExtractor
 
 
 @pytest.fixture
 def client(db_conn):
-    return TestClient(create_app(db_conn))
+    return TestClient(
+        create_app(db_conn, MockPdfTextExtractor(), MockNerExtractor())
+    )
 
 
 @pytest.fixture
