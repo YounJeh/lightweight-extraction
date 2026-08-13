@@ -1,6 +1,3 @@
-specs/
-tasks/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -17,6 +14,7 @@ env/
 .env
 .env.*
 !.env.example
+.sesskey
 
 # Testing / linting / typing caches
 .pytest_cache/
