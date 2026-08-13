@@ -1,6 +1,6 @@
 import sqlite3
 
-from app.models import ExtractionResult, ExtractionRun
+from app.models import ExtractionGrounding, ExtractionResult, ExtractionRun
 
 
 class ExtractionRunRepository:
@@ -15,11 +15,23 @@ class ExtractionRunRepository:
             (document_name,),
         )
         run_id = cursor.lastrowid
-        self._conn.executemany(
-            "INSERT INTO extraction_results (run_id, field_title, value, source) "
-            "VALUES (?, ?, ?, ?)",
-            [(run_id, r.field_title, r.value, r.source) for r in results],
-        )
+        for result in results:
+            result_cursor = self._conn.execute(
+                "INSERT INTO extraction_results (run_id, field_title, value, source) "
+                "VALUES (?, ?, ?, ?)",
+                (run_id, result.field_title, result.value, result.source),
+            )
+            if result.page_number is not None and result.text_position is not None:
+                grounding = ExtractionGrounding(
+                    result_id=result_cursor.lastrowid,
+                    page_number=result.page_number,
+                    text_position=result.text_position,
+                )
+                self._conn.execute(
+                    "INSERT INTO extraction_groundings "
+                    "(result_id, page_number, text_position) VALUES (?, ?, ?)",
+                    (grounding.result_id, grounding.page_number, grounding.text_position),
+                )
         self._conn.commit()
         return self.get_run(run_id)
 
@@ -36,13 +48,20 @@ class ExtractionRunRepository:
         if not row:
             return None
         result_rows = self._conn.execute(
-            "SELECT field_title, value, source FROM extraction_results "
-            "WHERE run_id = ? ORDER BY id",
+            "SELECT r.field_title, r.value, r.source, "
+            "g.page_number AS page_number, g.text_position AS text_position "
+            "FROM extraction_results r "
+            "LEFT JOIN extraction_groundings g ON g.result_id = r.id "
+            "WHERE r.run_id = ? ORDER BY r.id",
             (run_id,),
         ).fetchall()
         results = [
             ExtractionResult(
-                field_title=r["field_title"], value=r["value"], source=r["source"]
+                field_title=r["field_title"],
+                value=r["value"],
+                source=r["source"],
+                page_number=r["page_number"],
+                text_position=r["text_position"],
             )
             for r in result_rows
         ]
