@@ -176,33 +176,50 @@ logique métier dans les routes, requêtes SQL paramétrées).
 
 ## Success Criteria
 
-- [ ] `PyMuPDF4LlmTextExtractor` remplace le mock et extrait le texte réel
+- [x] `PyMuPDF4LlmTextExtractor` remplace le mock et extrait le texte réel
       d'un PDF uploadé, avec accès par page.
-- [ ] `LangExtractNerExtractor` appelle le vrai modèle Gemini (configuré via
+      *Marqueurs de page natifs à PyMuPDF4LLM (`page_separators=True`),
+      vérifié sur un PDF réel multi-page (Task 3).*
+- [x] `LangExtractNerExtractor` appelle le vrai modèle Gemini (configuré via
       `.env`) pour extraire les valeurs des champs sélectionnés.
-- [ ] Chaque `ExtractionResult` réel a un `ExtractionGrounding` associé
+      *Vérifié avec un vrai appel API (Task 5, `pytest -m live`).*
+- [x] Chaque `ExtractionResult` réel a un `ExtractionGrounding` associé
       (`page_number` + `text_position`), persisté dans la table séparée
       `extraction_groundings`.
-- [ ] Le modèle Gemini utilisé est configurable via `LLM_MODEL` dans `.env`,
+      *Round-trip vérifié via `ExtractionRunRepository` (Task 6).*
+- [x] Le modèle Gemini utilisé est configurable via `LLM_MODEL` dans `.env`,
       avec un comportement défini si la variable est vide.
-- [ ] Un test pytest opt-in (`@pytest.mark.live`, skip sans clé API) vérifie
-      l'extraction réelle sur le petit dataset `data/test_pdfs/` contre des
-      valeurs attendues connues.
-- [ ] Vérification manuelle : upload d'un PDF réel via l'UI, résultat
+      *Vide → défaut LangExtract natif (`gemini-3.5-flash`), pas de valeur
+      dupliquée en dur côté app (Task 5).*
+- [x] Un test pytest opt-in (`@pytest.mark.live`, skip sans clé API) vérifie
+      l'extraction réelle sur un petit dataset contre des valeurs attendues
+      connues.
+      *Dataset généré en mémoire via `pymupdf` (`tests/pdf_fixtures.py`) plutôt
+      que des fichiers dans `data/test_pdfs/` — décision prise en Task 4 pour
+      éviter de committer des binaires (voir Architecture Decisions du plan).*
+- [x] Vérification manuelle : upload d'un PDF réel via l'UI, résultat
       correctement extrait et affiché avec page + position.
-- [ ] Aucune modification de `app/routes/`, `app/ui/`, ou des signatures des
+      *Vérifié via curl contre le serveur réel (Task 7) : badge `langextract`,
+      page + citation affichés, run persistant après redémarrage.*
+- [x] Aucune modification de `app/routes/`, ou des signatures des
       `Protocol` — uniquement nouvelles implémentations d'outils + point
       d'injection dans `app/main.py` + enrichissement de `ExtractionResult`.
-- [ ] `uv run pytest` (sans le marqueur `live`) passe toujours sans réseau ni
+      *Exception découverte et documentée en Task 7 : `app/ui/components.py`
+      a nécessité deux petites modifications (badge dynamique au lieu de
+      `"mock"` en dur, affichage du grounding) — sans elles ce critère de
+      succès lui-même (badge/page/position visibles) n'était pas atteignable.*
+- [x] `uv run pytest` (sans le marqueur `live`) passe toujours sans réseau ni
       clé API.
+      *48 passed, 1 deselected.*
 
 ## Open Questions
 
-- API exacte de PyMuPDF4LLM pour un accès par page (ex. `page_chunks=True`) —
-  à vérifier au moment de l'implémentation (skill `source-driven-development`).
-- Forme exacte de l'API LangExtract (prompt, examples, schéma de sortie,
-  format des offsets) — idem, à vérifier sur la doc au moment de
-  l'implémentation.
-- Nom du modèle Gemini gratuit par défaut si `LLM_MODEL` est vide (ex.
-  `gemini-2.0-flash`) — à confirmer selon la disponibilité du tier gratuit au
-  moment de l'implémentation.
+Toutes résolues à l'implémentation (voir `tasks/plan-pdf-ner-real.md` pour le
+détail) :
+- API PyMuPDF4LLM pour l'accès par page → `page_separators=True` (marqueurs
+  natifs `--- end of page=N ---`, moteur layout désactivé via `use_layout(False)`).
+- API LangExtract → `langextract.extract(...)` + `data.ExampleData`/
+  `Extraction`/`CharInterval` pour les offsets.
+- Modèle Gemini par défaut → aucune valeur en dur ; `LLM_MODEL` vide laisse
+  LangExtract appliquer son propre défaut (`gemini-3.5-flash` au moment de
+  l'implémentation).

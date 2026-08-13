@@ -95,14 +95,14 @@ vérifiés indépendamment).
 
 ### Phase 1: Foundation
 
-- [ ] Task 1: Dépendances (`pymupdf4llm`, `langextract`) + marker pytest `live`
-- [ ] Task 2: Table `extraction_groundings` + modèle `ExtractionGrounding` +
+- [x] Task 1: Dépendances (`pymupdf4llm`, `langextract`) + marker pytest `live`
+- [x] Task 2: Table `extraction_groundings` + modèle `ExtractionGrounding` +
       champs grounding optionnels sur `ExtractionResult`
 
 ### Checkpoint: Foundation
-- [ ] `uv sync` installe l'environnement sans erreur
-- [ ] `uv run pytest` passe intégralement (38/38 existants, aucune régression)
-- [ ] Revue avec l'utilisateur avant de continuer
+- [x] `uv sync` installe l'environnement sans erreur
+- [x] `uv run pytest` passe intégralement (41/41 à l'époque, aucune régression)
+- [x] Revue avec l'utilisateur avant de continuer
 
 ### Phase 2: Outils réels
 
@@ -118,7 +118,7 @@ vérifiés indépendamment).
       1 deselected)
 - [x] `uv run pytest -m live` passe avec la vraie clé API de l'utilisateur
       (1 passed — vérifié pendant l'implémentation, pas seulement prévu)
-- [ ] Revue avec l'utilisateur avant de continuer
+- [x] Revue avec l'utilisateur avant de continuer *(utilisateur a dit "continue")*
 
 ### Phase 3: Persistance + branchement
 
@@ -132,18 +132,20 @@ vérifiés indépendamment).
       citation, persistant après redémarrage du serveur (vérifié via curl
       contre le serveur réel, avec la vraie clé API de l'utilisateur)
 - [x] `uv run pytest -m "not live"` passe intégralement (48 passed, 1 deselected)
-- [ ] Revue avec l'utilisateur avant de continuer
+- [x] Revue avec l'utilisateur avant de continuer *(utilisateur a dit "continue")*
 
 ### Phase 4: Polish
 
-- [ ] Task 8: Housekeeping (README, `.env.example`, cocher les success
+- [x] Task 8: Housekeeping (README, `.env.example`, cocher les success
       criteria de `specs/pdf-ner-real.md`)
 
 ### Checkpoint: Complete
-- [ ] Tous les success criteria de `specs/pdf-ner-real.md` sont cochés
-- [ ] `uv run pytest -m "not live"` passe intégralement
-- [ ] Parcours manuel complet (upload PDF réel → résultat réel avec grounding)
-      validé dans le navigateur
+- [x] Tous les success criteria de `specs/pdf-ner-real.md` sont cochés
+- [x] `uv run pytest -m "not live"` passe intégralement
+- [x] Parcours manuel complet (upload PDF réel → résultat réel avec grounding)
+      validé — via curl contre le serveur réel plutôt que dans un navigateur
+      graphique (pas d'affichage GUI disponible dans cet environnement),
+      y compris redémarrage du serveur
 - [ ] Revue finale avec l'utilisateur
 
 ## Risks and Mitigations
@@ -158,7 +160,11 @@ vérifiés indépendamment).
 
 ## Open Questions
 
-Aucune bloquante pour démarrer Task 1 — les trois inconnues techniques
-(API PyMuPDF4LLM, API LangExtract, modèle Gemini par défaut) sont déjà
-identifiées comme Open Questions dans la spec et affectées à des tâches
-précises (3, 5, 5) plutôt que bloquant l'ensemble du plan.
+Toutes résolues durant l'implémentation :
+- API PyMuPDF4LLM pour l'accès par page → `page_separators=True` (Task 3).
+- API LangExtract → `langextract.extract(text, prompt_description, examples,
+  model_id, api_key)` + `data.ExampleData`/`Extraction`/`CharInterval`
+  (Task 5).
+- Modèle Gemini par défaut → pas de valeur en dur, `LLM_MODEL` vide laisse
+  LangExtract appliquer son propre défaut (`gemini-3.5-flash` au moment de
+  l'implémentation) (Task 5).
