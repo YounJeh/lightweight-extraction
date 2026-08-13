@@ -148,14 +148,14 @@ factice fixe, indépendant du contenu réel du PDF) et `MockNerExtractor`
 marquant ses résultats comme `source="mock"`.
 
 **Acceptance criteria:**
-- [ ] `MockPdfTextExtractor.extract_text` retourne toujours le même texte,
+- [x] `MockPdfTextExtractor.extract_text` retourne toujours le même texte,
   quel que soit le contenu du fichier passé
-- [ ] `MockNerExtractor.extract` retourne un `ExtractionResult` par champ
+- [x] `MockNerExtractor.extract` retourne un `ExtractionResult` par champ
   passé en entrée, avec `source="mock"`
-- [ ] Les deux mocks sont déterministes (mêmes entrées → mêmes sorties)
+- [x] Les deux mocks sont déterministes (mêmes entrées → mêmes sorties)
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_mock_tools.py`
+- [x] Tests: `uv run pytest -v tests/test_mock_tools.py` (5/5 passent)
 
 **Dependencies:** Task 2 (dépend des modèles `Field`/`ExtractionResult`, pas des repositories — parallélisable avec Task 3/4)
 
