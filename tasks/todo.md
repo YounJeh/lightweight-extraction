@@ -83,13 +83,13 @@ isolée par test.
 de `app/db.py`, avec requêtes SQL paramétrées uniquement.
 
 **Acceptance criteria:**
-- [ ] Chaque méthode CRUD fonctionne indépendamment et persiste réellement en DB
-- [ ] Une erreur de validation (titre vide) est rejetée avant écriture
-- [ ] Aucune concaténation de chaîne dans le SQL
+- [x] Chaque méthode CRUD fonctionne indépendamment et persiste réellement en DB
+- [x] Une erreur de validation (titre vide) est rejetée avant écriture (create et update)
+- [x] Aucune concaténation de chaîne dans le SQL (requêtes paramétrées `?`)
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_field_repository.py`
-- [ ] Manuel: script/REPL rapide créant puis relisant un champ
+- [x] Tests: `uv run pytest -v tests/test_field_repository.py` (7/7 passent)
+- [x] Manuel: couvert par les tests `test_create_and_get` / `test_delete_removes_field`
 
 **Dependencies:** Task 2
 
