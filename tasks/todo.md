@@ -177,12 +177,13 @@ le nom du document (métadonnée uniquement) et la liste des `ExtractionResult`
 associés.
 
 **Acceptance criteria:**
-- [ ] Un run créé (nom de document + résultats) est relisible via `get_run`/`list_runs`
-- [ ] Aucune donnée binaire du PDF n'est écrite en DB — uniquement le nom du document
-- [ ] Requêtes SQL paramétrées uniquement
+- [x] Un run créé (nom de document + résultats) est relisible via `get_run`/`list_runs`
+- [x] Aucune donnée binaire du PDF n'est écrite en DB — uniquement le nom du document
+  (`create_run(document_name: str, ...)`, jamais de `bytes`)
+- [x] Requêtes SQL paramétrées uniquement
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_extraction_repository.py`
+- [x] Tests: `uv run pytest -v tests/test_extraction_repository.py` (5/5 passent)
 
 **Dependencies:** Task 2
 
