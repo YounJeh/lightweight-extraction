@@ -211,25 +211,30 @@ l'orchestration (validation → repository/tool → rendu).
 
 ## Success Criteria
 
-- [ ] Un champ (titre, définition, exemples) créé via l'UI est persisté en
+- [x] Un champ (titre, définition, exemples) créé via l'UI est persisté en
       SQLite et reste visible après redémarrage du serveur.
-- [ ] La page "Champs" liste tous les champs existants avec leurs attributs, et
+      *Vérifié manuellement (curl + redémarrage du serveur, Task 4).*
+- [x] La page "Champs" liste tous les champs existants avec leurs attributs, et
       permet update/delete depuis l'UI.
-- [ ] La page "Extraction" permet d'uploader un PDF, de cocher un sous-ensemble
+- [x] La page "Extraction" permet d'uploader un PDF, de cocher un sous-ensemble
       des champs disponibles, et de lancer une extraction.
-- [ ] Le résultat affiché contient une valeur simulée par champ coché, produite
+- [x] Le résultat affiché contient une valeur simulée par champ coché, produite
       par `MockNerExtractor`, clairement identifiée comme un résultat mock.
-- [ ] Le run d'extraction (nom du document + résultats par champ) est persisté
+- [x] Le run d'extraction (nom du document + résultats par champ) est persisté
       en SQLite et reste consultable après redémarrage du serveur — le fichier
       PDF source, lui, n'est jamais conservé durablement.
-- [ ] Aucun appel réseau, aucune lecture réelle du contenu du PDF, aucune
+      *Vérifié manuellement (upload → redémarrage → `/extraction/runs/1`
+      toujours consultable, Task 9).*
+- [x] Aucun appel réseau, aucune lecture réelle du contenu du PDF, aucune
       dépendance à PyMuPDF4LLM/LangExtract réels.
-- [ ] `uv run pytest` passe, avec au moins un test par route et par méthode du
-      repository.
-- [ ] Remplacer `MockPdfTextExtractor`/`MockNerExtractor` par une implémentation
+      *`pyproject.toml` ne liste ni PyMuPDF4LLM ni LangExtract.*
+- [x] `uv run pytest` passe, avec au moins un test par route et par méthode du
+      repository. *38/38 tests passent.*
+- [x] Remplacer `MockPdfTextExtractor`/`MockNerExtractor` par une implémentation
       réelle ne nécessite aucune modification des fichiers `routes/`, `ui/`, ou
       `models.py` — uniquement l'injection d'une autre implémentation des
-      `Protocol`.
+      `Protocol`. *Les deux outils sont injectés dans `create_app()` (app/main.py) ;
+      seul ce point d'injection changerait.*
 
 ## Open Questions
 

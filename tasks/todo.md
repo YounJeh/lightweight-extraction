@@ -276,13 +276,15 @@ runtime (`data/*.db`, `__pycache__`, `.venv`), et repasser explicitement chaque
 critère de succès de `specs/mock-ui.md` pour cocher ce qui est fait.
 
 **Acceptance criteria:**
-- [ ] `README.md` contient les commandes `uv sync` / `uv run python -m app.main` / `uv run pytest`
-- [ ] `.gitignore` vérifié complet
-- [ ] Tous les critères de succès de la spec sont cochés ou justifiés s'ils ne le sont pas
+- [x] `README.md` contient les commandes `uv sync` / `uv run python -m app.main` / `uv run pytest`
+- [x] `.gitignore` vérifié complet (`*.db`, `__pycache__/`, `.venv/`, `.sesskey` tous couverts)
+- [x] Tous les critères de succès de la spec sont cochés ou justifiés s'ils ne le sont pas
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v` (suite complète, aucune régression)
-- [ ] Manuel: relecture croisée `specs/mock-ui.md` § Success Criteria vs état réel de l'app
+- [x] Tests: `uv run pytest -v` (38/38, aucune régression)
+- [x] Manuel: relecture croisée `specs/mock-ui.md` § Success Criteria vs état réel de l'app
+  — tous vérifiés, y compris la persistance des runs après redémarrage (non testée
+  manuellement avant cette tâche)
 
 **Dependencies:** Task 8
 
@@ -296,7 +298,9 @@ critère de succès de `specs/mock-ui.md` pour cocher ce qui est fait.
 ---
 
 ## Checkpoint: Complete (après Task 9)
-- [ ] Tous les critères de succès de `specs/mock-ui.md` sont cochés
-- [ ] `uv run pytest` passe intégralement
-- [ ] Parcours manuel complet (champs → extraction) validé dans le navigateur
+- [x] Tous les critères de succès de `specs/mock-ui.md` sont cochés
+- [x] `uv run pytest` passe intégralement (38/38)
+- [x] Parcours manuel complet (champs → extraction) validé — via curl contre le
+  serveur réel plutôt que dans un navigateur graphique (pas d'affichage GUI
+  disponible dans cet environnement), y compris redémarrage du serveur
 - [ ] Revue finale avec l'utilisateur
