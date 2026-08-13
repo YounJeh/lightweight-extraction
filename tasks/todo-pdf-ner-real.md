@@ -117,7 +117,10 @@ PDF committé dans le dépôt : le générateur est la source de vérité.
 **Acceptance criteria:**
 - [ ] Le helper produit des `bytes` PDF valides (relisibles par
       `PyMuPDF4LlmTextExtractor`) et un mapping champ → valeur attendue
-- [ ] Déterministe (mêmes bytes à chaque appel)
+- [ ] Déterministe **au niveau du texte extrait** (le PDF brut généré par
+      `pymupdf` n'est pas byte-identique d'un appel à l'autre — métadonnées
+      d'horodatage internes — mais `PyMuPDF4LlmTextExtractor.extract_text`
+      dessus retourne toujours le même texte)
 - [ ] Aucune dépendance nouvelle (réutilise `pymupdf`, déjà tiré par
       `pymupdf4llm`)
 
