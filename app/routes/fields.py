@@ -1,8 +1,8 @@
-from fasthtml.common import P, RedirectResponse
+from fasthtml.common import RedirectResponse
 
 from app.models import FieldCreate, FieldUpdate
 from app.repository import FieldRepository
-from app.ui.components import field_create_form, fields_table
+from app.ui.components import error_banner, field_create_form, fields_table
 from app.ui.layout import page
 
 
@@ -14,7 +14,7 @@ def register_fields_routes(app, repo: FieldRepository):
     def _fields_page_with_error(message: str):
         return page(
             "Champs",
-            P(f"Erreur : {message}"),
+            error_banner(message),
             fields_table(repo.list_all()),
             field_create_form(),
         )

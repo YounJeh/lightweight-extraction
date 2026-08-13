@@ -3,7 +3,12 @@ from fasthtml.common import P, RedirectResponse, UploadFile
 from app.extraction_repository import ExtractionRunRepository
 from app.repository import FieldRepository
 from app.tools import NerExtractor, PdfTextExtractor
-from app.ui.components import extraction_form, extraction_result, extraction_runs_list
+from app.ui.components import (
+    error_banner,
+    extraction_form,
+    extraction_result,
+    extraction_runs_list,
+)
 from app.ui.layout import page
 
 
@@ -17,7 +22,7 @@ def register_extraction_routes(
     def _extraction_page_with_error(message: str):
         return page(
             "Extraction",
-            P(f"Erreur : {message}"),
+            error_banner(message),
             extraction_form(field_repo.list_all()),
             extraction_runs_list(run_repo.list_runs()),
         )

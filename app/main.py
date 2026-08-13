@@ -1,6 +1,6 @@
 import sqlite3
 
-from fasthtml.common import RedirectResponse, fast_app, serve
+from fasthtml.common import Link, Meta, RedirectResponse, fast_app, serve
 
 from app.db import DEFAULT_DB_PATH, get_connection, init_db
 from app.extraction_repository import ExtractionRunRepository
@@ -13,7 +13,13 @@ from app.tools.mock_pdf import MockPdfTextExtractor
 
 def create_app(conn: sqlite3.Connection):
     init_db(conn)
-    app, _ = fast_app()
+    app, _ = fast_app(
+        pico=False,
+        hdrs=(
+            Meta(name="viewport", content="width=device-width, initial-scale=1"),
+            Link(rel="stylesheet", href="/static/style.css"),
+        ),
+    )
 
     # Route handlers below are nested closures (not top-level `get`/`post`
     # functions), so FastHTML's name-based method inference doesn't apply —

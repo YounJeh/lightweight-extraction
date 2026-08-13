@@ -8,11 +8,7 @@ from fasthtml.common import (
     Li,
     P,
     Span,
-    Table,
-    Td,
     Textarea,
-    Th,
-    Tr,
     Ul,
 )
 
@@ -23,95 +19,152 @@ def _examples_to_text(examples: list[str]) -> str:
     return "\n".join(examples)
 
 
+def error_banner(message: str):
+    return Div(f"Erreur : {message}", cls="banner-error")
+
+
 def field_row(field: Field):
-    return Tr(
-        Td(
-            Form(
-                Input(name="title", value=field.title, required=True),
-                Textarea(field.definition, name="definition", required=True),
-                Textarea(
-                    _examples_to_text(field.examples),
-                    name="examples",
-                    placeholder="Un exemple par ligne",
-                ),
+    return Div(
+        Form(
+            Label("Titre", **{"for": f"title-{field.id}"}),
+            Input(name="title", value=field.title, required=True, id=f"title-{field.id}"),
+            Label("Définition", **{"for": f"def-{field.id}"}),
+            Textarea(field.definition, name="definition", required=True, id=f"def-{field.id}"),
+            Label("Exemples (un par ligne)", **{"for": f"ex-{field.id}"}),
+            Textarea(
+                _examples_to_text(field.examples),
+                name="examples",
+                placeholder="Un exemple par ligne",
+                id=f"ex-{field.id}",
+            ),
+            Div(
                 Button("Mettre à jour", type="submit"),
-                action=f"/fields/{field.id}/update",
-                method="post",
-            )
+                cls="card-footer",
+            ),
+            action=f"/fields/{field.id}/update",
+            method="post",
         ),
-        Td(
-            Form(
-                Button("Supprimer", type="submit"),
-                action=f"/fields/{field.id}/delete",
-                method="post",
-            )
+        Form(
+            Div(
+                Button("Supprimer", type="submit", cls="btn-danger"),
+                cls="card-footer",
+            ),
+            action=f"/fields/{field.id}/delete",
+            method="post",
         ),
+        cls="card",
     )
 
 
 def fields_table(fields: list[Field]):
     if not fields:
-        return Div("Aucun champ pour le moment — crée le premier ci-dessous.")
-    return Table(
-        Tr(Th("Titre / Définition / Exemples"), Th("Actions")),
-        *[field_row(field) for field in fields],
-    )
+        return Div(
+            "Aucun champ pour le moment — crée le premier ci-dessous.",
+            cls="empty-state",
+        )
+    return Div(*[field_row(field) for field in fields], cls="stack")
 
 
 def field_create_form():
-    return Form(
-        Input(name="title", placeholder="Titre", required=True),
-        Textarea(name="definition", placeholder="Définition", required=True),
-        Textarea(name="examples", placeholder="Exemples (un par ligne)"),
-        Button("Créer", type="submit"),
-        action="/fields",
-        method="post",
+    return Div(
+        Div("Nouveau champ", cls="card-title"),
+        Form(
+            Label("Titre", **{"for": "new-title"}),
+            Input(name="title", placeholder="Titre", required=True, id="new-title"),
+            Label("Définition", **{"for": "new-definition"}),
+            Textarea(
+                name="definition",
+                placeholder="Définition",
+                required=True,
+                id="new-definition",
+            ),
+            Label("Exemples (un par ligne)", **{"for": "new-examples"}),
+            Textarea(
+                name="examples",
+                placeholder="Exemples (un par ligne)",
+                id="new-examples",
+            ),
+            Div(Button("Créer", type="submit"), cls="card-footer"),
+            action="/fields",
+            method="post",
+        ),
+        cls="card",
     )
 
 
 def _field_checkbox(field: Field):
     input_id = f"field-{field.id}"
-    return Div(
+    return Label(
         Input(type="checkbox", name="field_ids", value=str(field.id), id=input_id),
-        Label(field.title, **{"for": input_id}),
+        field.title,
+        cls="chip",
+        **{"for": input_id},
     )
 
 
 def extraction_form(fields: list[Field]):
     if not fields:
         return Div(
-            "Aucun champ disponible — ",
-            A("crée d'abord un champ", href="/fields"),
-            ".",
+            Div(
+                "Aucun champ disponible — ",
+                A("crée d'abord un champ", href="/fields"),
+                ".",
+            ),
+            cls="empty-state",
         )
-    return Form(
-        Input(type="file", name="pdf", accept="application/pdf", required=True),
-        *[_field_checkbox(field) for field in fields],
-        Button("Lancer l'extraction", type="submit"),
-        action="/extraction",
-        method="post",
+    return Div(
+        Div("Nouvelle extraction", cls="card-title"),
+        Form(
+            Label("Document PDF", **{"for": "pdf-input"}),
+            Input(
+                type="file",
+                name="pdf",
+                accept="application/pdf",
+                required=True,
+                id="pdf-input",
+            ),
+            Label("Champs à extraire"),
+            Div(*[_field_checkbox(field) for field in fields], cls="chip-list"),
+            Div(Button("Lancer l'extraction", type="submit"), cls="card-footer"),
+            action="/extraction",
+            method="post",
+        ),
+        cls="card",
     )
 
 
 def _result_item(result: ExtractionResult):
-    return Li(f"{result.field_title} : {result.value} ", Span("(mock)"))
+    return Div(
+        Div(result.field_title, cls="result-label"),
+        Div(result.value, Span("mock", cls="badge"), cls="result-value"),
+        cls="result-row",
+    )
 
 
 def extraction_result(run: ExtractionRun):
     body = (
-        Ul(*[_result_item(result) for result in run.results])
+        Div(*[_result_item(result) for result in run.results])
         if run.results
         else P("Aucun résultat (aucun champ n'avait été sélectionné).")
     )
-    return Div(P(f"Document : {run.document_name}"), body)
+    return Div(
+        Div(f"Document : {run.document_name}", cls="card-title"),
+        body,
+        cls="card",
+    )
 
 
 def extraction_runs_list(runs: list[ExtractionRun]):
     if not runs:
-        return Div("Aucune extraction pour le moment.")
-    return Ul(
-        *[
-            Li(A(run.document_name, href=f"/extraction/runs/{run.id}"))
-            for run in runs
-        ]
+        return Div("Aucune extraction pour le moment.", cls="empty-state")
+    return Div(
+        Div("Historique", cls="card-title"),
+        Ul(
+            *[
+                Li(A(run.document_name, href=f"/extraction/runs/{run.id}"))
+                for run in runs
+            ],
+            cls="run-list",
+        ),
+        cls="card",
     )
