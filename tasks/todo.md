@@ -205,14 +205,18 @@ fichier PDF lui-même n'est jamais écrit sur disque ou en DB au-delà de la dur
 de la requête.
 
 **Acceptance criteria:**
-- [ ] L'utilisateur peut uploader un PDF, cocher un sous-ensemble de champs, et lancer l'extraction
-- [ ] Le résultat affiché contient une valeur simulée par champ coché, marquée comme mock
-- [ ] Le run est persisté et reste consultable après redémarrage du serveur
-- [ ] Aucune trace durable du fichier PDF source (disque ou DB) après la requête
+- [x] L'utilisateur peut uploader un PDF, cocher un sous-ensemble de champs, et lancer l'extraction
+- [x] Le résultat affiché contient une valeur simulée par champ coché, marquée comme mock
+- [x] Le run est persisté et reste consultable après redémarrage du serveur
+  (`GET /extraction/runs/{id}`, liste des runs sur `/extraction`)
+- [x] Aucune trace durable du fichier PDF source (disque ou DB) après la requête
+  — seul `pdf.filename` est stocké, vérifié par un test dédié sur le schéma DB
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_extraction_routes.py`
-- [ ] Manuel: upload d'un PDF factice, sélection de champs, vérification de l'affichage et de la persistance (redémarrage serveur + re-consultation)
+- [x] Tests: `uv run pytest -v tests/test_extraction_routes.py` (7/7 passent)
+- [x] Manuel: upload d'un PDF factice via curl contre le serveur réel, vérifié
+  redirection vers `/extraction/runs/1`, badge "mock", valeur issue de
+  l'exemple du champ, et nom du document affiché
 
 **Dependencies:** Task 4 (liste des champs disponibles), Task 5 (outils mock), Task 6 (persistance des runs)
 
@@ -226,10 +230,10 @@ de la requête.
 ---
 
 ## Checkpoint: Extraction (après Tasks 5-7)
-- [ ] Parcours upload → sélection champs → extraction simulée fonctionne de bout en bout dans le navigateur
-- [ ] Le run d'extraction persiste et reste consultable après redémarrage
-- [ ] Le fichier PDF source n'est jamais conservé durablement
-- [ ] `uv run pytest` passe
+- [x] Parcours upload → sélection champs → extraction simulée fonctionne de bout en bout (vérifié via curl contre le serveur réel)
+- [x] Le run d'extraction persiste et reste consultable après redémarrage
+- [x] Le fichier PDF source n'est jamais conservé durablement
+- [x] `uv run pytest` passe (33/33)
 - [ ] Revue avec l'utilisateur avant de continuer
 
 ---

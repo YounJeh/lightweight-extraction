@@ -1,0 +1,42 @@
+from fasthtml.common import P, RedirectResponse, UploadFile
+
+from app.extraction_repository import ExtractionRunRepository
+from app.repository import FieldRepository
+from app.tools import NerExtractor, PdfTextExtractor
+from app.ui.components import extraction_form, extraction_result, extraction_runs_list
+from app.ui.layout import page
+
+
+def register_extraction_routes(
+    app,
+    field_repo: FieldRepository,
+    run_repo: ExtractionRunRepository,
+    pdf_extractor: PdfTextExtractor,
+    ner_extractor: NerExtractor,
+):
+    # Route handlers are nested closures, so `.get`/`.post` are used
+    # explicitly (see app/main.py for why bare `@rt(path)` name inference
+    # doesn't apply here).
+    @app.get("/extraction")
+    def get():
+        fields = field_repo.list_all()
+        runs = run_repo.list_runs()
+        return page("Extraction", extraction_form(fields), extraction_runs_list(runs))
+
+    @app.post("/extraction")
+    async def post(pdf: UploadFile, field_ids: list[int] = []):
+        pdf_bytes = await pdf.read()
+        selected_fields = [f for f in field_repo.list_all() if f.id in field_ids]
+
+        text = pdf_extractor.extract_text(pdf_bytes)
+        results = ner_extractor.extract(text, selected_fields)
+
+        run = run_repo.create_run(pdf.filename, results)
+        return RedirectResponse(f"/extraction/runs/{run.id}", status_code=303)
+
+    @app.get("/extraction/runs/{id}")
+    def get_run(id: int):
+        run = run_repo.get_run(id)
+        if run is None:
+            return page("Extraction", P("Run introuvable."))
+        return page("Résultat d'extraction", extraction_result(run))

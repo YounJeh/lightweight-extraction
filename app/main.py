@@ -3,8 +3,12 @@ import sqlite3
 from fasthtml.common import Titled, fast_app, serve
 
 from app.db import DEFAULT_DB_PATH, get_connection, init_db
+from app.extraction_repository import ExtractionRunRepository
 from app.repository import FieldRepository
+from app.routes.extraction import register_extraction_routes
 from app.routes.fields import register_fields_routes
+from app.tools.mock_ner import MockNerExtractor
+from app.tools.mock_pdf import MockPdfTextExtractor
 
 
 def create_app(conn: sqlite3.Connection):
@@ -19,6 +23,13 @@ def create_app(conn: sqlite3.Connection):
         return Titled("Lightweight Extraction")
 
     register_fields_routes(app, FieldRepository(conn))
+    register_extraction_routes(
+        app,
+        FieldRepository(conn),
+        ExtractionRunRepository(conn),
+        MockPdfTextExtractor(),
+        MockNerExtractor(),
+    )
     return app
 
 
