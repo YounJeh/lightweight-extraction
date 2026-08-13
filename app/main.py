@@ -1,17 +1,28 @@
+import sqlite3
+
 from fasthtml.common import Titled, fast_app, serve
 
 from app.db import DEFAULT_DB_PATH, get_connection, init_db
-
-app, rt = fast_app()
-
-_startup_conn = get_connection(DEFAULT_DB_PATH)
-init_db(_startup_conn)
-_startup_conn.close()
+from app.repository import FieldRepository
+from app.routes.fields import register_fields_routes
 
 
-@rt("/")
-def get():
-    return Titled("Lightweight Extraction")
+def create_app(conn: sqlite3.Connection):
+    init_db(conn)
+    app, _ = fast_app()
+
+    # Route handlers below are nested closures (not top-level `get`/`post`
+    # functions), so FastHTML's name-based method inference doesn't apply —
+    # `.get`/`.post` are used explicitly to pin the HTTP method instead.
+    @app.get("/")
+    def get():
+        return Titled("Lightweight Extraction")
+
+    register_fields_routes(app, FieldRepository(conn))
+    return app
+
+
+app = create_app(get_connection(DEFAULT_DB_PATH))
 
 
 if __name__ == "__main__":

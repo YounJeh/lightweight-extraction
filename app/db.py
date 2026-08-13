@@ -28,7 +28,11 @@ CREATE TABLE IF NOT EXISTS extraction_results (
 
 def get_connection(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    # check_same_thread=False: Starlette runs sync route handlers in a worker
+    # thread pool, so the connection created at app startup (main thread) must
+    # remain usable from those worker threads. Safe here since this is a
+    # single-user local app with no concurrent writers.
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

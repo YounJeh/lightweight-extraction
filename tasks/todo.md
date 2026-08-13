@@ -109,13 +109,15 @@ exemples) avec formulaire de création et actions update/delete, câblée sur
 à ce stade, complétée en Task 8).
 
 **Acceptance criteria:**
-- [ ] Un champ créé via le formulaire apparaît immédiatement dans la liste
-- [ ] Update et delete fonctionnent depuis l'UI sans rechargement manuel de l'URL
-- [ ] Un champ créé reste visible après redémarrage du serveur (persistance réelle)
+- [x] Un champ créé via le formulaire apparaît immédiatement dans la liste
+- [x] Update et delete fonctionnent depuis l'UI sans rechargement manuel de l'URL
+  (POST + redirect 303 vers `/fields`)
+- [x] Un champ créé reste visible après redémarrage du serveur (persistance réelle)
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_fields_routes.py`
-- [ ] Manuel: parcours complet create → list → update → delete dans le navigateur
+- [x] Tests: `uv run pytest -v tests/test_fields_routes.py` (5/5 passent)
+- [x] Manuel: parcours complet create → list → update → delete vérifié via curl
+  contre le serveur réel (`uv run python -m app.main`), y compris redémarrage
 
 **Dependencies:** Task 3
 
