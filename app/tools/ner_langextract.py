@@ -28,7 +28,7 @@ class LangExtractNerExtractor:
             text_or_documents=text,
             prompt_description=_prompt_description(fields),
             examples=[example] if example else None,
-            api_key=os.getenv("GOOGLE_GENERATIVE_AI_API_KEY"),
+            api_key=_api_key_for(model_id),
             show_progress=False,
             **kwargs,
         )
@@ -55,6 +55,14 @@ class LangExtractNerExtractor:
                 )
             )
         return results
+
+
+def _api_key_for(model_id: str | None) -> str | None:
+    """LangExtract route vers OpenAI si model_id commence par gpt-4/gpt-5,
+    sinon vers Gemini (défaut) — la clé doit correspondre au provider."""
+    if model_id and model_id.startswith(("gpt-4", "gpt4.", "gpt-5", "gpt5.")):
+        return os.getenv("OPENAI_API_KEY")
+    return os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
 
 
 def _prompt_description(fields: list[Field]) -> str:

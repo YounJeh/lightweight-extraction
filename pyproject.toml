@@ -7,7 +7,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "langextract>=1.6.0",
+    "langextract[openai]>=1.6.0",
     "pydantic>=2.13.4",
     "pymupdf4llm>=1.28.2",
     "python-fasthtml>=0.14.11",
