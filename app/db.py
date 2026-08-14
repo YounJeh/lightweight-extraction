@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS extraction_results (
     value TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT 'mock',
     value_type TEXT,
+    typed_value TEXT,
     type_error TEXT
 );
 
@@ -62,5 +63,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     # CREATE TABLE IF NOT EXISTS ne les ajoute pas rétroactivement.
     _add_column_if_missing(conn, "fields", "type", "type TEXT NOT NULL DEFAULT 'text'")
     _add_column_if_missing(conn, "extraction_results", "value_type", "value_type TEXT")
+    _add_column_if_missing(
+        conn, "extraction_results", "typed_value", "typed_value TEXT"
+    )
     _add_column_if_missing(conn, "extraction_results", "type_error", "type_error TEXT")
     conn.commit()

@@ -51,6 +51,7 @@ def test_mock_ner_extractor_sets_value_type_from_field_without_error():
     [result] = extractor.extract("texte", [field])
 
     assert result.value_type == "date"
+    assert result.typed_value == result.value
     assert result.type_error is None
 
 

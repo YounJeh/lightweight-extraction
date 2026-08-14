@@ -69,6 +69,7 @@ class LangExtractNerExtractor:
                     page_number=page_number,
                     text_position=text_position,
                     value_type=field.type,
+                    typed_value=raw_value,
                     type_error=type_error,
                 )
             )

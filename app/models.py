@@ -32,6 +32,7 @@ class ExtractionResult(BaseModel):
     page_number: int | None = None
     text_position: str | None = None
     value_type: FieldType | None = None
+    typed_value: str | None = None
     type_error: str | None = None
 
 

@@ -148,6 +148,7 @@ def test_extract_sets_value_type_and_no_error_for_valid_typed_value(monkeypatch)
 
     assert len(results) == 1
     assert results[0].value == "30 ans"  # grounding textuel inchangé
+    assert results[0].typed_value == "30"  # valeur typée exposée séparément
     assert results[0].value_type == "int"
     assert results[0].type_error is None
 
@@ -169,6 +170,7 @@ def test_extract_sets_type_error_when_value_not_convertible(monkeypatch):
 
     assert len(results) == 1
     assert results[0].value == "inconnu"  # le grounding reste malgré l'erreur
+    assert results[0].typed_value == "inconnu"
     assert results[0].value_type == "int"
     assert results[0].type_error is not None
 

@@ -86,10 +86,12 @@ def test_init_db_adds_value_type_and_type_error_columns_to_pre_existing_results_
     init_db(conn)  # doit rester idempotent
 
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(extraction_results)")}
-    assert {"value_type", "type_error"} <= columns
+    assert {"value_type", "typed_value", "type_error"} <= columns
     row = conn.execute(
-        "SELECT value_type, type_error FROM extraction_results WHERE field_title = 'Titre'"
+        "SELECT value_type, typed_value, type_error FROM extraction_results "
+        "WHERE field_title = 'Titre'"
     ).fetchone()
     assert row["value_type"] is None
+    assert row["typed_value"] is None
     assert row["type_error"] is None
     conn.close()

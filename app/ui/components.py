@@ -209,12 +209,17 @@ def _result_type(result: ExtractionResult):
 
 
 def _result_row(result: ExtractionResult):
+    displayed_value = result.typed_value or result.value
     value_attrs = {"cls": "result-value"}
     if result.type_error:
         value_attrs = {"cls": "result-value result-value-error", "title": result.type_error}
+    elif displayed_value != result.value:
+        # La valeur typée est plus courte/normalisée que le texte groundé —
+        # ce dernier reste consultable au survol comme contexte.
+        value_attrs["title"] = result.value
     return Tr(
         Td(result.field_title, cls="result-field"),
-        Td(result.value, **value_attrs),
+        Td(displayed_value, **value_attrs),
         Td(_result_type(result), cls="result-type"),
         Td(Span(result.source, cls="badge"), cls="result-source"),
         Td(_result_grounding(result), cls="result-location"),

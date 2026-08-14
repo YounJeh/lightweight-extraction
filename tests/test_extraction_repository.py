@@ -65,13 +65,18 @@ def test_grounding_round_trips_through_get_run(repo):
 
 def test_value_type_and_type_error_round_trip_through_get_run(repo):
     valid = ExtractionResult(
-        field_title="Âge", value="30", source="langextract", value_type="int"
+        field_title="Âge",
+        value="15 % d'avance à la signature du contrat",
+        source="langextract",
+        value_type="int",
+        typed_value="15",
     )
     invalid = ExtractionResult(
         field_title="Date",
         value="pas une date",
         source="langextract",
         value_type="date",
+        typed_value="pas une date",
         type_error="valeur non convertible en date",
     )
 

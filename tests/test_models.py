@@ -46,7 +46,19 @@ def test_extraction_grounding_requires_all_fields():
 def test_extraction_result_valid_without_value_type():
     result = ExtractionResult(field_title="Titre", value="Contrat")
     assert result.value_type is None
+    assert result.typed_value is None
     assert result.type_error is None
+
+
+def test_extraction_result_accepts_typed_value_distinct_from_grounded_value():
+    result = ExtractionResult(
+        field_title="Avance",
+        value="15 % d'avance à la signature du contrat",
+        value_type="int",
+        typed_value="15",
+    )
+    assert result.typed_value == "15"
+    assert result.value == "15 % d'avance à la signature du contrat"
 
 
 def test_extraction_result_accepts_valid_typed_value():

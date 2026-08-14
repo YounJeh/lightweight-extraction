@@ -108,6 +108,26 @@ def test_extraction_result_page_shows_value_type(client, run_repo):
     assert "result-value-error" not in response.text
 
 
+def test_extraction_result_page_shows_typed_value_not_full_grounded_text(client, run_repo):
+    run_repo.create_run(
+        "doc.pdf",
+        [
+            ExtractionResult(
+                field_title="Avance",
+                value="15 % d'avance à la signature du contrat",
+                source="langextract",
+                value_type="int",
+                typed_value="15",
+            )
+        ],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert 'class="result-value" title="15 % d\'avance à la signature du contrat">15</td>' in response.text
+
+
 def test_extraction_result_page_flags_type_error_row(client, run_repo):
     run_repo.create_run(
         "doc.pdf",
