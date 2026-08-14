@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS fields (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     definition TEXT NOT NULL,
-    examples TEXT NOT NULL DEFAULT '[]'
+    examples TEXT NOT NULL DEFAULT '[]',
+    type TEXT NOT NULL DEFAULT 'text'
 );
 
 CREATE TABLE IF NOT EXISTS extraction_runs (
@@ -45,6 +46,17 @@ def get_connection(db_path: Path | str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     return conn
 
 
+def _add_column_if_missing(
+    conn: sqlite3.Connection, table: str, column: str, ddl: str
+) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    # ALTER TABLE ponctuel pour les DB créées avant l'ajout de ces colonnes —
+    # CREATE TABLE IF NOT EXISTS ne les ajoute pas rétroactivement.
+    _add_column_if_missing(conn, "fields", "type", "type TEXT NOT NULL DEFAULT 'text'")
     conn.commit()

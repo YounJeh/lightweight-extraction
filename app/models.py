@@ -1,11 +1,16 @@
+from typing import Literal
+
 from pydantic import BaseModel
 from pydantic import Field as PydField
+
+FieldType = Literal["text", "int", "float", "bool", "date"]
 
 
 class FieldBase(BaseModel):
     title: str
     definition: str
     examples: list[str] = PydField(default_factory=list)
+    type: FieldType = "text"
 
 
 class FieldCreate(FieldBase):
