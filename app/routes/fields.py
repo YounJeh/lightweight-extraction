@@ -27,13 +27,14 @@ def register_fields_routes(app, repo: FieldRepository):
         return page("Champs", fields_table(repo.list_all()), field_create_form())
 
     @app.post("/fields")
-    def post(title: str, definition: str, examples: str = ""):
+    def post(title: str, definition: str, examples: str = "", type: str = "text"):
         try:
             repo.create(
                 FieldCreate(
                     title=title,
                     definition=definition,
                     examples=_parse_examples(examples),
+                    type=type,
                 )
             )
         except ValueError as e:
@@ -41,7 +42,9 @@ def register_fields_routes(app, repo: FieldRepository):
         return RedirectResponse("/fields", status_code=303)
 
     @app.post("/fields/{id}/update")
-    def post_update(id: int, title: str, definition: str, examples: str = ""):
+    def post_update(
+        id: int, title: str, definition: str, examples: str = "", type: str = "text"
+    ):
         try:
             repo.update(
                 id,
@@ -49,6 +52,7 @@ def register_fields_routes(app, repo: FieldRepository):
                     title=title,
                     definition=definition,
                     examples=_parse_examples(examples),
+                    type=type,
                 ),
             )
         except ValueError as e:

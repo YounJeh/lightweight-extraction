@@ -6,8 +6,10 @@ from fasthtml.common import (
     Input,
     Label,
     Li,
+    Option,
     P,
     Script,
+    Select,
     Span,
     Table,
     Tbody,
@@ -21,9 +23,28 @@ from fasthtml.common import (
 
 from app.models import ExtractionResult, ExtractionRun, Field
 
+_FIELD_TYPES = [
+    ("text", "Texte"),
+    ("int", "Entier"),
+    ("float", "Décimal"),
+    ("bool", "Booléen"),
+    ("date", "Date"),
+]
+
 
 def _examples_to_text(examples: list[str]) -> str:
     return "\n".join(examples)
+
+
+def _type_select(field_id: str, selected: str = "text"):
+    return Select(
+        *[
+            Option(label, value=value, selected=(value == selected))
+            for value, label in _FIELD_TYPES
+        ],
+        name="type",
+        id=field_id,
+    )
 
 
 def error_banner(message: str):
@@ -44,6 +65,8 @@ def field_row(field: Field):
                 placeholder="Un exemple par ligne",
                 id=f"ex-{field.id}",
             ),
+            Label("Type", **{"for": f"type-{field.id}"}),
+            _type_select(f"type-{field.id}", selected=field.type),
             Div(
                 Button("Mettre à jour", type="submit"),
                 cls="card-footer",
@@ -91,6 +114,8 @@ def field_create_form():
                 placeholder="Exemples (un par ligne)",
                 id="new-examples",
             ),
+            Label("Type", **{"for": "new-type"}),
+            _type_select("new-type"),
             Div(Button("Créer", type="submit"), cls="card-footer"),
             action="/fields",
             method="post",
