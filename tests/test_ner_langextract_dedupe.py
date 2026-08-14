@@ -130,6 +130,68 @@ def test_extract_arbitrates_genuine_conflict_via_second_llm_call(monkeypatch):
     assert "Condition de règlement" in calls[1]["prompt_description"]
 
 
+def test_extract_sets_value_type_and_no_error_for_valid_typed_value(monkeypatch):
+    text = "Âge : 30 ans."
+    candidate = data.Extraction(
+        extraction_class="Âge",
+        extraction_text="30 ans",
+        char_interval=data.CharInterval(
+            start_pos=text.index("30 ans"), end_pos=text.index("30 ans") + len("30 ans")
+        ),
+        attributes={"value": "30"},
+    )
+    annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
+    monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
+    fields = [Field(id=1, title="Âge", definition="Âge de la personne", type="int")]
+
+    results = LangExtractNerExtractor().extract(text, fields)
+
+    assert len(results) == 1
+    assert results[0].value == "30 ans"  # grounding textuel inchangé
+    assert results[0].value_type == "int"
+    assert results[0].type_error is None
+
+
+def test_extract_sets_type_error_when_value_not_convertible(monkeypatch):
+    text = "Âge : inconnu."
+    candidate = data.Extraction(
+        extraction_class="Âge",
+        extraction_text="inconnu",
+        char_interval=data.CharInterval(
+            start_pos=text.index("inconnu"), end_pos=text.index("inconnu") + len("inconnu")
+        ),
+    )
+    annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
+    monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
+    fields = [Field(id=1, title="Âge", definition="Âge de la personne", type="int")]
+
+    results = LangExtractNerExtractor().extract(text, fields)
+
+    assert len(results) == 1
+    assert results[0].value == "inconnu"  # le grounding reste malgré l'erreur
+    assert results[0].value_type == "int"
+    assert results[0].type_error is not None
+
+
+def test_extract_falls_back_to_extraction_text_when_attributes_missing(monkeypatch):
+    text = "Âge : 42."
+    candidate = data.Extraction(
+        extraction_class="Âge",
+        extraction_text="42",
+        char_interval=data.CharInterval(
+            start_pos=text.index("42"), end_pos=text.index("42") + len("42")
+        ),
+        attributes=None,
+    )
+    annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
+    monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
+    fields = [Field(id=1, title="Âge", definition="Âge de la personne", type="int")]
+
+    results = LangExtractNerExtractor().extract(text, fields)
+
+    assert results[0].type_error is None
+
+
 def test_extract_falls_back_to_first_occurrence_when_arbitration_is_unparseable(monkeypatch):
     text = "Valeur A ici. Valeur B là."
     first = _grounded("Avance forfaitaire", "Valeur A", text.index("Valeur A"))

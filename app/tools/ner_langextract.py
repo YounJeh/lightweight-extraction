@@ -4,9 +4,18 @@ import langextract
 from langextract import data
 
 from app.models import ExtractionResult, Field
+from app.tools import type_coercion
 from app.tools.pdf_pymupdf4llm import PAGE_SEPARATOR_RE
 
 _CONTEXT_CHARS = 40
+
+_TYPE_INSTRUCTIONS = {
+    "text": "",
+    "int": " (nombre entier, ex. 30)",
+    "float": " (nombre décimal, ex. 3.5)",
+    "bool": " (oui/non)",
+    "date": " (date au format ISO AAAA-MM-JJ)",
+}
 
 
 class LangExtractNerExtractor:
@@ -41,12 +50,17 @@ class LangExtractNerExtractor:
 
         results = []
         for field_title, candidates in candidates_by_field.items():
-            chosen = _select_candidate(
-                fields_by_title[field_title], candidates, model_id, api_key
-            )
+            field = fields_by_title[field_title]
+            chosen = _select_candidate(field, candidates, model_id, api_key)
             page_number, text_position = _locate(
                 text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
             )
+            attributes_value = (chosen.attributes or {}).get("value")
+            raw_value = (
+                attributes_value if isinstance(attributes_value, str) and attributes_value
+                else chosen.extraction_text
+            )
+            type_error = type_coercion.validate(raw_value, field.type)
             results.append(
                 ExtractionResult(
                     field_title=field_title,
@@ -54,6 +68,8 @@ class LangExtractNerExtractor:
                     source="langextract",
                     page_number=page_number,
                     text_position=text_position,
+                    value_type=field.type,
+                    type_error=type_error,
                 )
             )
         return results
@@ -190,9 +206,13 @@ def _prompt_description(fields: list[Field]) -> str:
     lines = [
         "Pour chaque champ ci-dessous, si sa valeur est présente dans le "
         "texte, extrais-la littéralement (extraction_class = titre exact "
-        "du champ) :"
+        "du champ). Si un format est indiqué entre parenthèses, fournis en "
+        "plus la valeur dans ce format via l'attribut 'value' :"
     ]
-    lines += [f"- {field.title} : {field.definition}" for field in fields]
+    lines += [
+        f"- {field.title} : {field.definition}{_TYPE_INSTRUCTIONS[field.type]}"
+        for field in fields
+    ]
     return "\n".join(lines)
 
 
@@ -204,7 +224,11 @@ def _build_example(fields: list[Field]) -> "data.ExampleData | None":
         return None
     lines = [f"{field.title} : {field.examples[0]}" for field in fields_with_examples]
     extractions = [
-        data.Extraction(extraction_class=field.title, extraction_text=field.examples[0])
+        data.Extraction(
+            extraction_class=field.title,
+            extraction_text=field.examples[0],
+            attributes={"value": field.examples[0]} if field.type != "text" else None,
+        )
         for field in fields_with_examples
     ]
     return data.ExampleData(text="\n".join(lines), extractions=extractions)
