@@ -41,9 +41,11 @@ def register_extraction_routes(
         if not pdf.filename or not pdf.filename.lower().endswith(".pdf"):
             return _extraction_page_with_error("seuls les fichiers PDF sont acceptés.")
 
-        pdf_bytes = await pdf.read()
         selected_fields = [f for f in field_repo.list_all() if f.id in field_ids]
+        if not selected_fields:
+            return _extraction_page_with_error("sélectionne au moins un champ à extraire.")
 
+        pdf_bytes = await pdf.read()
         text = pdf_extractor.extract_text(pdf_bytes)
         results = ner_extractor.extract(text, selected_fields)
 
