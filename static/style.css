@@ -111,7 +111,7 @@ p {
 
 .content {
   padding: 40px 32px;
-  max-width: 760px;
+  max-width: 960px;
   width: 100%;
   margin: 0 auto;
 }
@@ -257,7 +257,6 @@ button.btn-danger:hover {
   font-weight: 500;
   padding: 2px 8px;
   border-radius: 999px;
-  margin-left: 8px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -315,12 +314,12 @@ button.btn-danger:hover {
 
 .result-table th:nth-child(2),
 .result-table td:nth-child(2) {
-  width: 33%;
+  width: 28%;
 }
 
 .result-table th:nth-child(3),
 .result-table td:nth-child(3) {
-  width: 15%;
+  width: 20%;
 }
 
 .result-table th:nth-child(4),
