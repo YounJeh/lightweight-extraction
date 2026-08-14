@@ -19,8 +19,9 @@ class LangExtractNerExtractor:
 
     def extract(self, text: str, fields: list[Field]) -> list[ExtractionResult]:
         example = _build_example(fields)
-        kwargs = {}
         model_id = os.getenv("LLM_MODEL")
+        api_key = _api_key_for(model_id)
+        kwargs = {}
         if model_id:
             kwargs["model_id"] = model_id
 
@@ -28,33 +29,153 @@ class LangExtractNerExtractor:
             text_or_documents=text,
             prompt_description=_prompt_description(fields),
             examples=[example] if example else None,
-            api_key=_api_key_for(model_id),
+            api_key=api_key,
             show_progress=False,
             **kwargs,
         )
 
-        field_titles = {field.title for field in fields}
+        candidates_by_field = _group_grounded_candidates(
+            annotated.extractions or [], fields
+        )
+        fields_by_title = {field.title: field for field in fields}
+
         results = []
-        for extraction in annotated.extractions or []:
-            if extraction.extraction_class not in field_titles:
-                continue
-            page_number, text_position = None, None
-            if extraction.char_interval is not None:
-                page_number, text_position = _locate(
-                    text,
-                    extraction.char_interval.start_pos,
-                    extraction.char_interval.end_pos,
-                )
+        for field_title, candidates in candidates_by_field.items():
+            chosen = _select_candidate(
+                fields_by_title[field_title], candidates, model_id, api_key
+            )
+            page_number, text_position = _locate(
+                text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
+            )
             results.append(
                 ExtractionResult(
-                    field_title=extraction.extraction_class,
-                    value=extraction.extraction_text,
+                    field_title=field_title,
+                    value=chosen.extraction_text,
                     source="langextract",
                     page_number=page_number,
                     text_position=text_position,
                 )
             )
         return results
+
+
+def _group_grounded_candidates(
+    extractions: list["data.Extraction"], fields: list[Field]
+) -> dict[str, list["data.Extraction"]]:
+    """LangExtract chunks long text and queries every field on each chunk,
+    so a field with no value in a given chunk still comes back as an
+    Extraction — ungrounded (char_interval is None, per LangExtract's own
+    semantics) and either empty or a hallucinated "no value" placeholder.
+    Only grounded, non-blank extractions are real candidates."""
+    field_titles = {field.title for field in fields}
+    grouped: dict[str, list[data.Extraction]] = {}
+    for extraction in extractions:
+        if extraction.extraction_class not in field_titles:
+            continue
+        if extraction.char_interval is None or not extraction.extraction_text.strip():
+            continue
+        grouped.setdefault(extraction.extraction_class, []).append(extraction)
+    return grouped
+
+
+def _normalize(value: str) -> str:
+    return " ".join(value.strip().lower().split())
+
+
+def _select_candidate(
+    field: Field,
+    candidates: list["data.Extraction"],
+    model_id: str | None,
+    api_key: str | None,
+) -> "data.Extraction":
+    """0 candidat n'atteint jamais cette fonction (filtré en amont). 1 seul
+    candidat -> accepté tel quel. Plusieurs candidats à la même valeur
+    normalisée -> fusionnés sur la première occurrence, sans appel LLM. Sinon
+    -> vrai conflit, arbitré par un second appel LLM."""
+    ordered = sorted(candidates, key=lambda c: c.char_interval.start_pos)
+    if len(ordered) == 1:
+        return ordered[0]
+
+    distinct_by_value: dict[str, data.Extraction] = {}
+    for candidate in ordered:
+        distinct_by_value.setdefault(_normalize(candidate.extraction_text), candidate)
+    distinct = list(distinct_by_value.values())
+    if len(distinct) == 1:
+        return distinct[0]
+
+    return _arbitrate(field, distinct, model_id, api_key)
+
+
+def _arbitrate(
+    field: Field,
+    candidates: list["data.Extraction"],
+    model_id: str | None,
+    api_key: str | None,
+) -> "data.Extraction":
+    """Plusieurs valeurs distinctes ont été extraites pour le même champ à
+    des endroits différents du document (pas un artefact de chunking, un
+    vrai conflit) — un second appel LLM, léger et hors grounding sur le
+    document source, tranche parmi les candidats."""
+    kwargs = {}
+    if model_id:
+        kwargs["model_id"] = model_id
+
+    annotated = langextract.extract(
+        text_or_documents=_arbitration_text(field, candidates),
+        prompt_description=_arbitration_prompt(field),
+        examples=[_arbitration_example()],
+        api_key=api_key,
+        show_progress=False,
+        **kwargs,
+    )
+
+    for extraction in annotated.extractions or []:
+        if extraction.extraction_class != "selection":
+            continue
+        chosen_value = _normalize(extraction.extraction_text)
+        for candidate in candidates:
+            if _normalize(candidate.extraction_text) == chosen_value:
+                return candidate
+
+    # L'arbitrage n'a renvoyé aucune correspondance exacte (échec de
+    # parsing) — repli déterministe plutôt que de perdre le champ.
+    return candidates[0]
+
+
+def _arbitration_text(field: Field, candidates: list["data.Extraction"]) -> str:
+    lines = [f"Champ : {field.title}", f"Définition : {field.definition}", ""]
+    lines += [
+        f"Candidat {i} : {candidate.extraction_text}"
+        for i, candidate in enumerate(candidates, start=1)
+    ]
+    return "\n".join(lines)
+
+
+def _arbitration_prompt(field: Field) -> str:
+    return (
+        f"Plusieurs valeurs candidates ont été extraites pour le champ "
+        f"« {field.title} » à des endroits différents du document. Choisis "
+        "celle qui correspond le mieux à la définition du champ et "
+        "recopie-la mot pour mot, à l'identique (extraction_class = "
+        "'selection')."
+    )
+
+
+def _arbitration_example() -> "data.ExampleData":
+    text = (
+        "Champ : Montant total\n"
+        "Définition : Montant total dû au titre du contrat.\n\n"
+        "Candidat 1 : 12 000 EUR HT\n"
+        "Candidat 2 : voir grille tarifaire en annexe"
+    )
+    return data.ExampleData(
+        text=text,
+        extractions=[
+            data.Extraction(
+                extraction_class="selection", extraction_text="12 000 EUR HT"
+            )
+        ],
+    )
 
 
 def _api_key_for(model_id: str | None) -> str | None:
