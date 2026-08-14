@@ -12,7 +12,9 @@ contournements, compromis. Format : contexte → décision → alternatives
 champ sur chaque chunk → un même champ ressort plusieurs fois, avec des
 valeurs différentes. Deux causes : chunks sans la valeur (extraction
 fantôme, `char_interval=None`) et chunks avec la valeur à plusieurs
-endroits du document (extractions groundées mais divergentes).
+endroits du document (extractions groundées mais divergentes). Le chunking
+se fait par phrase, sans overlap entre chunks — comportement par défaut de
+LangExtract (`langextract/chunking.py`), non paramétré côté app.
 
 **Décision** (`app/tools/ner_langextract.py`) :
 - extractions non groundées / vides → ignorées ;
