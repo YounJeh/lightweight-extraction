@@ -31,6 +31,8 @@ class ExtractionResult(BaseModel):
     source: str = "mock"
     page_number: int | None = None
     text_position: str | None = None
+    value_type: FieldType | None = None
+    type_error: str | None = None
 
 
 class ExtractionGrounding(BaseModel):

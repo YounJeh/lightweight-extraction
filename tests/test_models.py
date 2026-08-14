@@ -41,3 +41,27 @@ def test_extraction_result_accepts_grounding():
 def test_extraction_grounding_requires_all_fields():
     with pytest.raises(ValidationError):
         ExtractionGrounding(result_id=1, page_number=1)
+
+
+def test_extraction_result_valid_without_value_type():
+    result = ExtractionResult(field_title="Titre", value="Contrat")
+    assert result.value_type is None
+    assert result.type_error is None
+
+
+def test_extraction_result_accepts_valid_typed_value():
+    result = ExtractionResult(
+        field_title="Âge", value="30", value_type="int", type_error=None
+    )
+    assert result.value_type == "int"
+    assert result.type_error is None
+
+
+def test_extraction_result_accepts_type_error():
+    result = ExtractionResult(
+        field_title="Âge",
+        value="environ 30 ans",
+        value_type="int",
+        type_error="valeur non convertible en int",
+    )
+    assert result.type_error == "valeur non convertible en int"
