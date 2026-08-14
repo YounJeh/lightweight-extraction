@@ -202,10 +202,20 @@ def _result_grounding(result: ExtractionResult):
     )
 
 
+def _result_type(result: ExtractionResult):
+    if result.value_type is None:
+        return Span("—", cls="result-grounding-empty")
+    return Span(result.value_type, cls="badge")
+
+
 def _result_row(result: ExtractionResult):
+    value_attrs = {"cls": "result-value"}
+    if result.type_error:
+        value_attrs = {"cls": "result-value result-value-error", "title": result.type_error}
     return Tr(
         Td(result.field_title, cls="result-field"),
-        Td(result.value, cls="result-value"),
+        Td(result.value, **value_attrs),
+        Td(_result_type(result), cls="result-type"),
         Td(Span(result.source, cls="badge"), cls="result-source"),
         Td(_result_grounding(result), cls="result-location"),
     )
@@ -221,6 +231,7 @@ def extraction_result(run: ExtractionRun):
                     Tr(
                         Th("Champ"),
                         Th("Valeur"),
+                        Th("Type"),
                         Th("Source"),
                         Th("Localisation"),
                     )
