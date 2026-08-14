@@ -17,6 +17,28 @@ def test_create_and_get(repo):
     assert repo.get(field.id) == field
 
 
+def test_create_defaults_to_text_type(repo):
+    field = repo.create(FieldCreate(title="Nom", definition="Nom", examples=[]))
+    assert field.type == "text"
+
+
+def test_create_persists_explicit_type(repo):
+    field = repo.create(
+        FieldCreate(title="Âge", definition="Âge en années", examples=[], type="int")
+    )
+    assert repo.get(field.id).type == "int"
+
+
+def test_update_changes_type(repo):
+    field = repo.create(FieldCreate(title="Date", definition="d", examples=[]))
+
+    updated = repo.update(
+        field.id, FieldUpdate(title="Date", definition="d", examples=[], type="date")
+    )
+
+    assert updated.type == "date"
+
+
 def test_create_rejects_empty_title(repo):
     with pytest.raises(ValueError):
         repo.create(FieldCreate(title="   ", definition="x", examples=[]))

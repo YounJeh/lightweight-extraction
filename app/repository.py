@@ -11,8 +11,8 @@ class FieldRepository:
     def create(self, data: FieldCreate) -> Field:
         title = self._require_title(data.title)
         cursor = self._conn.execute(
-            "INSERT INTO fields (title, definition, examples) VALUES (?, ?, ?)",
-            (title, data.definition, json.dumps(data.examples)),
+            "INSERT INTO fields (title, definition, examples, type) VALUES (?, ?, ?, ?)",
+            (title, data.definition, json.dumps(data.examples), data.type),
         )
         self._conn.commit()
         return self.get(cursor.lastrowid)
@@ -30,8 +30,8 @@ class FieldRepository:
     def update(self, field_id: int, data: FieldUpdate) -> Field | None:
         title = self._require_title(data.title)
         self._conn.execute(
-            "UPDATE fields SET title = ?, definition = ?, examples = ? WHERE id = ?",
-            (title, data.definition, json.dumps(data.examples), field_id),
+            "UPDATE fields SET title = ?, definition = ?, examples = ?, type = ? WHERE id = ?",
+            (title, data.definition, json.dumps(data.examples), data.type, field_id),
         )
         self._conn.commit()
         return self.get(field_id)
@@ -54,4 +54,5 @@ class FieldRepository:
             title=row["title"],
             definition=row["definition"],
             examples=json.loads(row["examples"]),
+            type=row["type"],
         )
