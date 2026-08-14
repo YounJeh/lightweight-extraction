@@ -17,9 +17,17 @@ class ExtractionRunRepository:
         run_id = cursor.lastrowid
         for result in results:
             result_cursor = self._conn.execute(
-                "INSERT INTO extraction_results (run_id, field_title, value, source) "
-                "VALUES (?, ?, ?, ?)",
-                (run_id, result.field_title, result.value, result.source),
+                "INSERT INTO extraction_results "
+                "(run_id, field_title, value, source, value_type, type_error) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    result.field_title,
+                    result.value,
+                    result.source,
+                    result.value_type,
+                    result.type_error,
+                ),
             )
             if result.page_number is not None and result.text_position is not None:
                 grounding = ExtractionGrounding(
@@ -48,7 +56,7 @@ class ExtractionRunRepository:
         if not row:
             return None
         result_rows = self._conn.execute(
-            "SELECT r.field_title, r.value, r.source, "
+            "SELECT r.field_title, r.value, r.source, r.value_type, r.type_error, "
             "g.page_number AS page_number, g.text_position AS text_position "
             "FROM extraction_results r "
             "LEFT JOIN extraction_groundings g ON g.result_id = r.id "
@@ -62,6 +70,8 @@ class ExtractionRunRepository:
                 source=r["source"],
                 page_number=r["page_number"],
                 text_position=r["text_position"],
+                value_type=r["value_type"],
+                type_error=r["type_error"],
             )
             for r in result_rows
         ]

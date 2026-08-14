@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS extraction_results (
     run_id INTEGER NOT NULL REFERENCES extraction_runs(id),
     field_title TEXT NOT NULL,
     value TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'mock'
+    source TEXT NOT NULL DEFAULT 'mock',
+    value_type TEXT,
+    type_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS extraction_groundings (
@@ -59,4 +61,6 @@ def init_db(conn: sqlite3.Connection) -> None:
     # ALTER TABLE ponctuel pour les DB créées avant l'ajout de ces colonnes —
     # CREATE TABLE IF NOT EXISTS ne les ajoute pas rétroactivement.
     _add_column_if_missing(conn, "fields", "type", "type TEXT NOT NULL DEFAULT 'text'")
+    _add_column_if_missing(conn, "extraction_results", "value_type", "value_type TEXT")
+    _add_column_if_missing(conn, "extraction_results", "type_error", "type_error TEXT")
     conn.commit()

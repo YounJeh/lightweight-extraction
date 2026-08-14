@@ -63,6 +63,24 @@ def test_grounding_round_trips_through_get_run(repo):
     assert fetched.results == [result]
 
 
+def test_value_type_and_type_error_round_trip_through_get_run(repo):
+    valid = ExtractionResult(
+        field_title="Âge", value="30", source="langextract", value_type="int"
+    )
+    invalid = ExtractionResult(
+        field_title="Date",
+        value="pas une date",
+        source="langextract",
+        value_type="date",
+        type_error="valeur non convertible en date",
+    )
+
+    created = repo.create_run("doc.pdf", [valid, invalid])
+    fetched = repo.get_run(created.id)
+
+    assert fetched.results == [valid, invalid]
+
+
 def test_mixed_grounded_and_ungrounded_results_round_trip(repo):
     grounded = ExtractionResult(
         field_title="Titre",

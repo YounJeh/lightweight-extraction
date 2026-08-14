@@ -58,3 +58,38 @@ def test_init_db_adds_type_column_to_pre_existing_fields_table(tmp_path):
     row = conn.execute("SELECT type FROM fields WHERE title = ?", ("Titre existant",)).fetchone()
     assert row["type"] == "text"
     conn.close()
+
+
+def test_init_db_adds_value_type_and_type_error_columns_to_pre_existing_results_table(
+    tmp_path,
+):
+    db_path = tmp_path / "test.db"
+    conn = get_connection(db_path)
+    conn.execute(
+        "CREATE TABLE extraction_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "document_name TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE TABLE extraction_results (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "run_id INTEGER NOT NULL REFERENCES extraction_runs(id), "
+        "field_title TEXT NOT NULL, value TEXT NOT NULL, "
+        "source TEXT NOT NULL DEFAULT 'mock')"
+    )
+    conn.execute("INSERT INTO extraction_runs (document_name) VALUES ('doc.pdf')")
+    conn.execute(
+        "INSERT INTO extraction_results (run_id, field_title, value, source) "
+        "VALUES (1, 'Titre', 'valeur', 'mock')"
+    )
+    conn.commit()
+
+    init_db(conn)
+    init_db(conn)  # doit rester idempotent
+
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(extraction_results)")}
+    assert {"value_type", "type_error"} <= columns
+    row = conn.execute(
+        "SELECT value_type, type_error FROM extraction_results WHERE field_title = 'Titre'"
+    ).fetchone()
+    assert row["value_type"] is None
+    assert row["type_error"] is None
+    conn.close()
