@@ -7,8 +7,15 @@ from fasthtml.common import (
     Label,
     Li,
     P,
+    Script,
     Span,
+    Table,
+    Tbody,
+    Td,
     Textarea,
+    Th,
+    Thead,
+    Tr,
     Ul,
 )
 
@@ -102,6 +109,22 @@ def _field_checkbox(field: Field):
     )
 
 
+def _extraction_loading_script():
+    return Script(
+        """
+        (function () {
+          var form = document.getElementById("extraction-form");
+          var submitBtn = document.getElementById("extraction-submit-btn");
+          if (!form || !submitBtn) return;
+          form.addEventListener("submit", function () {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Extraction en cours…";
+          });
+        })();
+        """
+    )
+
+
 def extraction_form(fields: list[Field]):
     if not fields:
         return Div(
@@ -112,48 +135,76 @@ def extraction_form(fields: list[Field]):
             ),
             cls="empty-state",
         )
-    return Div(
-        Div("Nouvelle extraction", cls="card-title"),
-        Form(
-            Label("Document PDF", **{"for": "pdf-input"}),
-            Input(
-                type="file",
-                name="pdf",
-                accept="application/pdf",
-                required=True,
-                id="pdf-input",
+    return (
+        Div(
+            Div("Nouvelle extraction", cls="card-title"),
+            Form(
+                Label("Document PDF", **{"for": "pdf-input"}),
+                Input(
+                    type="file",
+                    name="pdf",
+                    accept="application/pdf",
+                    required=True,
+                    id="pdf-input",
+                ),
+                Label("Champs à extraire"),
+                Div(*[_field_checkbox(field) for field in fields], cls="chip-list"),
+                Div(
+                    Button(
+                        "Lancer l'extraction",
+                        type="submit",
+                        id="extraction-submit-btn",
+                    ),
+                    cls="card-footer",
+                ),
+                id="extraction-form",
+                action="/extraction",
+                method="post",
             ),
-            Label("Champs à extraire"),
-            Div(*[_field_checkbox(field) for field in fields], cls="chip-list"),
-            Div(Button("Lancer l'extraction", type="submit"), cls="card-footer"),
-            action="/extraction",
-            method="post",
+            cls="card",
         ),
-        cls="card",
+        _extraction_loading_script(),
     )
 
 
-def _result_item(result: ExtractionResult):
-    children = [
-        Div(result.field_title, cls="result-label"),
-        Div(result.value, Span(result.source, cls="badge"), cls="result-value"),
-    ]
-    if result.page_number is not None:
-        children.append(
-            Div(
-                f"Page {result.page_number} — {result.text_position}",
-                cls="result-grounding",
-            )
-        )
-    return Div(*children, cls="result-row")
+def _result_grounding(result: ExtractionResult):
+    if result.page_number is None:
+        return Span("—", cls="result-grounding-empty")
+    return Span(
+        Span(f"p. {result.page_number}", cls="result-page"),
+        f" · {result.text_position}",
+        cls="result-grounding",
+    )
+
+
+def _result_row(result: ExtractionResult):
+    return Tr(
+        Td(result.field_title, cls="result-field"),
+        Td(result.value, cls="result-value"),
+        Td(Span(result.source, cls="badge"), cls="result-source"),
+        Td(_result_grounding(result), cls="result-location"),
+    )
 
 
 def extraction_result(run: ExtractionRun):
-    body = (
-        Div(*[_result_item(result) for result in run.results])
-        if run.results
-        else P("Aucun résultat (aucun champ n'avait été sélectionné).")
-    )
+    if not run.results:
+        body = P("Aucun résultat (aucun champ n'avait été sélectionné).")
+    else:
+        body = Div(
+            Table(
+                Thead(
+                    Tr(
+                        Th("Champ"),
+                        Th("Valeur"),
+                        Th("Source"),
+                        Th("Localisation"),
+                    )
+                ),
+                Tbody(*[_result_row(result) for result in run.results]),
+                cls="result-table",
+            ),
+            cls="result-table-wrap",
+        )
     return Div(
         Div(f"Document : {run.document_name}", cls="card-title"),
         body,

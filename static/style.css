@@ -262,27 +262,94 @@ button.btn-danger:hover {
   letter-spacing: 0.03em;
 }
 
-/* Result rows */
+/* Result table */
 
-.result-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
+.result-table-wrap {
+  overflow-x: auto;
+}
+
+.result-table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.9rem;
+}
+
+.result-table th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 12px 8px;
   border-bottom: 1px solid var(--border);
 }
 
-.result-row:last-child {
+.result-table th:first-child,
+.result-table td:first-child {
+  padding-left: 0;
+}
+
+.result-table th:last-child,
+.result-table td:last-child {
+  padding-right: 0;
+}
+
+.result-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+.result-table tr:last-child td {
   border-bottom: none;
 }
 
-.result-label {
+.result-table th:nth-child(1),
+.result-table td:nth-child(1) {
+  width: 22%;
+}
+
+.result-table th:nth-child(2),
+.result-table td:nth-child(2) {
+  width: 33%;
+}
+
+.result-table th:nth-child(3),
+.result-table td:nth-child(3) {
+  width: 15%;
+}
+
+.result-table th:nth-child(4),
+.result-table td:nth-child(4) {
+  width: 30%;
+}
+
+.result-field {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .result-value {
   font-weight: 500;
+  color: var(--text-primary);
+}
+
+.result-grounding {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.result-page {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.result-grounding-empty {
+  color: var(--text-secondary);
 }
 
 /* Runs list */
@@ -306,6 +373,12 @@ button.btn-danger:hover {
 .run-list a:hover {
   color: var(--accent);
   text-decoration: none;
+}
+
+button:disabled,
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* Error banner */
