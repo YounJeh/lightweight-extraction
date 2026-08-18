@@ -54,6 +54,10 @@ def error_banner(message: str):
 def field_row(field: Field):
     return Div(
         Form(
+            Label("Clé", **{"for": f"key-{field.id}"}),
+            Input(name="key", value=field.key, required=True, id=f"key-{field.id}"),
+            Label("Section", **{"for": f"section-{field.id}"}),
+            Input(name="section", value=field.section or "", id=f"section-{field.id}"),
             Label("Titre", **{"for": f"title-{field.id}"}),
             Input(name="title", value=field.title, required=True, id=f"title-{field.id}"),
             Label("Définition", **{"for": f"def-{field.id}"}),
@@ -99,6 +103,10 @@ def field_create_form():
     return Div(
         Div("Nouveau champ", cls="card-title"),
         Form(
+            Label("Clé", **{"for": "new-key"}),
+            Input(name="key", placeholder="Clé", required=True, id="new-key"),
+            Label("Section", **{"for": "new-section"}),
+            Input(name="section", placeholder="Section", id="new-section"),
             Label("Titre", **{"for": "new-title"}),
             Input(name="title", placeholder="Titre", required=True, id="new-title"),
             Label("Définition", **{"for": "new-definition"}),

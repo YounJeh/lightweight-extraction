@@ -145,3 +145,34 @@ def test_fields_page_links_to_extraction_page(client):
     response = client.get("/fields")
 
     assert 'href="/extraction"' in response.text
+
+
+def test_get_fields_prefills_key_and_section_for_existing_field(client, repo):
+    repo.create(
+        FieldCreate(key="k1", title="A", definition="a", examples=[], section="Section 1")
+    )
+
+    response = client.get("/fields")
+
+    assert 'value="k1"' in response.text
+    assert 'value="Section 1"' in response.text
+
+
+def test_post_fields_with_duplicate_key_shows_error_without_crashing(client, repo):
+    repo.create(FieldCreate(key="k1", title="A", definition="a", examples=[]))
+
+    response = client.post(
+        "/fields", data={"key": "k1", "title": "B", "definition": "b", "examples": ""}
+    )
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert len(repo.list_all()) == 1
+
+
+def test_post_fields_without_section_leaves_it_empty(client, repo):
+    client.post(
+        "/fields", data={"key": "k1", "title": "A", "definition": "a", "examples": ""}
+    )
+
+    assert repo.list_all()[0].section is None
