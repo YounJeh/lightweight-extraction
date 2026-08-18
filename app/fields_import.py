@@ -86,7 +86,10 @@ def _rows_from_bytes(content: bytes, filename: str) -> list[dict[str, str]]:
         df = pd.read_excel(io.BytesIO(content), dtype=str, engine="openpyxl").fillna("")
         return df.to_dict(orient="records")
     delimiter = "\t" if lower.endswith(".tsv") else ","
-    text = content.decode("utf-8-sig")
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("cp1252")
     return list(csv.DictReader(io.StringIO(text), delimiter=delimiter))
 
 
@@ -97,7 +100,10 @@ def import_fields(content: bytes, filename: str) -> ImportResult:
     invalide rejette l'import complet (`fields` vide, `errors` rempli).
     Un `key` apparaissant plusieurs fois dans le fichier : la dernière
     occurrence l'emporte."""
-    rows = _rows_from_bytes(content, filename)
+    try:
+        rows = _rows_from_bytes(content, filename)
+    except Exception:
+        return ImportResult(errors=["fichier illisible (encodage ou format invalide)"])
     if not rows:
         return ImportResult(errors=["fichier vide"])
 

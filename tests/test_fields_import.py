@@ -108,6 +108,22 @@ def test_import_xlsx_produces_same_result_as_csv():
     assert result.fields[0].examples[0].value == "2"
 
 
+def test_import_cp1252_encoded_csv_is_decoded_correctly():
+    content = _csv_bytes([_VALID_ROW]).decode("utf-8").encode("cp1252")
+
+    result = import_fields(content, "export_excel.csv")
+
+    assert result.errors == []
+    assert result.fields[0].definition == _VALID_ROW["Définition"]
+
+
+def test_import_malformed_xlsx_returns_error_instead_of_crashing():
+    result = import_fields(b"not a real xlsx file", "fields.xlsx")
+
+    assert result.fields == []
+    assert len(result.errors) == 1
+
+
 def test_import_duplicate_key_in_same_file_keeps_last_occurrence():
     first = {**_VALID_ROW, "Nom": "Ancien nom"}
     second = {**_VALID_ROW, "Nom": "Nouveau nom"}

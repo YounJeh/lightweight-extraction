@@ -211,6 +211,15 @@ def test_post_fields_import_with_missing_column_writes_nothing(client, repo):
     assert repo.list_all() == []
 
 
+def test_post_fields_import_malformed_xlsx_shows_error_without_crashing(client, repo):
+    files = {"file": ("fields.xlsx", b"not a real xlsx file", "application/octet-stream")}
+    response = client.post("/fields/import", files=files, follow_redirects=True)
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert repo.list_all() == []
+
+
 def test_post_fields_import_twice_is_idempotent_not_duplicating(client, repo):
     _upload_gold_csv(client)
     _upload_gold_csv(client)
