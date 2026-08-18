@@ -1,9 +1,20 @@
+from collections.abc import Callable
 from datetime import date
 
 from app.models import FieldType
 
 _TRUE_TOKENS = {"oui", "vrai", "true", "1"}
 _FALSE_TOKENS = {"non", "faux", "false", "0"}
+
+
+def _convertible(
+    raw: str, stripped: str, converter: Callable[[str], object], expected: str
+) -> str | None:
+    try:
+        converter(stripped)
+    except ValueError:
+        return f"« {raw} » n'est pas {expected}"
+    return None
 
 
 def validate(raw: str, field_type: FieldType) -> str | None:
@@ -20,18 +31,10 @@ def validate(raw: str, field_type: FieldType) -> str | None:
         return f"valeur vide, non convertible en {field_type}"
 
     if field_type == "int":
-        try:
-            int(stripped)
-        except ValueError:
-            return f"« {raw} » n'est pas un entier valide"
-        return None
+        return _convertible(raw, stripped, int, "un entier valide")
 
     if field_type == "float":
-        try:
-            float(stripped)
-        except ValueError:
-            return f"« {raw} » n'est pas un nombre décimal valide"
-        return None
+        return _convertible(raw, stripped, float, "un nombre décimal valide")
 
     if field_type == "bool":
         # Ne jamais utiliser bool(str) : toute chaîne non vide est truthy en
@@ -42,10 +45,8 @@ def validate(raw: str, field_type: FieldType) -> str | None:
         return f"« {raw} » n'est pas un booléen reconnu (oui/non, vrai/faux, true/false, 1/0)"
 
     if field_type == "date":
-        try:
-            date.fromisoformat(stripped)
-        except ValueError:
-            return f"« {raw} » n'est pas une date au format ISO (AAAA-MM-JJ)"
-        return None
+        return _convertible(
+            raw, stripped, date.fromisoformat, "une date au format ISO (AAAA-MM-JJ)"
+        )
 
     return None

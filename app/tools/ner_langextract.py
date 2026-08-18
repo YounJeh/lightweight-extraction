@@ -41,6 +41,13 @@ def _typed_hint(example: str, field_type: FieldType) -> str | None:
     return None
 
 
+def _typed_attribute(extraction: "data.Extraction") -> str | None:
+    """Valeur typée fournie par le LLM via attributes['value'], si présente
+    et non vide — None sinon (l'appelant retombe alors sur extraction_text)."""
+    value = (extraction.attributes or {}).get("value")
+    return value if isinstance(value, str) and value else None
+
+
 class LangExtractNerExtractor:
     """NerExtractor backed by LangExtract, calling the real Gemini model.
 
@@ -78,11 +85,7 @@ class LangExtractNerExtractor:
             page_number, text_position = _locate(
                 text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
             )
-            attributes_value = (chosen.attributes or {}).get("value")
-            raw_value = (
-                attributes_value if isinstance(attributes_value, str) and attributes_value
-                else chosen.extraction_text
-            )
+            raw_value = _typed_attribute(chosen) or chosen.extraction_text
             type_error = type_coercion.validate(raw_value, field.type)
             results.append(
                 ExtractionResult(
@@ -240,6 +243,16 @@ def _prompt_description(fields: list[Field]) -> str:
     return "\n".join(lines)
 
 
+def _example_attributes(field: Field) -> dict[str, str] | None:
+    """attributes['value'] du few-shot pour ce champ — None pour les champs
+    text (pas de valeur typée à distinguer) ou si aucun indice n'a pu être
+    isolé dans l'exemple (voir _typed_hint)."""
+    if field.type == "text":
+        return None
+    hint = _typed_hint(field.examples[0], field.type)
+    return {"value": hint} if hint else None
+
+
 def _build_example(fields: list[Field]) -> "data.ExampleData | None":
     """Un seul exemple few-shot synthétique, combinant le premier exemple de
     chaque champ qui en a un — pas d'exemple si aucun champ n'en fournit."""
@@ -247,20 +260,14 @@ def _build_example(fields: list[Field]) -> "data.ExampleData | None":
     if not fields_with_examples:
         return None
     lines = [f"{field.title} : {field.examples[0]}" for field in fields_with_examples]
-    extractions = []
-    for field in fields_with_examples:
-        attributes = None
-        if field.type != "text":
-            hint = _typed_hint(field.examples[0], field.type)
-            if hint:
-                attributes = {"value": hint}
-        extractions.append(
-            data.Extraction(
-                extraction_class=field.title,
-                extraction_text=field.examples[0],
-                attributes=attributes,
-            )
+    extractions = [
+        data.Extraction(
+            extraction_class=field.title,
+            extraction_text=field.examples[0],
+            attributes=_example_attributes(field),
         )
+        for field in fields_with_examples
+    ]
     return data.ExampleData(text="\n".join(lines), extractions=extractions)
 
 
