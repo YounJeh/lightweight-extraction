@@ -132,6 +132,26 @@ def field_create_form():
     )
 
 
+def field_import_form():
+    return Div(
+        Div("Importer des champs", cls="card-title"),
+        Form(
+            Label("Fichier (.csv, .tsv, .xlsx)", **{"for": "import-file"}),
+            Input(
+                type="file",
+                name="file",
+                accept=".csv,.tsv,.xlsx",
+                required=True,
+                id="import-file",
+            ),
+            Div(Button("Importer", type="submit"), cls="card-footer"),
+            action="/fields/import",
+            method="post",
+        ),
+        cls="card",
+    )
+
+
 def _field_checkbox(field: Field):
     input_id = f"field-{field.id}"
     return Label(

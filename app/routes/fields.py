@@ -3,7 +3,7 @@ from fasthtml.common import RedirectResponse, UploadFile
 from app.fields_import import import_fields
 from app.models import FieldCreate, FieldExample, FieldUpdate
 from app.repository import FieldRepository
-from app.ui.components import error_banner, field_create_form, fields_table
+from app.ui.components import error_banner, field_create_form, field_import_form, fields_table
 from app.ui.layout import page
 
 
@@ -17,6 +17,7 @@ def register_fields_routes(app, repo: FieldRepository):
             "Champs",
             error_banner(message),
             field_create_form(),
+            field_import_form(),
             fields_table(repo.list_all()),
         )
 
@@ -25,7 +26,9 @@ def register_fields_routes(app, repo: FieldRepository):
     # doesn't apply here).
     @app.get("/fields")
     def get():
-        return page("Champs", field_create_form(), fields_table(repo.list_all()))
+        return page(
+            "Champs", field_create_form(), field_import_form(), fields_table(repo.list_all())
+        )
 
     @app.post("/fields")
     def post(
