@@ -7,8 +7,8 @@ from app.tools.ner_langextract import LangExtractNerExtractor
 
 def _fields() -> list[Field]:
     return [
-        Field(id=1, title="Condition de règlement", definition="...", examples=[]),
-        Field(id=2, title="Avance forfaitaire", definition="...", examples=[]),
+        Field(id=1, key="condition_reglement", title="Condition de règlement", definition="...", examples=[]),
+        Field(id=2, key="avance_forfaitaire", title="Avance forfaitaire", definition="...", examples=[]),
     ]
 
 
@@ -142,7 +142,7 @@ def test_extract_sets_value_type_and_no_error_for_valid_typed_value(monkeypatch)
     )
     annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
     monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
-    fields = [Field(id=1, title="Âge", definition="Âge de la personne", type="int")]
+    fields = [Field(id=1, key="age", title="Âge", definition="Âge de la personne", type="int")]
 
     results = LangExtractNerExtractor().extract(text, fields)
 
@@ -164,7 +164,7 @@ def test_extract_sets_type_error_when_value_not_convertible(monkeypatch):
     )
     annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
     monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
-    fields = [Field(id=1, title="Âge", definition="Âge de la personne", type="int")]
+    fields = [Field(id=1, key="age", title="Âge", definition="Âge de la personne", type="int")]
 
     results = LangExtractNerExtractor().extract(text, fields)
 
@@ -187,7 +187,7 @@ def test_extract_falls_back_to_extraction_text_when_attributes_missing(monkeypat
     )
     annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
     monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
-    fields = [Field(id=1, title="Âge", definition="Âge de la personne", type="int")]
+    fields = [Field(id=1, key="age", title="Âge", definition="Âge de la personne", type="int")]
 
     results = LangExtractNerExtractor().extract(text, fields)
 
