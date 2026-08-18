@@ -52,6 +52,11 @@ def register_extraction_routes(
         run = run_repo.create_run(pdf.filename, results)
         return RedirectResponse(f"/extraction/runs/{run.id}", status_code=303)
 
+    @app.post("/extraction/runs/delete")
+    def post_delete_all():
+        run_repo.delete_all_runs()
+        return RedirectResponse("/extraction", status_code=303)
+
     @app.get("/extraction/runs/{id}")
     def get_run(id: int):
         run = run_repo.get_run(id)

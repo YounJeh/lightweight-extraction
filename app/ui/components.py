@@ -258,6 +258,14 @@ def extraction_runs_list(runs: list[ExtractionRun]):
         return Div("Aucune extraction pour le moment.", cls="empty-state")
     return Div(
         Div("Historique", cls="card-title"),
+        Div(
+            Form(
+                Button("Nettoyer l'historique", type="submit", cls="btn-danger"),
+                action="/extraction/runs/delete",
+                method="post",
+            ),
+            cls="card-actions",
+        ),
         Ul(
             *[
                 Li(A(run.document_name, href=f"/extraction/runs/{run.id}"))
