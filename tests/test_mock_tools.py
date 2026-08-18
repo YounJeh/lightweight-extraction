@@ -15,8 +15,8 @@ def test_mock_pdf_extractor_returns_same_text_regardless_of_input():
 
 def test_mock_ner_extractor_returns_one_result_per_field():
     fields = [
-        Field(id=1, title="Nom", definition="d", examples=["Jean"]),
-        Field(id=2, title="Date", definition="d", examples=[]),
+        Field(id=1, key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}]),
+        Field(id=2, key="date", title="Date", definition="d", examples=[]),
     ]
     extractor = MockNerExtractor()
 
@@ -27,7 +27,13 @@ def test_mock_ner_extractor_returns_one_result_per_field():
 
 
 def test_mock_ner_extractor_uses_first_example_when_available():
-    field = Field(id=1, title="Nom", definition="d", examples=["Jean", "Paul"])
+    field = Field(
+        id=1,
+        key="nom",
+        title="Nom",
+        definition="d",
+        examples=[{"context": "Jean"}, {"context": "Paul"}],
+    )
     extractor = MockNerExtractor()
 
     [result] = extractor.extract("texte", [field])
@@ -36,7 +42,7 @@ def test_mock_ner_extractor_uses_first_example_when_available():
 
 
 def test_mock_ner_extractor_falls_back_when_no_examples():
-    field = Field(id=1, title="Nom", definition="d", examples=[])
+    field = Field(id=1, key="nom", title="Nom", definition="d", examples=[])
     extractor = MockNerExtractor()
 
     [result] = extractor.extract("texte", [field])
@@ -45,7 +51,14 @@ def test_mock_ner_extractor_falls_back_when_no_examples():
 
 
 def test_mock_ner_extractor_sets_value_type_from_field_without_error():
-    field = Field(id=1, title="Date", definition="d", examples=["2026-08-14"], type="date")
+    field = Field(
+        id=1,
+        key="date",
+        title="Date",
+        definition="d",
+        examples=[{"context": "2026-08-14"}],
+        type="date",
+    )
     extractor = MockNerExtractor()
 
     [result] = extractor.extract("texte", [field])
@@ -56,7 +69,7 @@ def test_mock_ner_extractor_sets_value_type_from_field_without_error():
 
 
 def test_mock_ner_extractor_is_deterministic():
-    fields = [Field(id=1, title="Nom", definition="d", examples=[])]
+    fields = [Field(id=1, key="nom", title="Nom", definition="d", examples=[])]
     extractor = MockNerExtractor()
 
     first = extractor.extract("texte", fields)
