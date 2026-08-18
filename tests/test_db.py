@@ -106,6 +106,32 @@ def test_init_db_creates_unique_index_on_fields_key(tmp_path):
     conn.close()
 
 
+def test_init_db_migrates_pre_existing_table_with_multiple_fields(tmp_path):
+    db_path = tmp_path / "test.db"
+    conn = get_connection(db_path)
+    # Simule une DB pré-`key`/`section` avec plusieurs champs déjà en base —
+    # sans backfill, ils hériteraient tous du même défaut '' et la création
+    # de l'index unique sur `key` échouerait.
+    conn.execute(
+        "CREATE TABLE fields (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "title TEXT NOT NULL, definition TEXT NOT NULL, "
+        "examples TEXT NOT NULL DEFAULT '[]', type TEXT NOT NULL DEFAULT 'text')"
+    )
+    conn.execute("INSERT INTO fields (title, definition) VALUES ('A', 'defA')")
+    conn.execute("INSERT INTO fields (title, definition) VALUES ('B', 'defB')")
+    conn.execute("INSERT INTO fields (title, definition) VALUES ('C', 'defC')")
+    conn.commit()
+
+    init_db(conn)  # ne doit pas lever d'IntegrityError
+    init_db(conn)  # doit rester idempotent
+
+    rows = conn.execute("SELECT id, key FROM fields ORDER BY id").fetchall()
+    keys = [row["key"] for row in rows]
+    assert len(keys) == len(set(keys))  # toutes uniques
+    assert all(k for k in keys)  # aucune vide
+    conn.close()
+
+
 def test_init_db_adds_value_type_and_type_error_columns_to_pre_existing_results_table(
     tmp_path,
 ):

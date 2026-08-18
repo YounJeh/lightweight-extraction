@@ -69,6 +69,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "extraction_results", "value_type", "TEXT")
     _add_column_if_missing(conn, "extraction_results", "typed_value", "TEXT")
     _add_column_if_missing(conn, "extraction_results", "type_error", "TEXT")
+    # Les lignes migrées depuis le schéma pré-`key` héritent toutes du même
+    # défaut '' (ALTER TABLE ADD COLUMN ne permet pas une valeur par ligne) —
+    # il faut leur donner une clé unique avant de poser l'index, sinon sa
+    # création échoue dès qu'il y a 2 lignes ou plus.
+    conn.execute("UPDATE fields SET key = 'field-' || id WHERE key = ''")
     # Index séparé plutôt qu'une contrainte UNIQUE inline sur `key` : SQLite
     # ne permet pas d'ajouter une contrainte UNIQUE via ALTER TABLE ADD
     # COLUMN sur une table existante, un index fonctionne dans les deux cas.
