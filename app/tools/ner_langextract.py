@@ -1,9 +1,10 @@
 import os
+import re
 
 import langextract
 from langextract import data
 
-from app.models import ExtractionResult, Field
+from app.models import ExtractionResult, Field, FieldType
 from app.tools import type_coercion
 from app.tools.pdf_pymupdf4llm import PAGE_SEPARATOR_RE
 
@@ -16,6 +17,28 @@ _TYPE_INSTRUCTIONS = {
     "bool": " (oui/non)",
     "date": " (date au format ISO AAAA-MM-JJ)",
 }
+
+_NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+_ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_BOOL_TOKEN_RE = re.compile(r"\b(oui|non|vrai|faux|true|false)\b", re.IGNORECASE)
+
+
+def _typed_hint(example: str, field_type: FieldType) -> str | None:
+    """Isole, dans un exemple en langage naturel, la sous-chaîne qui
+    représente la valeur typée attendue — pour montrer au LLM, via le
+    few-shot, que attributes['value'] doit être une valeur étroite/typée et
+    non une recopie de extraction_text. None si rien n'est trouvé (le champ
+    few-shot reste alors sans attributs, comme avant)."""
+    if field_type in ("int", "float"):
+        match = _NUMBER_RE.search(example)
+        return match.group(0).replace(",", ".") if match else None
+    if field_type == "date":
+        match = _ISO_DATE_RE.search(example)
+        return match.group(0) if match else None
+    if field_type == "bool":
+        match = _BOOL_TOKEN_RE.search(example)
+        return match.group(0).lower() if match else None
+    return None
 
 
 class LangExtractNerExtractor:
@@ -224,14 +247,20 @@ def _build_example(fields: list[Field]) -> "data.ExampleData | None":
     if not fields_with_examples:
         return None
     lines = [f"{field.title} : {field.examples[0]}" for field in fields_with_examples]
-    extractions = [
-        data.Extraction(
-            extraction_class=field.title,
-            extraction_text=field.examples[0],
-            attributes={"value": field.examples[0]} if field.type != "text" else None,
+    extractions = []
+    for field in fields_with_examples:
+        attributes = None
+        if field.type != "text":
+            hint = _typed_hint(field.examples[0], field.type)
+            if hint:
+                attributes = {"value": hint}
+        extractions.append(
+            data.Extraction(
+                extraction_class=field.title,
+                extraction_text=field.examples[0],
+                attributes=attributes,
+            )
         )
-        for field in fields_with_examples
-    ]
     return data.ExampleData(text="\n".join(lines), extractions=extractions)
 
 
