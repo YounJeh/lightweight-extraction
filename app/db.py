@@ -6,8 +6,10 @@ DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "app.db"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fields (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL DEFAULT '',
     title TEXT NOT NULL,
     definition TEXT NOT NULL,
+    section TEXT,
     examples TEXT NOT NULL DEFAULT '[]',
     type TEXT NOT NULL DEFAULT 'text'
 );
@@ -62,7 +64,13 @@ def init_db(conn: sqlite3.Connection) -> None:
     # ALTER TABLE ponctuel pour les DB créées avant l'ajout de ces colonnes —
     # CREATE TABLE IF NOT EXISTS ne les ajoute pas rétroactivement.
     _add_column_if_missing(conn, "fields", "type", "TEXT NOT NULL DEFAULT 'text'")
+    _add_column_if_missing(conn, "fields", "key", "TEXT NOT NULL DEFAULT ''")
+    _add_column_if_missing(conn, "fields", "section", "TEXT")
     _add_column_if_missing(conn, "extraction_results", "value_type", "TEXT")
     _add_column_if_missing(conn, "extraction_results", "typed_value", "TEXT")
     _add_column_if_missing(conn, "extraction_results", "type_error", "TEXT")
+    # Index séparé plutôt qu'une contrainte UNIQUE inline sur `key` : SQLite
+    # ne permet pas d'ajouter une contrainte UNIQUE via ALTER TABLE ADD
+    # COLUMN sur une table existante, un index fonctionne dans les deux cas.
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_fields_key ON fields(key)")
     conn.commit()

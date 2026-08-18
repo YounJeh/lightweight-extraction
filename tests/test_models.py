@@ -1,23 +1,45 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models import ExtractionGrounding, ExtractionResult, Field
+from app.models import ExtractionGrounding, ExtractionResult, Field, FieldCreate
 
 
 def test_field_type_defaults_to_text():
-    field = Field(id=1, title="Titre", definition="Définition")
+    field = Field(id=1, key="titre", title="Titre", definition="Définition")
     assert field.type == "text"
 
 
 @pytest.mark.parametrize("field_type", ["text", "int", "float", "bool", "date"])
 def test_field_accepts_each_supported_type(field_type):
-    field = Field(id=1, title="Titre", definition="Définition", type=field_type)
+    field = Field(
+        id=1, key="titre", title="Titre", definition="Définition", type=field_type
+    )
     assert field.type == field_type
 
 
 def test_field_rejects_unsupported_type():
     with pytest.raises(ValidationError):
-        Field(id=1, title="Titre", definition="Définition", type="autre_chose")
+        Field(
+            id=1, key="titre", title="Titre", definition="Définition", type="autre_chose"
+        )
+
+
+def test_field_create_requires_key():
+    with pytest.raises(ValidationError):
+        FieldCreate(title="Titre", definition="Définition")
+
+
+def test_field_parses_structured_examples():
+    field = Field(
+        id=1,
+        key="titre",
+        title="Titre",
+        definition="Définition",
+        examples=[{"context": "texte", "value": "10", "source": "doc.pdf"}],
+    )
+    assert field.examples[0].context == "texte"
+    assert field.examples[0].value == "10"
+    assert field.examples[0].source == "doc.pdf"
 
 
 def test_extraction_result_valid_without_grounding():
