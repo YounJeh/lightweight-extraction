@@ -89,7 +89,7 @@ def field_row(field: Field):
 def fields_table(fields: list[Field]):
     if not fields:
         return Div(
-            "Aucun champ pour le moment — crée le premier ci-dessous.",
+            "Aucun champ pour le moment — crée le premier ci-dessus.",
             cls="empty-state",
         )
     return Div(*[field_row(field) for field in fields], cls="stack")

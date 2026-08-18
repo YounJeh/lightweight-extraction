@@ -15,8 +15,8 @@ def register_fields_routes(app, repo: FieldRepository):
         return page(
             "Champs",
             error_banner(message),
-            fields_table(repo.list_all()),
             field_create_form(),
+            fields_table(repo.list_all()),
         )
 
     # Route handlers are nested closures, so `.get`/`.post` are used
@@ -24,7 +24,7 @@ def register_fields_routes(app, repo: FieldRepository):
     # doesn't apply here).
     @app.get("/fields")
     def get():
-        return page("Champs", fields_table(repo.list_all()), field_create_form())
+        return page("Champs", field_create_form(), fields_table(repo.list_all()))
 
     @app.post("/fields")
     def post(title: str, definition: str, examples: str = "", type: str = "text"):
