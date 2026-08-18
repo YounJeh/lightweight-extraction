@@ -44,6 +44,15 @@ class ExtractionRunRepository:
         self._conn.commit()
         return self.get_run(run_id)
 
+    def delete_all_runs(self) -> None:
+        self._conn.execute(
+            "DELETE FROM extraction_groundings WHERE result_id IN "
+            "(SELECT id FROM extraction_results)"
+        )
+        self._conn.execute("DELETE FROM extraction_results")
+        self._conn.execute("DELETE FROM extraction_runs")
+        self._conn.commit()
+
     def list_runs(self) -> list[ExtractionRun]:
         rows = self._conn.execute(
             "SELECT id FROM extraction_runs ORDER BY id"

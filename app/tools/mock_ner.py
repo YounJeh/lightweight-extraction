@@ -11,7 +11,7 @@ class MockNerExtractor:
     @staticmethod
     def _mock_result(field: Field) -> ExtractionResult:
         value = (
-            field.examples[0]
+            field.examples[0].context
             if field.examples
             else f"Valeur simulée pour « {field.title} »"
         )

@@ -1,6 +1,7 @@
 from fasthtml.common import (
     A,
     Button,
+    Details,
     Div,
     Form,
     Input,
@@ -11,6 +12,7 @@ from fasthtml.common import (
     Script,
     Select,
     Span,
+    Summary,
     Table,
     Tbody,
     Td,
@@ -21,7 +23,7 @@ from fasthtml.common import (
     Ul,
 )
 
-from app.models import ExtractionResult, ExtractionRun, Field
+from app.models import ExtractionResult, ExtractionRun, Field, FieldExample
 
 _FIELD_TYPES = [
     ("text", "Texte"),
@@ -32,8 +34,8 @@ _FIELD_TYPES = [
 ]
 
 
-def _examples_to_text(examples: list[str]) -> str:
-    return "\n".join(examples)
+def _examples_to_text(examples: list[FieldExample]) -> str:
+    return "\n".join(e.context for e in examples)
 
 
 def _type_select(field_id: str, selected: str = "text"):
@@ -54,6 +56,10 @@ def error_banner(message: str):
 def field_row(field: Field):
     return Div(
         Form(
+            Label("Clé", **{"for": f"key-{field.id}"}),
+            Input(name="key", value=field.key, required=True, id=f"key-{field.id}"),
+            Label("Section", **{"for": f"section-{field.id}"}),
+            Input(name="section", value=field.section or "", id=f"section-{field.id}"),
             Label("Titre", **{"for": f"title-{field.id}"}),
             Input(name="title", value=field.title, required=True, id=f"title-{field.id}"),
             Label("Définition", **{"for": f"def-{field.id}"}),
@@ -89,7 +95,7 @@ def field_row(field: Field):
 def fields_table(fields: list[Field]):
     if not fields:
         return Div(
-            "Aucun champ pour le moment — crée le premier ci-dessous.",
+            "Aucun champ pour le moment — crée le premier ci-dessus.",
             cls="empty-state",
         )
     return Div(*[field_row(field) for field in fields], cls="stack")
@@ -99,6 +105,10 @@ def field_create_form():
     return Div(
         Div("Nouveau champ", cls="card-title"),
         Form(
+            Label("Clé", **{"for": "new-key"}),
+            Input(name="key", placeholder="Clé", required=True, id="new-key"),
+            Label("Section", **{"for": "new-section"}),
+            Input(name="section", placeholder="Section", id="new-section"),
             Label("Titre", **{"for": "new-title"}),
             Input(name="title", placeholder="Titre", required=True, id="new-title"),
             Label("Définition", **{"for": "new-definition"}),
@@ -124,13 +134,104 @@ def field_create_form():
     )
 
 
-def _field_checkbox(field: Field):
+def field_import_form():
+    return Div(
+        Div("Importer des champs", cls="card-title"),
+        Form(
+            Label("Fichier (.csv, .tsv, .xlsx)", **{"for": "import-file"}),
+            Input(
+                type="file",
+                name="file",
+                accept=".csv,.tsv,.xlsx",
+                required=True,
+                id="import-file",
+            ),
+            Div(Button("Importer", type="submit"), cls="card-footer"),
+            action="/fields/import",
+            method="post",
+        ),
+        cls="card",
+    )
+
+
+_OTHER_SECTION = "Autres"
+
+
+def _group_fields_by_section(fields: list[Field]) -> list[tuple[str, list[Field]]]:
+    groups: dict[str, list[Field]] = {}
+    for field in fields:
+        groups.setdefault(field.section or _OTHER_SECTION, []).append(field)
+    return [(name, groups[name]) for name in sorted(groups)]
+
+
+def _field_checkbox_row(field: Field):
     input_id = f"field-{field.id}"
     return Label(
-        Input(type="checkbox", name="field_ids", value=str(field.id), id=input_id),
+        Input(
+            type="checkbox", name="field_ids", value=str(field.id), id=input_id, checked=True
+        ),
         field.title,
-        cls="chip",
+        cls="field-row",
         **{"for": input_id},
+    )
+
+
+def _field_section_group(section: str, fields: list[Field]):
+    return Details(
+        Summary(
+            Span(section, cls="field-group-name"),
+            Span(f"{len(fields)}/{len(fields)} sélectionnés", cls="field-group-count"),
+        ),
+        Div(
+            Button(
+                "Tout sélectionner", type="button", data_select="all", cls="field-group-toggle"
+            ),
+            Button(
+                "Tout désélectionner",
+                type="button",
+                data_select="none",
+                cls="field-group-toggle",
+            ),
+            cls="field-group-actions",
+        ),
+        Div(*[_field_checkbox_row(f) for f in fields], cls="field-group-list"),
+        cls="field-group",
+    )
+
+
+def _field_group_selection_script():
+    return Script(
+        """
+        (function () {
+          var container = document.querySelector(".field-groups");
+          if (!container) return;
+
+          function updateCount(group) {
+            var boxes = group.querySelectorAll('input[type="checkbox"]');
+            var checked = group.querySelectorAll('input[type="checkbox"]:checked').length;
+            var countEl = group.querySelector(".field-group-count");
+            if (countEl) countEl.textContent = checked + "/" + boxes.length + " sélectionnés";
+          }
+
+          container.addEventListener("change", function (e) {
+            if (e.target.type !== "checkbox") return;
+            var group = e.target.closest(".field-group");
+            if (group) updateCount(group);
+          });
+
+          container.addEventListener("click", function (e) {
+            var button = e.target.closest("[data-select]");
+            if (!button) return;
+            var group = button.closest(".field-group");
+            if (!group) return;
+            var checked = button.dataset.select === "all";
+            group.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+              cb.checked = checked;
+            });
+            updateCount(group);
+          });
+        })();
+        """
     )
 
 
@@ -173,7 +274,13 @@ def extraction_form(fields: list[Field]):
                     id="pdf-input",
                 ),
                 Label("Champs à extraire"),
-                Div(*[_field_checkbox(field) for field in fields], cls="chip-list"),
+                Div(
+                    *[
+                        _field_section_group(section, section_fields)
+                        for section, section_fields in _group_fields_by_section(fields)
+                    ],
+                    cls="field-groups",
+                ),
                 Div(
                     Button(
                         "Lancer l'extraction",
@@ -189,6 +296,7 @@ def extraction_form(fields: list[Field]):
             cls="card",
         ),
         _extraction_loading_script(),
+        _field_group_selection_script(),
     )
 
 
@@ -258,6 +366,14 @@ def extraction_runs_list(runs: list[ExtractionRun]):
         return Div("Aucune extraction pour le moment.", cls="empty-state")
     return Div(
         Div("Historique", cls="card-title"),
+        Div(
+            Form(
+                Button("Nettoyer l'historique", type="submit", cls="btn-danger"),
+                action="/extraction/runs/delete",
+                method="post",
+            ),
+            cls="card-actions",
+        ),
         Ul(
             *[
                 Li(A(run.document_name, href=f"/extraction/runs/{run.id}"))

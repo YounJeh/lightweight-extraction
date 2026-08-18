@@ -17,9 +17,10 @@ def _test_fields() -> list[Field]:
     return [
         Field(
             id=i,
+            key=f"field_{i}",
             title=title,
             definition=f"Valeur du champ « {title} »",
-            examples=[value],
+            examples=[{"context": value}],
         )
         for i, (title, value) in enumerate(SAMPLE_CONTRACT_FIELDS.items(), start=1)
     ]

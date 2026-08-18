@@ -40,16 +40,76 @@ def test_get_extraction_shows_empty_state_without_fields(client):
 
 
 def test_get_extraction_lists_available_fields(client, field_repo):
-    field_repo.create(FieldCreate(title="Nom", definition="d", examples=[]))
+    field_repo.create(FieldCreate(key="nom", title="Nom", definition="d", examples=[]))
 
     response = client.get("/extraction")
 
     assert "Nom" in response.text
 
 
+def test_get_extraction_groups_fields_by_section_alphabetically(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+    field_repo.create(
+        FieldCreate(key="b", title="B", definition="d", examples=[], section="Assurances")
+    )
+
+    response = client.get("/extraction")
+
+    assert response.text.index("Assurances") < response.text.index("Pénalité")
+
+
+def test_get_extraction_puts_fields_without_section_in_autres_group(client, field_repo):
+    field_repo.create(FieldCreate(key="a", title="A", definition="d", examples=[]))
+
+    response = client.get("/extraction")
+
+    assert "Autres" in response.text
+
+
+def test_get_extraction_field_groups_are_closed_by_default(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+
+    response = client.get("/extraction")
+
+    assert "<details class=\"field-group\">" in response.text
+    assert "<details open" not in response.text
+
+
+def test_get_extraction_group_shows_toggle_buttons_and_initial_counter(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+    field_repo.create(
+        FieldCreate(key="b", title="B", definition="d", examples=[], section="Pénalité")
+    )
+
+    response = client.get("/extraction")
+
+    assert "2/2 sélectionnés" in response.text
+    assert 'data-select="all"' in response.text
+    assert 'data-select="none"' in response.text
+
+
+def test_get_extraction_fields_are_checked_by_default(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+
+    response = client.get("/extraction")
+
+    assert (
+        '<input type="checkbox" name="field_ids" value="1" checked id="field-1">'
+        in response.text
+    )
+
+
 def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo, run_repo):
     field = field_repo.create(
-        FieldCreate(title="Nom", definition="d", examples=["Jean"])
+        FieldCreate(key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}])
     )
 
     response = _upload(client, [field.id])
@@ -66,7 +126,7 @@ def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo,
 
 def test_post_extraction_result_page_shows_mock_badge(client, field_repo):
     field = field_repo.create(
-        FieldCreate(title="Nom", definition="d", examples=["Jean"])
+        FieldCreate(key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}])
     )
 
     response = _upload(client, [field.id])
@@ -149,7 +209,7 @@ def test_extraction_result_page_flags_type_error_row(client, run_repo):
 
 
 def test_uploaded_pdf_bytes_are_never_persisted(client, field_repo, db_conn):
-    field = field_repo.create(FieldCreate(title="Nom", definition="d", examples=[]))
+    field = field_repo.create(FieldCreate(key="nom", title="Nom", definition="d", examples=[]))
 
     _upload(client, [field.id])
 

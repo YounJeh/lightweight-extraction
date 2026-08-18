@@ -6,10 +6,18 @@ from pydantic import Field as PydField
 FieldType = Literal["text", "int", "float", "bool", "date"]
 
 
+class FieldExample(BaseModel):
+    context: str
+    value: str | None = None
+    source: str | None = None
+
+
 class FieldBase(BaseModel):
+    key: str
     title: str
     definition: str
-    examples: list[str] = PydField(default_factory=list)
+    section: str | None = None
+    examples: list[FieldExample] = PydField(default_factory=list)
     type: FieldType = "text"
 
 

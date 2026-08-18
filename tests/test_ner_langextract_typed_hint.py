@@ -27,9 +27,10 @@ def test_typed_hint_returns_none_for_text_type_input():
 def test_build_example_sets_narrowed_attributes_value_for_typed_field():
     field = Field(
         id=1,
+        key="pourcentage_avance",
         title="pourcentage_avance",
         definition="d",
-        examples=["10 % d’avance à la signature du contrat"],
+        examples=[{"context": "10 % d’avance à la signature du contrat"}],
         type="int",
     )
 
@@ -42,9 +43,10 @@ def test_build_example_sets_narrowed_attributes_value_for_typed_field():
 def test_build_example_omits_attributes_when_no_hint_found():
     field = Field(
         id=1,
+        key="motif",
         title="motif",
         definition="d",
-        examples=["Aucun motif clair ici"],
+        examples=[{"context": "Aucun motif clair ici"}],
         type="int",
     )
 
@@ -55,7 +57,12 @@ def test_build_example_omits_attributes_when_no_hint_found():
 
 def test_build_example_omits_attributes_for_text_fields():
     field = Field(
-        id=1, title="Nom", definition="d", examples=["Jean Dupont"], type="text"
+        id=1,
+        key="nom",
+        title="Nom",
+        definition="d",
+        examples=[{"context": "Jean Dupont"}],
+        type="text",
     )
 
     example = _build_example([field])

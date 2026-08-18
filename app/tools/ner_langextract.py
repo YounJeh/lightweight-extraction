@@ -249,7 +249,7 @@ def _example_attributes(field: Field) -> dict[str, str] | None:
     isolé dans l'exemple (voir _typed_hint)."""
     if field.type == "text":
         return None
-    hint = _typed_hint(field.examples[0], field.type)
+    hint = _typed_hint(field.examples[0].context, field.type)
     return {"value": hint} if hint else None
 
 
@@ -259,11 +259,13 @@ def _build_example(fields: list[Field]) -> "data.ExampleData | None":
     fields_with_examples = [f for f in fields if f.examples]
     if not fields_with_examples:
         return None
-    lines = [f"{field.title} : {field.examples[0]}" for field in fields_with_examples]
+    lines = [
+        f"{field.title} : {field.examples[0].context}" for field in fields_with_examples
+    ]
     extractions = [
         data.Extraction(
             extraction_class=field.title,
-            extraction_text=field.examples[0],
+            extraction_text=field.examples[0].context,
             attributes=_example_attributes(field),
         )
         for field in fields_with_examples
