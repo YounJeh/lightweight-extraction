@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -176,3 +178,59 @@ def test_post_fields_without_section_leaves_it_empty(client, repo):
     )
 
     assert repo.list_all()[0].section is None
+
+
+_GOLD_CSV_PATH = Path(__file__).resolve().parent.parent / "DATASET GOLD.csv"
+
+
+def _upload_gold_csv(client, content: bytes | None = None):
+    files = {
+        "file": (
+            "DATASET GOLD.csv",
+            content if content is not None else _GOLD_CSV_PATH.read_bytes(),
+            "text/csv",
+        )
+    }
+    return client.post("/fields/import", files=files, follow_redirects=True)
+
+
+def test_post_fields_import_loads_real_gold_dataset(client, repo):
+    response = _upload_gold_csv(client)
+
+    assert response.status_code == 200
+    assert len(repo.list_all()) == 96
+
+
+def test_post_fields_import_with_missing_column_writes_nothing(client, repo):
+    header = "label,Nom,Définition,Type,exemple valeur,Exemple texte,source\n"  # sans section
+    row = "k1,Titre,Def,INT,1,contexte,doc.pdf\n"
+    response = _upload_gold_csv(client, (header + row).encode("utf-8"))
+
+    assert "Erreur" in response.text
+    assert "section" in response.text
+    assert repo.list_all() == []
+
+
+def test_post_fields_import_twice_is_idempotent_not_duplicating(client, repo):
+    _upload_gold_csv(client)
+    _upload_gold_csv(client)
+
+    assert len(repo.list_all()) == 96
+
+
+def test_post_fields_import_replaces_definition_on_same_key(client, repo):
+    _upload_gold_csv(client)
+    original_content = _GOLD_CSV_PATH.read_text(encoding="utf-8")
+    target = (
+        "Pourcentage retenu sur le montant total du marché pour les défauts "
+        "de performances suite à l'engagement de performance"
+    )
+    modified_content = original_content.replace(target, f"MODIFIÉ : {target}", 1)
+    assert modified_content != original_content  # la substitution a bien matché
+
+    _upload_gold_csv(client, modified_content.encode("utf-8"))
+
+    fields = repo.list_all()
+    assert len(fields) == 96
+    modified = [f for f in fields if f.definition.startswith("MODIFIÉ")]
+    assert len(modified) == 1

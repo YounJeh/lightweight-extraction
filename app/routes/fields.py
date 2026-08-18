@@ -1,5 +1,6 @@
-from fasthtml.common import RedirectResponse
+from fasthtml.common import RedirectResponse, UploadFile
 
+from app.fields_import import import_fields
 from app.models import FieldCreate, FieldExample, FieldUpdate
 from app.repository import FieldRepository
 from app.ui.components import error_banner, field_create_form, fields_table
@@ -79,4 +80,14 @@ def register_fields_routes(app, repo: FieldRepository):
     @app.post("/fields/{id}/delete")
     def post_delete(id: int):
         repo.delete(id)
+        return RedirectResponse("/fields", status_code=303)
+
+    @app.post("/fields/import")
+    async def post_import(file: UploadFile):
+        content = await file.read()
+        result = import_fields(content, file.filename or "")
+        if result.errors:
+            return _fields_page_with_error("; ".join(result.errors))
+        for field in result.fields:
+            repo.upsert_by_key(field)
         return RedirectResponse("/fields", status_code=303)
