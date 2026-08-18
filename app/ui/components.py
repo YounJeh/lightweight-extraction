@@ -167,7 +167,9 @@ def _group_fields_by_section(fields: list[Field]) -> list[tuple[str, list[Field]
 def _field_checkbox_row(field: Field):
     input_id = f"field-{field.id}"
     return Label(
-        Input(type="checkbox", name="field_ids", value=str(field.id), id=input_id),
+        Input(
+            type="checkbox", name="field_ids", value=str(field.id), id=input_id, checked=True
+        ),
         field.title,
         cls="field-row",
         **{"for": input_id},
@@ -178,7 +180,7 @@ def _field_section_group(section: str, fields: list[Field]):
     return Details(
         Summary(
             Span(section, cls="field-group-name"),
-            Span(f"0/{len(fields)} sélectionnés", cls="field-group-count"),
+            Span(f"{len(fields)}/{len(fields)} sélectionnés", cls="field-group-count"),
         ),
         Div(
             Button(

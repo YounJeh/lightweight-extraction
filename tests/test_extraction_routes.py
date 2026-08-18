@@ -89,9 +89,22 @@ def test_get_extraction_group_shows_toggle_buttons_and_initial_counter(client, f
 
     response = client.get("/extraction")
 
-    assert "0/2 sélectionnés" in response.text
+    assert "2/2 sélectionnés" in response.text
     assert 'data-select="all"' in response.text
     assert 'data-select="none"' in response.text
+
+
+def test_get_extraction_fields_are_checked_by_default(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+
+    response = client.get("/extraction")
+
+    assert (
+        '<input type="checkbox" name="field_ids" value="1" checked id="field-1">'
+        in response.text
+    )
 
 
 def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo, run_repo):
