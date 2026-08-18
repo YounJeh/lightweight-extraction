@@ -72,3 +72,10 @@ nécessite une clé API valide dans `.env`) :
 ```console
 uv run pytest -v -m live
 ```
+
+## Mise à jour totale de la DB
+```console
+uv run python scripts/reset_db.py
+```
+
+
