@@ -175,11 +175,61 @@ def _field_checkbox_row(field: Field):
 
 
 def _field_section_group(section: str, fields: list[Field]):
-    count_label = "champ" if len(fields) == 1 else "champs"
     return Details(
-        Summary(f"{section} · {len(fields)} {count_label}"),
+        Summary(
+            Span(section, cls="field-group-name"),
+            Span(f"0/{len(fields)} sélectionnés", cls="field-group-count"),
+        ),
+        Div(
+            Button(
+                "Tout sélectionner", type="button", data_select="all", cls="field-group-toggle"
+            ),
+            Button(
+                "Tout désélectionner",
+                type="button",
+                data_select="none",
+                cls="field-group-toggle",
+            ),
+            cls="field-group-actions",
+        ),
         Div(*[_field_checkbox_row(f) for f in fields], cls="field-group-list"),
         cls="field-group",
+    )
+
+
+def _field_group_selection_script():
+    return Script(
+        """
+        (function () {
+          var container = document.querySelector(".field-groups");
+          if (!container) return;
+
+          function updateCount(group) {
+            var boxes = group.querySelectorAll('input[type="checkbox"]');
+            var checked = group.querySelectorAll('input[type="checkbox"]:checked').length;
+            var countEl = group.querySelector(".field-group-count");
+            if (countEl) countEl.textContent = checked + "/" + boxes.length + " sélectionnés";
+          }
+
+          container.addEventListener("change", function (e) {
+            if (e.target.type !== "checkbox") return;
+            var group = e.target.closest(".field-group");
+            if (group) updateCount(group);
+          });
+
+          container.addEventListener("click", function (e) {
+            var button = e.target.closest("[data-select]");
+            if (!button) return;
+            var group = button.closest(".field-group");
+            if (!group) return;
+            var checked = button.dataset.select === "all";
+            group.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+              cb.checked = checked;
+            });
+            updateCount(group);
+          });
+        })();
+        """
     )
 
 
@@ -244,6 +294,7 @@ def extraction_form(fields: list[Field]):
             cls="card",
         ),
         _extraction_loading_script(),
+        _field_group_selection_script(),
     )
 
 

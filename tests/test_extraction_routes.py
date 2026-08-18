@@ -79,6 +79,21 @@ def test_get_extraction_field_groups_are_closed_by_default(client, field_repo):
     assert "<details open" not in response.text
 
 
+def test_get_extraction_group_shows_toggle_buttons_and_initial_counter(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+    field_repo.create(
+        FieldCreate(key="b", title="B", definition="d", examples=[], section="Pénalité")
+    )
+
+    response = client.get("/extraction")
+
+    assert "0/2 sélectionnés" in response.text
+    assert 'data-select="all"' in response.text
+    assert 'data-select="none"' in response.text
+
+
 def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo, run_repo):
     field = field_repo.create(
         FieldCreate(key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}])
