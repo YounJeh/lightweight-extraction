@@ -48,10 +48,14 @@ def _normalize_type(raw: str, line_no: int, key: str) -> FieldType:
     return normalized
 
 
+def _col(row: dict[str, str], name: str) -> str:
+    return (row.get(name) or "").strip()
+
+
 def _row_to_field_create(row: dict[str, str], line_no: int) -> FieldCreate:
-    key = (row.get("label") or "").strip()
-    title = (row.get("Nom") or "").strip()
-    definition = (row.get("Définition") or "").strip()
+    key = _col(row, "label")
+    title = _col(row, "Nom")
+    definition = _col(row, "Définition")
     if not key:
         raise _RowError(line_no, key, "colonne 'label' vide")
     if not title:
@@ -59,11 +63,11 @@ def _row_to_field_create(row: dict[str, str], line_no: int) -> FieldCreate:
     if not definition:
         raise _RowError(line_no, key, "colonne 'Définition' vide")
 
-    field_type = _normalize_type(row.get("Type") or "", line_no, key)
-    section = (row.get("section") or "").strip() or None
-    context = (row.get("Exemple texte") or "").strip()
-    value = (row.get("exemple valeur") or "").strip() or None
-    source = (row.get("source") or "").strip() or None
+    field_type = _normalize_type(_col(row, "Type"), line_no, key)
+    section = _col(row, "section") or None
+    context = _col(row, "Exemple texte")
+    value = _col(row, "exemple valeur") or None
+    source = _col(row, "source") or None
     examples = [FieldExample(context=context, value=value, source=source)] if context else []
 
     return FieldCreate(

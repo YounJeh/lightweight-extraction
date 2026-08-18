@@ -9,20 +9,12 @@ class FieldRepository:
         self._conn = conn
 
     def create(self, data: FieldCreate) -> Field:
-        key = self._require_key(data.key)
-        title = self._require_title(data.title)
+        key, params = self._validated_params(data)
         try:
             cursor = self._conn.execute(
                 "INSERT INTO fields (key, title, definition, section, examples, type) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    key,
-                    title,
-                    data.definition,
-                    data.section,
-                    self._dump_examples(data.examples),
-                    data.type,
-                ),
+                params,
             )
         except sqlite3.IntegrityError as e:
             raise ValueError(f"key already exists: {key}") from e
@@ -40,21 +32,12 @@ class FieldRepository:
         return self._row_to_field(row) if row else None
 
     def update(self, field_id: int, data: FieldUpdate) -> Field | None:
-        key = self._require_key(data.key)
-        title = self._require_title(data.title)
+        key, params = self._validated_params(data)
         try:
             self._conn.execute(
                 "UPDATE fields SET key = ?, title = ?, definition = ?, section = ?, "
                 "examples = ?, type = ? WHERE id = ?",
-                (
-                    key,
-                    title,
-                    data.definition,
-                    data.section,
-                    self._dump_examples(data.examples),
-                    data.type,
-                    field_id,
-                ),
+                (*params, field_id),
             )
         except sqlite3.IntegrityError as e:
             raise ValueError(f"key already exists: {key}") from e
@@ -65,8 +48,7 @@ class FieldRepository:
         """Crée le champ si `data.key` est inédit, sinon remplace
         entièrement title/definition/section/examples/type de la ligne
         existante (pas de fusion) — utilisé par l'import de fichier."""
-        key = self._require_key(data.key)
-        title = self._require_title(data.title)
+        key, params = self._validated_params(data)
         self._conn.execute(
             "INSERT INTO fields (key, title, definition, section, examples, type) "
             "VALUES (?, ?, ?, ?, ?, ?) "
@@ -74,14 +56,7 @@ class FieldRepository:
             "title = excluded.title, definition = excluded.definition, "
             "section = excluded.section, examples = excluded.examples, "
             "type = excluded.type",
-            (
-                key,
-                title,
-                data.definition,
-                data.section,
-                self._dump_examples(data.examples),
-                data.type,
-            ),
+            params,
         )
         self._conn.commit()
         row = self._conn.execute(
@@ -92,6 +67,20 @@ class FieldRepository:
     def delete(self, field_id: int) -> None:
         self._conn.execute("DELETE FROM fields WHERE id = ?", (field_id,))
         self._conn.commit()
+
+    @classmethod
+    def _validated_params(cls, data: FieldCreate | FieldUpdate) -> tuple[str, tuple]:
+        key = cls._require_key(data.key)
+        title = cls._require_title(data.title)
+        params = (
+            key,
+            title,
+            data.definition,
+            data.section,
+            cls._dump_examples(data.examples),
+            data.type,
+        )
+        return key, params
 
     @staticmethod
     def _require_title(title: str) -> str:
