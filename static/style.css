@@ -222,36 +222,69 @@ button.btn-danger:hover {
   background: var(--danger-bg);
 }
 
-/* Field selection chips */
+/* Field selection groups */
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 14px;
-  margin: 0 8px 8px 0;
-  cursor: pointer;
-  font-size: 0.9rem;
-  background: var(--bg-card);
+.field-groups {
+  border-top: 1px solid var(--border);
+  margin-bottom: 16px;
 }
 
-.chip input {
+.field-group {
+  border-bottom: 1px solid var(--border);
+}
+
+.field-group summary {
+  padding: 10px 2px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.field-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.field-group summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--text-secondary);
+}
+
+.field-group[open] summary::before {
+  content: "▾";
+}
+
+.field-group-list {
+  padding-bottom: 4px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 2px 7px 1.9em;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  border-top: 1px solid var(--border);
+}
+
+.field-row:first-child {
+  border-top: none;
+}
+
+.field-row:hover {
+  background: var(--bg-main);
+}
+
+.field-row input {
   accent-color: var(--accent);
   margin: 0;
-}
-
-.chip:has(input:checked) {
-  background: var(--accent-tint);
-  border-color: var(--accent);
-  color: var(--accent-hover);
-}
-
-.chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
 }
 
 /* Badge */
