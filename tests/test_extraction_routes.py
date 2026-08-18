@@ -40,7 +40,7 @@ def test_get_extraction_shows_empty_state_without_fields(client):
 
 
 def test_get_extraction_lists_available_fields(client, field_repo):
-    field_repo.create(FieldCreate(title="Nom", definition="d", examples=[]))
+    field_repo.create(FieldCreate(key="nom", title="Nom", definition="d", examples=[]))
 
     response = client.get("/extraction")
 
@@ -49,7 +49,7 @@ def test_get_extraction_lists_available_fields(client, field_repo):
 
 def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo, run_repo):
     field = field_repo.create(
-        FieldCreate(title="Nom", definition="d", examples=["Jean"])
+        FieldCreate(key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}])
     )
 
     response = _upload(client, [field.id])
@@ -66,7 +66,7 @@ def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo,
 
 def test_post_extraction_result_page_shows_mock_badge(client, field_repo):
     field = field_repo.create(
-        FieldCreate(title="Nom", definition="d", examples=["Jean"])
+        FieldCreate(key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}])
     )
 
     response = _upload(client, [field.id])
@@ -149,7 +149,7 @@ def test_extraction_result_page_flags_type_error_row(client, run_repo):
 
 
 def test_uploaded_pdf_bytes_are_never_persisted(client, field_repo, db_conn):
-    field = field_repo.create(FieldCreate(title="Nom", definition="d", examples=[]))
+    field = field_repo.create(FieldCreate(key="nom", title="Nom", definition="d", examples=[]))
 
     _upload(client, [field.id])
 

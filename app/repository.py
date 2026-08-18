@@ -9,11 +9,23 @@ class FieldRepository:
         self._conn = conn
 
     def create(self, data: FieldCreate) -> Field:
+        key = self._require_key(data.key)
         title = self._require_title(data.title)
-        cursor = self._conn.execute(
-            "INSERT INTO fields (title, definition, examples, type) VALUES (?, ?, ?, ?)",
-            (title, data.definition, json.dumps(data.examples), data.type),
-        )
+        try:
+            cursor = self._conn.execute(
+                "INSERT INTO fields (key, title, definition, section, examples, type) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    key,
+                    title,
+                    data.definition,
+                    data.section,
+                    self._dump_examples(data.examples),
+                    data.type,
+                ),
+            )
+        except sqlite3.IntegrityError as e:
+            raise ValueError(f"key already exists: {key}") from e
         self._conn.commit()
         return self.get(cursor.lastrowid)
 
@@ -28,13 +40,54 @@ class FieldRepository:
         return self._row_to_field(row) if row else None
 
     def update(self, field_id: int, data: FieldUpdate) -> Field | None:
+        key = self._require_key(data.key)
         title = self._require_title(data.title)
-        self._conn.execute(
-            "UPDATE fields SET title = ?, definition = ?, examples = ?, type = ? WHERE id = ?",
-            (title, data.definition, json.dumps(data.examples), data.type, field_id),
-        )
+        try:
+            self._conn.execute(
+                "UPDATE fields SET key = ?, title = ?, definition = ?, section = ?, "
+                "examples = ?, type = ? WHERE id = ?",
+                (
+                    key,
+                    title,
+                    data.definition,
+                    data.section,
+                    self._dump_examples(data.examples),
+                    data.type,
+                    field_id,
+                ),
+            )
+        except sqlite3.IntegrityError as e:
+            raise ValueError(f"key already exists: {key}") from e
         self._conn.commit()
         return self.get(field_id)
+
+    def upsert_by_key(self, data: FieldCreate) -> Field:
+        """Crée le champ si `data.key` est inédit, sinon remplace
+        entièrement title/definition/section/examples/type de la ligne
+        existante (pas de fusion) — utilisé par l'import de fichier."""
+        key = self._require_key(data.key)
+        title = self._require_title(data.title)
+        self._conn.execute(
+            "INSERT INTO fields (key, title, definition, section, examples, type) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET "
+            "title = excluded.title, definition = excluded.definition, "
+            "section = excluded.section, examples = excluded.examples, "
+            "type = excluded.type",
+            (
+                key,
+                title,
+                data.definition,
+                data.section,
+                self._dump_examples(data.examples),
+                data.type,
+            ),
+        )
+        self._conn.commit()
+        row = self._conn.execute(
+            "SELECT * FROM fields WHERE key = ?", (key,)
+        ).fetchone()
+        return self._row_to_field(row)
 
     def delete(self, field_id: int) -> None:
         self._conn.execute("DELETE FROM fields WHERE id = ?", (field_id,))
@@ -48,11 +101,24 @@ class FieldRepository:
         return title
 
     @staticmethod
+    def _require_key(key: str) -> str:
+        key = key.strip()
+        if not key:
+            raise ValueError("key must not be empty")
+        return key
+
+    @staticmethod
+    def _dump_examples(examples: list) -> str:
+        return json.dumps([e.model_dump() for e in examples])
+
+    @staticmethod
     def _row_to_field(row: sqlite3.Row) -> Field:
         return Field(
             id=row["id"],
+            key=row["key"],
             title=row["title"],
             definition=row["definition"],
+            section=row["section"],
             examples=json.loads(row["examples"]),
             type=row["type"],
         )

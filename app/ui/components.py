@@ -21,7 +21,7 @@ from fasthtml.common import (
     Ul,
 )
 
-from app.models import ExtractionResult, ExtractionRun, Field
+from app.models import ExtractionResult, ExtractionRun, Field, FieldExample
 
 _FIELD_TYPES = [
     ("text", "Texte"),
@@ -32,8 +32,8 @@ _FIELD_TYPES = [
 ]
 
 
-def _examples_to_text(examples: list[str]) -> str:
-    return "\n".join(examples)
+def _examples_to_text(examples: list[FieldExample]) -> str:
+    return "\n".join(e.context for e in examples)
 
 
 def _type_select(field_id: str, selected: str = "text"):
