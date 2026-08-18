@@ -47,6 +47,38 @@ def test_get_extraction_lists_available_fields(client, field_repo):
     assert "Nom" in response.text
 
 
+def test_get_extraction_groups_fields_by_section_alphabetically(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+    field_repo.create(
+        FieldCreate(key="b", title="B", definition="d", examples=[], section="Assurances")
+    )
+
+    response = client.get("/extraction")
+
+    assert response.text.index("Assurances") < response.text.index("Pénalité")
+
+
+def test_get_extraction_puts_fields_without_section_in_autres_group(client, field_repo):
+    field_repo.create(FieldCreate(key="a", title="A", definition="d", examples=[]))
+
+    response = client.get("/extraction")
+
+    assert "Autres" in response.text
+
+
+def test_get_extraction_field_groups_are_closed_by_default(client, field_repo):
+    field_repo.create(
+        FieldCreate(key="a", title="A", definition="d", examples=[], section="Pénalité")
+    )
+
+    response = client.get("/extraction")
+
+    assert "<details class=\"field-group\">" in response.text
+    assert "<details open" not in response.text
+
+
 def test_post_extraction_runs_mock_pipeline_and_persists_run(client, field_repo, run_repo):
     field = field_repo.create(
         FieldCreate(key="nom", title="Nom", definition="d", examples=[{"context": "Jean"}])

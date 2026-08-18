@@ -1,6 +1,7 @@
 from fasthtml.common import (
     A,
     Button,
+    Details,
     Div,
     Form,
     Input,
@@ -11,6 +12,7 @@ from fasthtml.common import (
     Script,
     Select,
     Span,
+    Summary,
     Table,
     Tbody,
     Td,
@@ -152,13 +154,32 @@ def field_import_form():
     )
 
 
-def _field_checkbox(field: Field):
+_OTHER_SECTION = "Autres"
+
+
+def _group_fields_by_section(fields: list[Field]) -> list[tuple[str, list[Field]]]:
+    groups: dict[str, list[Field]] = {}
+    for field in fields:
+        groups.setdefault(field.section or _OTHER_SECTION, []).append(field)
+    return [(name, groups[name]) for name in sorted(groups)]
+
+
+def _field_checkbox_row(field: Field):
     input_id = f"field-{field.id}"
     return Label(
         Input(type="checkbox", name="field_ids", value=str(field.id), id=input_id),
         field.title,
-        cls="chip",
+        cls="field-row",
         **{"for": input_id},
+    )
+
+
+def _field_section_group(section: str, fields: list[Field]):
+    count_label = "champ" if len(fields) == 1 else "champs"
+    return Details(
+        Summary(f"{section} · {len(fields)} {count_label}"),
+        Div(*[_field_checkbox_row(f) for f in fields], cls="field-group-list"),
+        cls="field-group",
     )
 
 
@@ -201,7 +222,13 @@ def extraction_form(fields: list[Field]):
                     id="pdf-input",
                 ),
                 Label("Champs à extraire"),
-                Div(*[_field_checkbox(field) for field in fields], cls="chip-list"),
+                Div(
+                    *[
+                        _field_section_group(section, section_fields)
+                        for section, section_fields in _group_fields_by_section(fields)
+                    ],
+                    cls="field-groups",
+                ),
                 Div(
                     Button(
                         "Lancer l'extraction",
