@@ -3,7 +3,7 @@ from starlette.testclient import TestClient
 
 from app.extraction_repository import ExtractionRunRepository
 from app.main import create_app
-from app.models import FieldCreate
+from app.models import ExtractionResult, FieldCreate
 from app.repository import FieldRepository
 from app.tools.mock_ner import MockNerExtractor
 from app.tools.mock_pdf import MockPdfTextExtractor
@@ -93,6 +93,59 @@ def test_get_extraction_run_is_consultable_after_creation(client, run_repo):
 
     assert response.status_code == 200
     assert "doc.pdf" in response.text
+
+
+def test_extraction_result_page_shows_value_type(client, run_repo):
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Âge", value="30", source="mock", value_type="int")],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert "int" in response.text
+    assert "result-value-error" not in response.text
+
+
+def test_extraction_result_page_shows_typed_value_not_full_grounded_text(client, run_repo):
+    run_repo.create_run(
+        "doc.pdf",
+        [
+            ExtractionResult(
+                field_title="Avance",
+                value="15 % d'avance à la signature du contrat",
+                source="langextract",
+                value_type="int",
+                typed_value="15",
+            )
+        ],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert 'class="result-value" title="15 % d\'avance à la signature du contrat">15</td>' in response.text
+
+
+def test_extraction_result_page_flags_type_error_row(client, run_repo):
+    run_repo.create_run(
+        "doc.pdf",
+        [
+            ExtractionResult(
+                field_title="Âge",
+                value="inconnu",
+                source="mock",
+                value_type="int",
+                type_error="« inconnu » n'est pas un entier valide",
+            )
+        ],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert "result-value-error" in response.text
 
 
 def test_uploaded_pdf_bytes_are_never_persisted(client, field_repo, db_conn):

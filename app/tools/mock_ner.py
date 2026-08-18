@@ -15,4 +15,10 @@ class MockNerExtractor:
             if field.examples
             else f"Valeur simulée pour « {field.title} »"
         )
-        return ExtractionResult(field_title=field.title, value=value, source="mock")
+        return ExtractionResult(
+            field_title=field.title,
+            value=value,
+            source="mock",
+            value_type=field.type,
+            typed_value=value,
+        )

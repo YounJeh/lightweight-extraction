@@ -44,6 +44,17 @@ def test_mock_ner_extractor_falls_back_when_no_examples():
     assert "Nom" in result.value
 
 
+def test_mock_ner_extractor_sets_value_type_from_field_without_error():
+    field = Field(id=1, title="Date", definition="d", examples=["2026-08-14"], type="date")
+    extractor = MockNerExtractor()
+
+    [result] = extractor.extract("texte", [field])
+
+    assert result.value_type == "date"
+    assert result.typed_value == result.value
+    assert result.type_error is None
+
+
 def test_mock_ner_extractor_is_deterministic():
     fields = [Field(id=1, title="Nom", definition="d", examples=[])]
     extractor = MockNerExtractor()

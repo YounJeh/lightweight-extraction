@@ -6,8 +6,10 @@ from fasthtml.common import (
     Input,
     Label,
     Li,
+    Option,
     P,
     Script,
+    Select,
     Span,
     Table,
     Tbody,
@@ -21,9 +23,28 @@ from fasthtml.common import (
 
 from app.models import ExtractionResult, ExtractionRun, Field
 
+_FIELD_TYPES = [
+    ("text", "Texte"),
+    ("int", "Entier"),
+    ("float", "Décimal"),
+    ("bool", "Booléen"),
+    ("date", "Date"),
+]
+
 
 def _examples_to_text(examples: list[str]) -> str:
     return "\n".join(examples)
+
+
+def _type_select(field_id: str, selected: str = "text"):
+    return Select(
+        *[
+            Option(label, value=value, selected=(value == selected))
+            for value, label in _FIELD_TYPES
+        ],
+        name="type",
+        id=field_id,
+    )
 
 
 def error_banner(message: str):
@@ -44,6 +65,8 @@ def field_row(field: Field):
                 placeholder="Un exemple par ligne",
                 id=f"ex-{field.id}",
             ),
+            Label("Type", **{"for": f"type-{field.id}"}),
+            _type_select(f"type-{field.id}", selected=field.type),
             Div(
                 Button("Mettre à jour", type="submit"),
                 cls="card-footer",
@@ -91,6 +114,8 @@ def field_create_form():
                 placeholder="Exemples (un par ligne)",
                 id="new-examples",
             ),
+            Label("Type", **{"for": "new-type"}),
+            _type_select("new-type"),
             Div(Button("Créer", type="submit"), cls="card-footer"),
             action="/fields",
             method="post",
@@ -177,10 +202,25 @@ def _result_grounding(result: ExtractionResult):
     )
 
 
+def _result_type(result: ExtractionResult):
+    if result.value_type is None:
+        return Span("—", cls="result-grounding-empty")
+    return Span(result.value_type, cls="badge")
+
+
 def _result_row(result: ExtractionResult):
+    displayed_value = result.typed_value or result.value
+    value_attrs = {"cls": "result-value"}
+    if result.type_error:
+        value_attrs = {"cls": "result-value result-value-error", "title": result.type_error}
+    elif displayed_value != result.value:
+        # La valeur typée est plus courte/normalisée que le texte groundé —
+        # ce dernier reste consultable au survol comme contexte.
+        value_attrs["title"] = result.value
     return Tr(
         Td(result.field_title, cls="result-field"),
-        Td(result.value, cls="result-value"),
+        Td(displayed_value, **value_attrs),
+        Td(_result_type(result), cls="result-type"),
         Td(Span(result.source, cls="badge"), cls="result-source"),
         Td(_result_grounding(result), cls="result-location"),
     )
@@ -196,6 +236,7 @@ def extraction_result(run: ExtractionRun):
                     Tr(
                         Th("Champ"),
                         Th("Valeur"),
+                        Th("Type"),
                         Th("Source"),
                         Th("Localisation"),
                     )

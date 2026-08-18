@@ -1,11 +1,16 @@
+from typing import Literal
+
 from pydantic import BaseModel
 from pydantic import Field as PydField
+
+FieldType = Literal["text", "int", "float", "bool", "date"]
 
 
 class FieldBase(BaseModel):
     title: str
     definition: str
     examples: list[str] = PydField(default_factory=list)
+    type: FieldType = "text"
 
 
 class FieldCreate(FieldBase):
@@ -26,6 +31,9 @@ class ExtractionResult(BaseModel):
     source: str = "mock"
     page_number: int | None = None
     text_position: str | None = None
+    value_type: FieldType | None = None
+    typed_value: str | None = None
+    type_error: str | None = None
 
 
 class ExtractionGrounding(BaseModel):

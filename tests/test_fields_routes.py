@@ -46,6 +46,31 @@ def test_post_fields_creates_a_field_and_redirects(client, repo):
     assert fields[0].examples == ["01/01/2026", "02/02/2026"]
 
 
+def test_post_fields_without_type_defaults_to_text(client, repo):
+    client.post(
+        "/fields", data={"title": "Nom", "definition": "d", "examples": ""}
+    )
+
+    assert repo.list_all()[0].type == "text"
+
+
+def test_post_fields_creates_field_with_chosen_type(client, repo):
+    client.post(
+        "/fields",
+        data={"title": "Âge", "definition": "d", "examples": "", "type": "int"},
+    )
+
+    assert repo.list_all()[0].type == "int"
+
+
+def test_get_fields_shows_selected_type_for_existing_field(client, repo):
+    repo.create(FieldCreate(title="Date", definition="d", examples=[], type="date"))
+
+    response = client.get("/fields")
+
+    assert '<option value="date" selected>Date</option>' in response.text
+
+
 def test_post_fields_update_modifies_field(client, repo):
     field = repo.create(FieldCreate(title="A", definition="a", examples=[]))
 
@@ -58,6 +83,17 @@ def test_post_fields_update_modifies_field(client, repo):
     assert updated.title == "A2"
     assert updated.definition == "a2"
     assert updated.examples == ["ex1"]
+
+
+def test_post_fields_update_changes_type(client, repo):
+    field = repo.create(FieldCreate(title="A", definition="a", examples=[]))
+
+    client.post(
+        f"/fields/{field.id}/update",
+        data={"title": "A", "definition": "a", "examples": "", "type": "bool"},
+    )
+
+    assert repo.get(field.id).type == "bool"
 
 
 def test_post_fields_delete_removes_field(client, repo):

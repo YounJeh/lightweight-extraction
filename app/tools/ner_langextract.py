@@ -1,12 +1,51 @@
 import os
+import re
 
 import langextract
 from langextract import data
 
-from app.models import ExtractionResult, Field
+from app.models import ExtractionResult, Field, FieldType
+from app.tools import type_coercion
 from app.tools.pdf_pymupdf4llm import PAGE_SEPARATOR_RE
 
 _CONTEXT_CHARS = 40
+
+_TYPE_INSTRUCTIONS = {
+    "text": "",
+    "int": " (nombre entier, ex. 30)",
+    "float": " (nombre décimal, ex. 3.5)",
+    "bool": " (oui/non)",
+    "date": " (date au format ISO AAAA-MM-JJ)",
+}
+
+_NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+_ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_BOOL_TOKEN_RE = re.compile(r"\b(oui|non|vrai|faux|true|false)\b", re.IGNORECASE)
+
+
+def _typed_hint(example: str, field_type: FieldType) -> str | None:
+    """Isole, dans un exemple en langage naturel, la sous-chaîne qui
+    représente la valeur typée attendue — pour montrer au LLM, via le
+    few-shot, que attributes['value'] doit être une valeur étroite/typée et
+    non une recopie de extraction_text. None si rien n'est trouvé (le champ
+    few-shot reste alors sans attributs, comme avant)."""
+    if field_type in ("int", "float"):
+        match = _NUMBER_RE.search(example)
+        return match.group(0).replace(",", ".") if match else None
+    if field_type == "date":
+        match = _ISO_DATE_RE.search(example)
+        return match.group(0) if match else None
+    if field_type == "bool":
+        match = _BOOL_TOKEN_RE.search(example)
+        return match.group(0).lower() if match else None
+    return None
+
+
+def _typed_attribute(extraction: "data.Extraction") -> str | None:
+    """Valeur typée fournie par le LLM via attributes['value'], si présente
+    et non vide — None sinon (l'appelant retombe alors sur extraction_text)."""
+    value = (extraction.attributes or {}).get("value")
+    return value if isinstance(value, str) and value else None
 
 
 class LangExtractNerExtractor:
@@ -41,12 +80,13 @@ class LangExtractNerExtractor:
 
         results = []
         for field_title, candidates in candidates_by_field.items():
-            chosen = _select_candidate(
-                fields_by_title[field_title], candidates, model_id, api_key
-            )
+            field = fields_by_title[field_title]
+            chosen = _select_candidate(field, candidates, model_id, api_key)
             page_number, text_position = _locate(
                 text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
             )
+            raw_value = _typed_attribute(chosen) or chosen.extraction_text
+            type_error = type_coercion.validate(raw_value, field.type)
             results.append(
                 ExtractionResult(
                     field_title=field_title,
@@ -54,6 +94,9 @@ class LangExtractNerExtractor:
                     source="langextract",
                     page_number=page_number,
                     text_position=text_position,
+                    value_type=field.type,
+                    typed_value=raw_value,
+                    type_error=type_error,
                 )
             )
         return results
@@ -190,10 +233,24 @@ def _prompt_description(fields: list[Field]) -> str:
     lines = [
         "Pour chaque champ ci-dessous, si sa valeur est présente dans le "
         "texte, extrais-la littéralement (extraction_class = titre exact "
-        "du champ) :"
+        "du champ). Si un format est indiqué entre parenthèses, fournis en "
+        "plus la valeur dans ce format via l'attribut 'value' :"
     ]
-    lines += [f"- {field.title} : {field.definition}" for field in fields]
+    lines += [
+        f"- {field.title} : {field.definition}{_TYPE_INSTRUCTIONS[field.type]}"
+        for field in fields
+    ]
     return "\n".join(lines)
+
+
+def _example_attributes(field: Field) -> dict[str, str] | None:
+    """attributes['value'] du few-shot pour ce champ — None pour les champs
+    text (pas de valeur typée à distinguer) ou si aucun indice n'a pu être
+    isolé dans l'exemple (voir _typed_hint)."""
+    if field.type == "text":
+        return None
+    hint = _typed_hint(field.examples[0], field.type)
+    return {"value": hint} if hint else None
 
 
 def _build_example(fields: list[Field]) -> "data.ExampleData | None":
@@ -204,7 +261,11 @@ def _build_example(fields: list[Field]) -> "data.ExampleData | None":
         return None
     lines = [f"{field.title} : {field.examples[0]}" for field in fields_with_examples]
     extractions = [
-        data.Extraction(extraction_class=field.title, extraction_text=field.examples[0])
+        data.Extraction(
+            extraction_class=field.title,
+            extraction_text=field.examples[0],
+            attributes=_example_attributes(field),
+        )
         for field in fields_with_examples
     ]
     return data.ExampleData(text="\n".join(lines), extractions=extractions)
