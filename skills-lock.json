@@ -79,6 +79,12 @@
       "skillPath": "skills/idea-refine/SKILL.md",
       "computedHash": "9fc0ae5d8a074872a636d22f9c6fe71e041b86cddc9fe5af90ef654f5032ec5d"
     },
+    "langfuse": {
+      "source": "langfuse/skills",
+      "sourceType": "github",
+      "skillPath": "skills/langfuse/SKILL.md",
+      "computedHash": "67866f71375f91085b943bdabe0c29c6b69705d77f6440cfbc60fcffea544adf"
+    },
     "incremental-implementation": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",
