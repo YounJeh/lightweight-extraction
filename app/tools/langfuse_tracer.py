@@ -54,3 +54,16 @@ class LangfuseTracer:
                     yield _SpanHandle(span)
         finally:
             self._client.flush()
+
+    @contextmanager
+    def trace_llm_call(self, *, name: str, model_id: str | None, prompt: str):
+        """Un appel LangExtract réel (extraction principale ou arbitrage) —
+        typé "generation" (pas "span") pour que le nom de modèle et,
+        potentiellement, les coûts/tokens soient exploitables côté Langfuse.
+        Nested sous le span ouvert par trace_extraction (contexte OTEL actif),
+        pas de flush ici : trace_extraction flush une fois l'ensemble
+        terminé."""
+        with self._client.start_as_current_observation(
+            as_type="generation", name=name, input=prompt, model=model_id
+        ) as generation:
+            yield _SpanHandle(generation)

@@ -75,27 +75,41 @@ class LangExtractNerExtractor:
             field_titles=[field.title for field in fields],
             source_filename=source_filename,
         ) as trace:
-            results = self._extract(text, fields, model_id)
+            results = self._extract(text, fields, model_id, self._tracer)
             trace.set_output([result.model_dump() for result in results])
             return results
 
     def _extract(
-        self, text: str, fields: list[Field], model_id: str | None
+        self,
+        text: str,
+        fields: list[Field],
+        model_id: str | None,
+        tracer: Tracer,
     ) -> list[ExtractionResult]:
         example = _build_example(fields)
         api_key = _api_key_for(model_id)
+        prompt_description = _prompt_description(fields)
         kwargs = {}
         if model_id:
             kwargs["model_id"] = model_id
 
-        annotated = langextract.extract(
-            text_or_documents=text,
-            prompt_description=_prompt_description(fields),
-            examples=[example] if example else None,
-            api_key=api_key,
-            show_progress=False,
-            **kwargs,
-        )
+        with tracer.trace_llm_call(
+            name="extract-fields", model_id=model_id, prompt=prompt_description
+        ) as generation:
+            annotated = langextract.extract(
+                text_or_documents=text,
+                prompt_description=prompt_description,
+                examples=[example] if example else None,
+                api_key=api_key,
+                show_progress=False,
+                **kwargs,
+            )
+            generation.set_output(
+                [
+                    {"field": e.extraction_class, "value": e.extraction_text}
+                    for e in (annotated.extractions or [])
+                ]
+            )
 
         candidates_by_field = _group_grounded_candidates(
             annotated.extractions or [], fields
@@ -105,7 +119,7 @@ class LangExtractNerExtractor:
         results = []
         for field_title, candidates in candidates_by_field.items():
             field = fields_by_title[field_title]
-            chosen = _select_candidate(field, candidates, model_id, api_key)
+            chosen = _select_candidate(field, candidates, model_id, api_key, tracer)
             page_number, text_position = _locate(
                 text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
             )
@@ -154,6 +168,7 @@ def _select_candidate(
     candidates: list["data.Extraction"],
     model_id: str | None,
     api_key: str | None,
+    tracer: Tracer,
 ) -> "data.Extraction":
     """0 candidat n'atteint jamais cette fonction (filtré en amont). 1 seul
     candidat -> accepté tel quel. Plusieurs candidats à la même valeur
@@ -170,7 +185,7 @@ def _select_candidate(
     if len(distinct) == 1:
         return distinct[0]
 
-    return _arbitrate(field, distinct, model_id, api_key)
+    return _arbitrate(field, distinct, model_id, api_key, tracer)
 
 
 def _arbitrate(
@@ -178,6 +193,7 @@ def _arbitrate(
     candidates: list["data.Extraction"],
     model_id: str | None,
     api_key: str | None,
+    tracer: Tracer,
 ) -> "data.Extraction":
     """Plusieurs valeurs distinctes ont été extraites pour le même champ à
     des endroits différents du document (pas un artefact de chunking, un
@@ -187,14 +203,21 @@ def _arbitrate(
     if model_id:
         kwargs["model_id"] = model_id
 
-    annotated = langextract.extract(
-        text_or_documents=_arbitration_text(field, candidates),
-        prompt_description=_arbitration_prompt(field),
-        examples=[_arbitration_example()],
-        api_key=api_key,
-        show_progress=False,
-        **kwargs,
-    )
+    arbitration_prompt = _arbitration_prompt(field)
+    with tracer.trace_llm_call(
+        name="arbitrate-conflict", model_id=model_id, prompt=arbitration_prompt
+    ) as generation:
+        annotated = langextract.extract(
+            text_or_documents=_arbitration_text(field, candidates),
+            prompt_description=arbitration_prompt,
+            examples=[_arbitration_example()],
+            api_key=api_key,
+            show_progress=False,
+            **kwargs,
+        )
+        generation.set_output(
+            [e.extraction_text for e in (annotated.extractions or [])]
+        )
 
     for extraction in annotated.extractions or []:
         if extraction.extraction_class != "selection":

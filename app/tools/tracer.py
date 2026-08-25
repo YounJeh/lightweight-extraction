@@ -3,7 +3,7 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import Any, Protocol
 
 
-class TraceHandle(Protocol):
+class ObservationHandle(Protocol):
     def set_output(self, output: Any) -> None: ...
 
 
@@ -16,7 +16,15 @@ class Tracer(Protocol):
         model_id: str | None,
         field_titles: list[str],
         source_filename: str | None,
-    ) -> AbstractContextManager[TraceHandle]: ...
+    ) -> AbstractContextManager[ObservationHandle]: ...
+
+    def trace_llm_call(
+        self,
+        *,
+        name: str,
+        model_id: str | None,
+        prompt: str,
+    ) -> AbstractContextManager[ObservationHandle]: ...
 
 
 class _NoOpSpan:
@@ -28,6 +36,9 @@ class NoOpTracer:
     """Tracer par défaut : aucune clé Langfuse en environnement, ou en tests."""
 
     def trace_extraction(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
+        return nullcontext(_NoOpSpan())
+
+    def trace_llm_call(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
         return nullcontext(_NoOpSpan())
 
 
