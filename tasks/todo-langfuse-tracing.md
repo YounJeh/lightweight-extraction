@@ -52,7 +52,7 @@ signalé à l'utilisateur plutôt que corrigé silencieusement.
 
 ---
 
-## Task 2: `Protocol` `Tracer` + `NoOpTracer` + `build_tracer()`
+## Task 2: `Protocol` `Tracer` + `NoOpTracer` + `build_tracer()` ✅
 
 **Description:** Créer `app/tools/tracer.py` : `Protocol` `Tracer` avec une
 seule méthode `trace_extraction(*, provider: str, model_id: str | None,
@@ -66,15 +66,15 @@ fonction (lazy) pour ne pas rendre `langfuse` une dépendance dure au niveau du
 module si les clés sont absentes.
 
 **Acceptance criteria:**
-- [ ] `NoOpTracer().trace_extraction(...)` s'utilise en `with ...:` sans
+- [x] `NoOpTracer().trace_extraction(...)` s'utilise en `with ...:` sans
       lever, quels que soient les kwargs
-- [ ] `build_tracer()` renvoie une instance de `NoOpTracer` quand les
+- [x] `build_tracer()` renvoie une instance de `NoOpTracer` quand les
       variables d'environnement Langfuse sont absentes
-- [ ] `build_tracer()` ne lève pas d'erreur d'import si `langfuse` n'est pas
+- [x] `build_tracer()` ne lève pas d'erreur d'import si `langfuse` n'est pas
       utilisé (clés absentes) — import paresseux vérifié
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_tracer.py`
+- [x] Tests: `uv run pytest -v tests/test_tracer.py` (4 passed)
 
 **Dependencies:** Task 1
 
