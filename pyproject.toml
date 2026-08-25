@@ -8,6 +8,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "langextract[openai]>=1.6.0",
+    "langfuse>=4.14.5",
     "openpyxl>=3.1.5",
     "pandas>=3.0.5",
     "pydantic>=2.13.4",
