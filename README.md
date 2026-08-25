@@ -42,6 +42,24 @@ LLM_MODEL=                          # vide = défaut LangExtract (gemini-3.5-fla
 Sans clé API, l'app démarre et la gestion des champs fonctionne normalement ;
 seule une extraction (`POST /extraction`) échouera.
 
+### Tracing Langfuse (optionnel)
+
+Pour voir chaque extraction (texte source, résultat, latence, erreurs) dans
+un dashboard [Langfuse Cloud](https://cloud.langfuse.com), créer un projet
+Langfuse puis renseigner ses clés dans `.env` :
+
+```
+LANGFUSE_PUBLIC_KEY=...
+LANGFUSE_SECRET_KEY=...
+LANGFUSE_BASE_URL=                  # vide = région EU (cloud.langfuse.com)
+```
+
+Sans ces deux clés, aucune trace n'est envoyée (`NoOpTracer`, comportement
+par défaut). Une fois configurées, chaque extraction apparaît dans le
+dashboard Langfuse sous le nom `ner_extraction`, avec le texte source en
+input, le résultat en output, et provider/modèle/champs/nom de fichier en
+tags et metadata.
+
 ## Lancer l'application
 
 ```console
