@@ -155,6 +155,7 @@ def field_import_form():
 
 
 _OTHER_SECTION = "Autres"
+_DEFAULT_CHECKED_FIELD_COUNT = 20
 
 
 def _group_fields_by_section(fields: list[Field]) -> list[tuple[str, list[Field]]]:
@@ -164,11 +165,11 @@ def _group_fields_by_section(fields: list[Field]) -> list[tuple[str, list[Field]
     return [(name, groups[name]) for name in sorted(groups)]
 
 
-def _field_checkbox_row(field: Field):
+def _field_checkbox_row(field: Field, checked: bool):
     input_id = f"field-{field.id}"
     return Label(
         Input(
-            type="checkbox", name="field_ids", value=str(field.id), id=input_id, checked=True
+            type="checkbox", name="field_ids", value=str(field.id), id=input_id, checked=checked
         ),
         field.title,
         cls="field-row",
@@ -176,11 +177,12 @@ def _field_checkbox_row(field: Field):
     )
 
 
-def _field_section_group(section: str, fields: list[Field]):
+def _field_section_group(section: str, fields: list[Field], default_checked_ids: set[int]):
+    checked_count = sum(1 for f in fields if f.id in default_checked_ids)
     return Details(
         Summary(
             Span(section, cls="field-group-name"),
-            Span(f"{len(fields)}/{len(fields)} sélectionnés", cls="field-group-count"),
+            Span(f"{checked_count}/{len(fields)} sélectionnés", cls="field-group-count"),
         ),
         Div(
             Button(
@@ -194,7 +196,10 @@ def _field_section_group(section: str, fields: list[Field]):
             ),
             cls="field-group-actions",
         ),
-        Div(*[_field_checkbox_row(f) for f in fields], cls="field-group-list"),
+        Div(
+            *[_field_checkbox_row(f, f.id in default_checked_ids) for f in fields],
+            cls="field-group-list",
+        ),
         cls="field-group",
     )
 
@@ -261,6 +266,7 @@ def extraction_form(fields: list[Field]):
             ),
             cls="empty-state",
         )
+    default_checked_ids = {f.id for f in fields[:_DEFAULT_CHECKED_FIELD_COUNT]}
     return (
         Div(
             Div("Nouvelle extraction", cls="card-title"),
@@ -276,7 +282,7 @@ def extraction_form(fields: list[Field]):
                 Label("Champs à extraire"),
                 Div(
                     *[
-                        _field_section_group(section, section_fields)
+                        _field_section_group(section, section_fields, default_checked_ids)
                         for section, section_fields in _group_fields_by_section(fields)
                     ],
                     cls="field-groups",
