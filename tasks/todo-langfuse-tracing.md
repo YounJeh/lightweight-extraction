@@ -4,7 +4,7 @@ Plan de référence : [tasks/plan-langfuse-tracing.md](plan-langfuse-tracing.md)
 
 ---
 
-## Task 1: Dépendance `langfuse` + variables `.env`
+## Task 1: Dépendance `langfuse` + variables `.env` ✅
 
 **Description:** Ajouter le SDK Langfuse aux dépendances du projet (`uv add
 langfuse` — vérifier au passage le nom exact du package et sa version
@@ -14,18 +14,31 @@ EU en commentaire si pertinent) dans `.env` et `.env.example`, suivant le
 pattern déjà en place (`GOOGLE_GENERATIVE_AI_API_KEY`, `LLM_MODEL`). Rien
 n'importe encore `langfuse` dans le code applicatif à ce stade.
 
+**Note découverte à l'implémentation :** le SDK installé (`langfuse==4.14.5`)
+est basé OpenTelemetry ; sa variable de host est `LANGFUSE_BASE_URL`
+(`LANGFUSE_HOST` existe mais est documentée *deprecated* dans le SDK). Utilisé
+`LANGFUSE_BASE_URL` dans `.env.example` au lieu de `LANGFUSE_HOST` comme prévu
+initialement — voir Open Questions du plan.
+
 **Acceptance criteria:**
-- [ ] `uv sync` installe `langfuse` sans erreur
-- [ ] `.env.example` documente les 3 nouvelles variables (vides, avec
+- [x] `uv sync` installe `langfuse` sans erreur
+- [x] `.env.example` documente les 3 nouvelles variables (vides, avec
       commentaire d'usage)
-- [ ] `.env` (réel, non commité) contient les clés Langfuse Cloud de
-      l'utilisateur
-- [ ] `uv run pytest -v` continue de passer intégralement (rien n'utilise
-      encore la dépendance)
+- [x] `.env` (réel, non commité) contient les clés Langfuse Cloud de
+      l'utilisateur *(à compléter par l'utilisateur — pas de clé Langfuse
+      disponible côté agent)*
+- [x] `uv run pytest -v` continue de passer intégralement (rien n'utilise
+      encore la dépendance) — 2 échecs pré-existants sur `main`, non liés à ce
+      changement (voir note ci-dessous)
+
+**Note :** `tests/test_extraction_routes.py::test_post_extraction_with_no_fields_selected_persists_empty_results`
+et `::test_get_extraction_run_is_consultable_after_creation` échouent déjà sur
+`main` avant ce changement (vérifié par stash) — hors scope de cette tâche,
+signalé à l'utilisateur plutôt que corrigé silencieusement.
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v`
-- [ ] Build: `uv sync`
+- [x] Tests: `uv run pytest -v` (148 passed, 2 pre-existing failures unrelated)
+- [x] Build: `uv sync`
 
 **Dependencies:** None
 
