@@ -135,18 +135,18 @@ def test_post_extraction_result_page_shows_mock_badge(client, field_repo):
     assert "mock" in response.text
 
 
-def test_post_extraction_with_no_fields_selected_persists_empty_results(
+def test_post_extraction_with_no_fields_selected_shows_error_and_persists_nothing(
     client, run_repo
 ):
-    _upload(client, [])
+    response = _upload(client, [])
 
-    runs = run_repo.list_runs()
-    assert len(runs) == 1
-    assert runs[0].results == []
+    assert "sélectionne au moins un champ" in response.text
+    assert run_repo.list_runs() == []
 
 
-def test_get_extraction_run_is_consultable_after_creation(client, run_repo):
-    _upload(client, [])
+def test_get_extraction_run_is_consultable_after_creation(client, field_repo, run_repo):
+    field = field_repo.create(FieldCreate(key="nom", title="Nom", definition="d", examples=[]))
+    _upload(client, [field.id])
     run = run_repo.list_runs()[0]
 
     response = client.get(f"/extraction/runs/{run.id}")
