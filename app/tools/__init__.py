@@ -8,4 +8,10 @@ class PdfTextExtractor(Protocol):
 
 
 class NerExtractor(Protocol):
-    def extract(self, text: str, fields: list[Field]) -> list[ExtractionResult]: ...
+    def extract(
+        self,
+        text: str,
+        fields: list[Field],
+        *,
+        source_filename: str | None = None,
+    ) -> list[ExtractionResult]: ...

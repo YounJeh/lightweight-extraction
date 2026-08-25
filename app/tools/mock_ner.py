@@ -5,7 +5,13 @@ class MockNerExtractor:
     """Simule LangExtract : une valeur factice déterministe par champ, sans
     grounding réel dans le texte (cohérent avec un texte source lui-même simulé)."""
 
-    def extract(self, text: str, fields: list[Field]) -> list[ExtractionResult]:
+    def extract(
+        self,
+        text: str,
+        fields: list[Field],
+        *,
+        source_filename: str | None = None,
+    ) -> list[ExtractionResult]:
         return [self._mock_result(field) for field in fields]
 
     @staticmethod

@@ -151,12 +151,13 @@ internes ~3s puis warning loggé).
 ---
 
 ## Checkpoint: Implémentation (après Task 3)
-- [ ] `uv run pytest -m "not live"` passe sans réseau ni clé Langfuse
-- [ ] Revue avec l'utilisateur avant de continuer
+- [x] `uv run pytest -m "not live"` passe sans réseau ni clé Langfuse
+- [x] Revue avec l'utilisateur avant de continuer *(utilisateur a dit "tague
+      le fichier et continue")*
 
 ---
 
-## Task 4: Branchement — `LangExtractNerExtractor` + `routes/extraction.py`
+## Task 4: Branchement — `LangExtractNerExtractor` + `routes/extraction.py` ✅
 
 **Description:** `LangExtractNerExtractor.__init__(self, tracer: Tracer | None
 = None)` (défaut : `build_tracer()`) ; `extract(self, text, fields, *,
@@ -169,16 +170,27 @@ source_filename=source_filename):`. Même paramètre optionnel
 `source_filename=pdf.filename` à `ner_extractor.extract(...)`. `app/main.py`
 inchangé (le tracer par défaut de `LangExtractNerExtractor()` suffit).
 
+**Note à l'implémentation :** le corps historique de `extract` est resté tel
+quel dans une méthode privée `_extract` (appelée à l'intérieur du `with`) —
+`extract` ne fait plus que résoudre `model_id`/provider, ouvrir la trace,
+déléguer à `_extract`, puis `trace.set_output(...)` avant de retourner. Ajouté
+un test dédié (`tests/test_ner_langextract_tracing.py`, tracer espion) qui
+vérifie concrètement que provider/model_id/field_titles/source_filename
+atteignent bien `trace_extraction`, et que l'output posé sur le handle
+correspond aux résultats retournés — pas seulement "rien n'a cassé".
+
 **Acceptance criteria:**
-- [ ] `uv run python -m app.main` démarre sans erreur, avec ou sans clés
+- [x] `uv run python -m app.main` démarre sans erreur, avec ou sans clés
       Langfuse dans `.env`
-- [ ] Appel de `extract(text, fields)` sans `source_filename` (ancien style)
+- [x] Appel de `extract(text, fields)` sans `source_filename` (ancien style)
       continue de fonctionner (défaut `None`) — aucune régression sur les
       tests de routes existants
-- [ ] `MockNerExtractor.extract` accepte le nouveau kwarg sans erreur
+- [x] `MockNerExtractor.extract` accepte le nouveau kwarg sans erreur
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v -m "not live"` (aucune régression)
+- [x] Tests: `uv run pytest -v -m "not live"` (159 passed, 1 deselected,
+      aucune régression)
+- [x] Manuel: `create_app` + injection réelle démarre sans erreur (smoke test)
 
 **Dependencies:** Task 3
 

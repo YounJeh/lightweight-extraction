@@ -47,7 +47,9 @@ def register_extraction_routes(
 
         pdf_bytes = await pdf.read()
         text = pdf_extractor.extract_text(pdf_bytes)
-        results = ner_extractor.extract(text, selected_fields)
+        results = ner_extractor.extract(
+            text, selected_fields, source_filename=pdf.filename
+        )
 
         run = run_repo.create_run(pdf.filename, results)
         return RedirectResponse(f"/extraction/runs/{run.id}", status_code=303)
