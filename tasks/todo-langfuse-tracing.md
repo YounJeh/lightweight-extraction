@@ -4,6 +4,57 @@ Plan de référence : [tasks/plan-langfuse-tracing.md](plan-langfuse-tracing.md)
 
 ---
 
+## Task 6 (post-launch) : audit best practices via le skill `langfuse` ✅
+
+**Description :** Skill officiel Langfuse installé (`.agents/skills/langfuse`,
+source `langfuse/skills`, symlink `.claude/skills/langfuse` — voir
+`skills-lock.json`). Audit de l'instrumentation existante (Tasks 1-5) contre
+`references/instrumentation.md` du skill et
+https://langfuse.com/docs/observability/best-practices (récupérées à jour).
+
+**Écarts trouvés et corrigés :**
+- Les appels LLM réels (extraction + arbitrage éventuel) étaient aplatis dans
+  un seul span "span"-typé → ajout de `Tracer.trace_llm_call`, imbriqué,
+  `as_type="generation"` avec `model=model_id`, un par appel réel à
+  `langextract.extract()`. Vérifié en réel (upload PDF réel + `langfuse-cli`) :
+  `SPAN ner_extraction -> GENERATION extract-fields (model=gpt-4o-mini)`.
+
+**Incident découvert et corrigé pendant l'audit (hors scope initial, mais
+bloquant) :** `tests/conftest.py` laissait fuiter les vraies clés Langfuse du
+`.env` local vers `os.environ` pendant toute la suite de tests (un `load_env()`
+déclenché par l'import de `app.main` pendant la collecte réinjectait les clés
+après un simple `pop()`). Deux runs de la suite ont envoyé ~16 traces réelles
+(données de test synthétiques, pas de documents utilisateur) au compte
+Langfuse Cloud de l'utilisateur. Fix : dépouillage dans une fixture
+`autouse`/`scope="session"` (s'exécute après la collecte, dernier mot garanti)
++ test de garde-fou. Utilisateur informé ; a choisi de laisser les traces de
+test en place (pas de suppression).
+
+**Gaps connus, acceptés tels quels (décisions utilisateur) :**
+- Pas de token/coût par génération : `langextract` n'expose aucune info
+  d'usage dans son objet de retour (`AnnotatedDocument` — vérifié, pas
+  d'attribut usage/tokens). Non comblé sans instrumentation plus profonde de
+  `langextract` lui-même, hors scope "très simple".
+- Texte source complet du contrat envoyé en clair comme input de trace vers
+  Langfuse Cloud (pas de masquage) — utilisateur a choisi de garder tel quel.
+
+**Verification:**
+- [x] Tests: `uv run pytest -v -m "not live"` (165 passed, 1 deselected)
+- [x] Manuel: upload PDF réel → trace `ner_extraction` avec generation
+      `extract-fields` imbriquée, vérifiée via `langfuse-cli`
+- [x] Confirmé via `langfuse-cli` : zéro nouvelle trace créée par `uv run
+      pytest -m "not live"` après le fix de `conftest.py`
+
+**Files touched:**
+- `.agents/skills/langfuse/` + `.claude/skills/langfuse` (symlink) +
+  `skills-lock.json`
+- `app/tools/tracer.py`, `app/tools/langfuse_tracer.py`,
+  `app/tools/ner_langextract.py`
+- `tests/conftest.py`, `tests/test_tracer.py`, `tests/test_langfuse_tracer.py`,
+  `tests/test_ner_langextract_tracing.py`
+
+---
+
 ## Task 1: Dépendance `langfuse` + variables `.env` ✅
 
 **Description:** Ajouter le SDK Langfuse aux dépendances du projet (`uv add
