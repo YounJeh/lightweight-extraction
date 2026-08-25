@@ -76,6 +76,10 @@ module si les clés sont absentes.
 **Verification:**
 - [x] Tests: `uv run pytest -v tests/test_tracer.py` (4 passed)
 
+**Révisé en Task 3 :** `trace_extraction` a gagné un paramètre `text` et cède
+désormais un `TraceHandle` (`set_output`) plutôt que `None` — voir note de
+Task 3.
+
 **Dependencies:** Task 1
 
 **Files likely touched:**
@@ -93,7 +97,7 @@ module si les clés sont absentes.
 
 ---
 
-## Task 3: `LangfuseTracer` (implémentation réelle)
+## Task 3: `LangfuseTracer` (implémentation réelle) ✅
 
 **Description:** Vérifier d'abord l'API exacte du SDK Langfuse installé
 (nom du client, méthode de création de span/trace, gestion des
@@ -106,25 +110,41 @@ avec tags `[provider, model_id]` (filtrer les `None`) et metadata
 du `with` (succès ou exception). Gérer explicitement le flush si l'API vérifiée
 l'exige (voir Open Questions du plan).
 
+**Note découverte à l'implémentation (voir Architecture Decisions du plan,
+section "Révision") :** l'API vérifiée du SDK (`get_client()`,
+`start_as_current_observation(as_type="span", name=..., input=...)`,
+`span.update(output=...)`, `propagate_attributes(trace_name=..., tags=...,
+metadata=...)`, `client.flush()`) permet de capturer le texte source et le
+résultat de l'extraction, pas seulement des tags — capture ajoutée au
+`Protocol` `Tracer` (paramètre `text`, `TraceHandle.set_output`) pour
+réellement répondre à l'objectif "voir chaque prompt/completion" retenu à
+l'idéation. Pas de kwarg `tags` direct sur le span : passe par
+`propagate_attributes`, imbriqué à l'intérieur du span racine (ordre requis
+par le SDK). `flush()` vérifié ne pas lever si le réseau échoue (retries
+internes ~3s puis warning loggé).
+
 **Acceptance criteria:**
-- [ ] `LangfuseTracer()` se construit sans clé API explicite en argument (lit
-      `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` de
+- [x] `LangfuseTracer()` se construit sans clé API explicite en argument (lit
+      `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_BASE_URL` de
       l'environnement, comme le SDK le permet nativement)
-- [ ] `trace_extraction(...)` utilisé en `with` n'avale pas les exceptions
+- [x] `trace_extraction(...)` utilisé en `with` n'avale pas les exceptions
       levées à l'intérieur du bloc (une erreur LangExtract doit toujours
-      remonter à l'appelant)
-- [ ] Aucun appel réseau réel déclenché par les tests offline (client
-      Langfuse mocké/monkeypatché dans `tests/test_langfuse_tracer.py`)
+      remonter à l'appelant) — testé explicitement
+- [x] Aucun appel réseau réel déclenché par les tests offline (client
+      Langfuse et `propagate_attributes` monkeypatchés dans
+      `tests/test_langfuse_tracer.py`)
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_langfuse_tracer.py` (SDK mocké, pas
-      de réseau)
+- [x] Tests: `uv run pytest -v tests/test_langfuse_tracer.py` (3 passed, SDK
+      mocké, pas de réseau)
 
 **Dependencies:** Task 2
 
 **Files likely touched:**
 - `app/tools/langfuse_tracer.py`
+- `app/tools/tracer.py` *(révisé — `text` + `TraceHandle.set_output`)*
 - `tests/test_langfuse_tracer.py`
+- `tests/test_tracer.py` *(mis à jour pour la nouvelle signature)*
 
 **Estimated scope:** M (API externe à vérifier avant de coder)
 

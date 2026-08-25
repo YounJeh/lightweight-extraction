@@ -1,24 +1,34 @@
 import os
 from contextlib import AbstractContextManager, nullcontext
-from typing import Protocol
+from typing import Any, Protocol
+
+
+class TraceHandle(Protocol):
+    def set_output(self, output: Any) -> None: ...
 
 
 class Tracer(Protocol):
     def trace_extraction(
         self,
         *,
+        text: str,
         provider: str,
         model_id: str | None,
         field_titles: list[str],
         source_filename: str | None,
-    ) -> AbstractContextManager[None]: ...
+    ) -> AbstractContextManager[TraceHandle]: ...
+
+
+class _NoOpSpan:
+    def set_output(self, output: Any) -> None:
+        pass
 
 
 class NoOpTracer:
     """Tracer par défaut : aucune clé Langfuse en environnement, ou en tests."""
 
-    def trace_extraction(self, **_kwargs) -> AbstractContextManager[None]:
-        return nullcontext()
+    def trace_extraction(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
+        return nullcontext(_NoOpSpan())
 
 
 def build_tracer() -> Tracer:

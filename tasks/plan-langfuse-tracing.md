@@ -20,6 +20,23 @@ self-host Docker, tracing du reste du pipeline (PDF extraction).
 
 ## Architecture Decisions
 
+- **Révision (Task 3) — capture input/output, pas seulement tags/metadata.**
+  Le SDK vérifié expose `start_as_current_observation(..., input=...)` et
+  `span.update(output=...)`, qui permettent de voir le texte source et le
+  résultat de l'extraction dans le dashboard — sans ça, une trace ne montre
+  que "ça a tourné, avec ces tags", ce qui rate l'objectif principal retenu à
+  l'idéation ("voir chaque prompt/completion"). `Tracer.trace_extraction`
+  prend donc `text` en plus, et le context manager cède (`yield`) un
+  `TraceHandle` avec une seule méthode `set_output(output)`, appelée par
+  `LangExtractNerExtractor.extract` juste avant de retourner ses résultats.
+  `NoOpTracer` cède un `_NoOpSpan` dont `set_output` ne fait rien.
+- **Tags/metadata via `propagate_attributes` (SDK vérifié), pas un paramètre
+  `tags` sur le span lui-même** — le SDK Langfuse installé (`langfuse==4.14.5`,
+  OTEL-based) n'expose pas de kwarg `tags` sur `start_as_current_observation`
+  ; les tags/metadata de trace passent par le context manager dédié
+  `propagate_attributes(trace_name=..., tags=..., metadata=...)`, imbriqué
+  juste à l'intérieur du span racine (ordre requis par le SDK — voir
+  docstring `propagate_attributes`).
 - **`Tracer` en context manager, pas en décorateur.** Un décorateur `@observe`
   appliqué au niveau de la fonction ne permettrait pas d'injecter un
   `NoOpTracer` en tests ni de swapper l'implémentation à la construction,
@@ -50,11 +67,15 @@ self-host Docker, tracing du reste du pipeline (PDF extraction).
   `NoOpTracer` (pas de clé Langfuse requise en CI). La vérification que
   Langfuse reçoit bien la trace se fait manuellement (checkpoint), pas par un
   test automatisé qui dépendrait d'un compte Langfuse Cloud réel.
-- **API exacte du SDK Langfuse à vérifier à l'implémentation, pas devinée**
-  (nom du package, `Langfuse()`/`get_client()`, méthode de span, et surtout le
-  comportement de flush asynchrone du client — un point connu de perte de
-  traces si le process se termine avant l'envoi du batch). Même approche que
-  pour LangExtract dans le plan précédent (`source-driven-development`).
+- **API exacte du SDK Langfuse vérifiée à l'implémentation (Task 3), pas
+  devinée** : `get_client()` (singleton, lit les variables d'environnement du
+  SDK), `client.start_as_current_observation(as_type="span", name=...,
+  input=...)` (context manager), `span.update(output=...)`,
+  `propagate_attributes(trace_name=..., tags=..., metadata=...)`,
+  `client.flush()`. Flush **synchrone après chaque trace** (dans un
+  `finally`, donc même en cas d'exception) plutôt qu'un hook de shutdown :
+  vérifié que `flush()` ne lève pas d'exception même si l'export réseau
+  échoue (retries internes du SDK, log un warning) — voir Task 3.
 
 ## Dependency Graph
 
@@ -122,6 +143,7 @@ pas de parallélisation utile vu la taille du scope.
 
 ## Open Questions
 
+Toutes résolues :
 - ~~Nom exact du package PyPI et de l'API du SDK Langfuse actuel~~ **Résolu
   (Task 1)** : package `langfuse` (PyPI), version installée `4.14.5` — SDK v3+
   basé OpenTelemetry (dépendances `opentelemetry-*` tirées automatiquement).
@@ -132,5 +154,12 @@ pas de parallélisation utile vu la taille du scope.
   est documenté **deprecated** en faveur de `LANGFUSE_BASE_URL` : c'est ce
   dernier qui est utilisé dans `.env.example` (pas `LANGFUSE_HOST` comme prévu
   initialement dans ce plan).
-- Faut-il un `flush()` explicite par requête FastHTML, ou un hook de shutdown
-  suffit-il ? — à trancher en Task 3, vérifié par le checkpoint manuel.
+- ~~Faut-il un `flush()` explicite par requête FastHTML, ou un hook de
+  shutdown suffit-il ?~~ **Résolu (Task 3)** : `flush()` synchrone dans un
+  `finally` à chaque `trace_extraction`. Vérifié manuellement (script
+  autonome, host injoignable) que `flush()` retry en interne (~3s) puis logue
+  un warning sans lever — un problème réseau Langfuse ne peut donc pas faire
+  planter une extraction, mais ajoute jusqu'à quelques secondes de latence à
+  la requête si Langfuse Cloud est injoignable. Acceptable pour ce projet
+  (usage local/faible volume) ; à revisiter si ça devient gênant en usage
+  réel (flush en tâche de fond, par ex.).
