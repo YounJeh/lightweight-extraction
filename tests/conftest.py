@@ -23,6 +23,18 @@ def _no_real_langfuse_in_tests():
     os.environ.pop("LANGFUSE_SECRET_KEY", None)
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _no_real_basic_auth_in_tests():
+    """Même raisonnement que `_no_real_langfuse_in_tests` : le `.env` local
+    contient de vrais identifiants Basic Auth (nécessaires pour créer les
+    secrets Cloud Run), qui casseraient tous les tests de routes n'envoyant
+    pas de credentials si on les laissait fuiter dans os.environ. Seuls les
+    tests de `tests/test_auth.py` doivent voir ces variables — ils les
+    positionnent eux-mêmes via `monkeypatch.setenv`."""
+    os.environ.pop("BASIC_AUTH_USER", None)
+    os.environ.pop("BASIC_AUTH_PASSWORD", None)
+
+
 @pytest.fixture
 def db_conn(tmp_path):
     db_path = tmp_path / "test.db"
