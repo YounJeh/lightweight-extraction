@@ -96,4 +96,46 @@ uv run pytest -v -m live
 uv run python scripts/reset_db.py
 ```
 
+## Déploiement Cloud Run
+
+L'app est déployable sur [Cloud Run](https://cloud.google.com/run) (projet
+GCP `extraction-pv`, région `europe-west9`) — voir
+[specs/deploy-cloud-run.md](specs/deploy-cloud-run.md) pour la spec complète.
+
+Service actuel : `https://extraction-pv-783442504013.europe-west9.run.app`
+
+**Accès protégé par Basic Auth** (identifiants communiqués séparément, jamais
+committés) — un lien partageable sans compte Google, pas l'auth IAM native de
+Cloud Run.
+
+**Persistance éphémère** : la base SQLite vit dans le système de fichiers du
+conteneur. Chaque redémarrage (scale-to-zero, redéploiement, OOM) repart avec
+une base vide — comportement accepté pour un usage démo ponctuel, pas de
+persistance durable (Cloud SQL/GCS) mise en place.
+
+Redéploiement (buildpacks, pas de Dockerfile) :
+
+```console
+gcloud run deploy extraction-pv \
+  --source . \
+  --region europe-west9 \
+  --project extraction-pv \
+  --allow-unauthenticated \
+  --set-env-vars=LLM_MODEL=gpt-4o-mini \
+  --set-build-env-vars="GOOGLE_ENTRYPOINT=python -m app.main" \
+  --set-secrets=GOOGLE_GENERATIVE_AI_API_KEY=google-generative-ai-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,LANGFUSE_PUBLIC_KEY=langfuse-public-key:latest,LANGFUSE_SECRET_KEY=langfuse-secret-key:latest,BASIC_AUTH_USER=basic-auth-user:latest,BASIC_AUTH_PASSWORD=basic-auth-password:latest
+```
+
+Secrets gérés dans [Secret Manager](https://cloud.google.com/secret-manager)
+du projet `extraction-pv` (`google-generative-ai-api-key`, `openai-api-key`,
+`langfuse-public-key`, `langfuse-secret-key`, `basic-auth-user`,
+`basic-auth-password`) — pour mettre à jour une valeur :
+
+```console
+printf '%s' 'nouvelle-valeur' | gcloud secrets versions add <nom-du-secret> --data-file=- --project=extraction-pv
+```
+
+(`printf` sans retour à la ligne final — un `\n` parasite dans un secret casse
+une comparaison stricte, ex. le Basic Auth.)
+
 
