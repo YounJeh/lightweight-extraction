@@ -224,6 +224,13 @@ button.btn-danger:hover {
 
 /* Field selection groups */
 
+.field-groups-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .field-groups {
   border-top: 1px solid var(--border);
   margin-bottom: 16px;

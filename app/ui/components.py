@@ -209,6 +209,7 @@ def _field_group_selection_script():
         """
         (function () {
           var container = document.querySelector(".field-groups");
+          var globalToggle = document.getElementById("field-select-all-toggle");
           if (!container) return;
 
           function updateCount(group) {
@@ -218,10 +219,20 @@ def _field_group_selection_script():
             if (countEl) countEl.textContent = checked + "/" + boxes.length + " sélectionnés";
           }
 
+          function updateGlobalToggle() {
+            if (!globalToggle) return;
+            var boxes = container.querySelectorAll('input[type="checkbox"]');
+            var checked = container.querySelectorAll('input[type="checkbox"]:checked').length;
+            var allChecked = boxes.length > 0 && checked === boxes.length;
+            globalToggle.textContent = allChecked ? "Tout désélectionner" : "Tout sélectionner";
+            globalToggle.dataset.allChecked = allChecked;
+          }
+
           container.addEventListener("change", function (e) {
             if (e.target.type !== "checkbox") return;
             var group = e.target.closest(".field-group");
             if (group) updateCount(group);
+            updateGlobalToggle();
           });
 
           container.addEventListener("click", function (e) {
@@ -234,7 +245,21 @@ def _field_group_selection_script():
               cb.checked = checked;
             });
             updateCount(group);
+            updateGlobalToggle();
           });
+
+          if (globalToggle) {
+            globalToggle.addEventListener("click", function () {
+              var checkAll = globalToggle.dataset.allChecked !== "true";
+              container.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                cb.checked = checkAll;
+              });
+              container.querySelectorAll(".field-group").forEach(updateCount);
+              updateGlobalToggle();
+            });
+          }
+
+          updateGlobalToggle();
         })();
         """
     )
@@ -267,6 +292,7 @@ def extraction_form(fields: list[Field]):
             cls="empty-state",
         )
     default_checked_ids = {f.id for f in fields[:_DEFAULT_CHECKED_FIELD_COUNT]}
+    all_checked_by_default = len(default_checked_ids) == len(fields)
     return (
         Div(
             Div("Nouvelle extraction", cls="card-title"),
@@ -279,7 +305,17 @@ def extraction_form(fields: list[Field]):
                     required=True,
                     id="pdf-input",
                 ),
-                Label("Champs à extraire"),
+                Div(
+                    Label("Champs à extraire"),
+                    Button(
+                        "Tout désélectionner" if all_checked_by_default else "Tout sélectionner",
+                        type="button",
+                        id="field-select-all-toggle",
+                        data_all_checked="true" if all_checked_by_default else "false",
+                        cls="field-group-toggle",
+                    ),
+                    cls="field-groups-header",
+                ),
                 Div(
                     *[
                         _field_section_group(section, section_fields, default_checked_ids)
