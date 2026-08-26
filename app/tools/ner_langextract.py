@@ -217,11 +217,14 @@ def _arbitrate(
         kwargs["model_id"] = model_id
 
     arbitration_prompt = _arbitration_prompt(field)
+    arbitration_text = _arbitration_text(field, candidates)
     with tracer.trace_llm_call(
-        name="arbitrate-conflict", model_id=model_id, prompt=arbitration_prompt
+        name=f"arbitrate-conflict-{field.title}",
+        model_id=model_id,
+        prompt=f"{arbitration_prompt}\n\n{arbitration_text}",
     ) as generation:
         annotated = langextract.extract(
-            text_or_documents=_arbitration_text(field, candidates),
+            text_or_documents=arbitration_text,
             prompt_description=arbitration_prompt,
             examples=[_arbitration_example()],
             api_key=api_key,

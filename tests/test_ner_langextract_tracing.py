@@ -149,8 +149,13 @@ def test_extract_traces_arbitration_as_a_second_generation_when_conflict(monkeyp
     tracer = _SpyTracer()
     LangExtractNerExtractor(tracer=tracer).extract(text, [field])
 
-    assert [c["name"] for c in tracer.llm_calls] == ["extract-fields", "arbitrate-conflict"]
+    assert [c["name"] for c in tracer.llm_calls] == [
+        "extract-fields",
+        "arbitrate-conflict-Condition de règlement",
+    ]
     assert "Condition de règlement" in tracer.llm_calls[1]["prompt"]
+    assert "Par chèque ou virement à 30 jours." in tracer.llm_calls[1]["prompt"]
+    assert "15% à l'avancement sur situations mensuelles." in tracer.llm_calls[1]["prompt"]
     assert tracer.llm_calls[1]["handle"].output == [
         "15% à l'avancement sur situations mensuelles."
     ]
