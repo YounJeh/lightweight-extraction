@@ -212,6 +212,37 @@ def test_extract_falls_back_to_extraction_text_when_attributes_missing(monkeypat
     assert results[0].type_error is None
 
 
+def test_extract_arbitration_prompt_includes_context_snippet_per_candidate(monkeypatch):
+    text = (
+        "Préavis de résiliation : 30 jours avant l'échéance. "
+        "Durée de validité du contrat : 15 jours."
+    )
+    first = _grounded("Avance forfaitaire", "30 jours", text.index("30 jours"))
+    second = _grounded("Avance forfaitaire", "15 jours", text.index("15 jours"))
+    main_annotated = data.AnnotatedDocument(extractions=[first, second], text=text)
+    arbitration_annotated = data.AnnotatedDocument(
+        extractions=[data.Extraction(extraction_class="selection", extraction_text="15 jours")],
+        text="arbitration input",
+    )
+
+    calls = []
+
+    def fake_extract(**kwargs):
+        calls.append(kwargs)
+        return main_annotated if len(calls) == 1 else arbitration_annotated
+
+    monkeypatch.setattr(ner_langextract.langextract, "extract", fake_extract)
+
+    results = LangExtractNerExtractor().extract(text, _fields())
+
+    assert len(results) == 1
+    assert results[0].value == "15 jours"
+    arbitration_input = calls[1]["text_or_documents"]
+    assert "Préavis de résiliation" in arbitration_input  # contexte du candidat écarté
+    assert "Durée de validité du contrat" in arbitration_input  # contexte du candidat retenu
+    assert arbitration_input.count("page 1") == 2  # les deux candidats sont sur la même page
+
+
 def test_extract_falls_back_to_first_occurrence_when_arbitration_is_unparseable(monkeypatch):
     text = "Valeur A ici. Valeur B là."
     first = _grounded("Avance forfaitaire", "Valeur A", text.index("Valeur A"))

@@ -9,7 +9,7 @@ from app.tools import type_coercion
 from app.tools.pdf_pymupdf4llm import PAGE_SEPARATOR_RE
 from app.tools.tracer import Tracer, build_tracer
 
-_CONTEXT_CHARS = 40
+_CONTEXT_CHARS = 80
 
 _TYPE_INSTRUCTIONS = {
     "text": "",
@@ -132,7 +132,9 @@ class LangExtractNerExtractor:
         results = []
         for field_title, candidates in candidates_by_field.items():
             field = fields_by_title[field_title]
-            chosen = _select_candidate(field, candidates, model_id, api_key, tracer)
+            chosen = _select_candidate(
+                field, candidates, text, model_id, api_key, tracer
+            )
             page_number, text_position = _locate(
                 text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
             )
@@ -179,6 +181,7 @@ def _normalize(value: str) -> str:
 def _select_candidate(
     field: Field,
     candidates: list["data.Extraction"],
+    text: str,
     model_id: str | None,
     api_key: str | None,
     tracer: Tracer,
@@ -193,31 +196,36 @@ def _select_candidate(
 
     distinct_by_value: dict[str, data.Extraction] = {}
     for candidate in ordered:
-        distinct_by_value.setdefault(_normalize(candidate.extraction_text), candidate)
+        distinct_by_value.setdefault(_normalize(
+            candidate.extraction_text), candidate)
     distinct = list(distinct_by_value.values())
     if len(distinct) == 1:
         return distinct[0]
 
-    return _arbitrate(field, distinct, model_id, api_key, tracer)
+    return _arbitrate(field, distinct, text, model_id, api_key, tracer)
 
 
 def _arbitrate(
     field: Field,
     candidates: list["data.Extraction"],
+    text: str,
     model_id: str | None,
     api_key: str | None,
     tracer: Tracer,
 ) -> "data.Extraction":
     """Plusieurs valeurs distinctes ont été extraites pour le même champ à
     des endroits différents du document (pas un artefact de chunking, un
-    vrai conflit) — un second appel LLM, léger et hors grounding sur le
-    document source, tranche parmi les candidats."""
+    vrai conflit) — un second appel LLM tranche parmi les candidats. Chaque
+    candidat est accompagné de sa page et du texte qui l'entoure dans le
+    document source (même grounding que celui exposé sur le résultat final,
+    voir _locate), pour que l'arbitre puisse distinguer une clause pertinente
+    d'une clause voisine qui ressemble à la bonne réponse sans en être une."""
     kwargs = {}
     if model_id:
         kwargs["model_id"] = model_id
 
     arbitration_prompt = _arbitration_prompt(field)
-    arbitration_text = _arbitration_text(field, candidates)
+    arbitration_text = _arbitration_text(field, candidates, text)
     with tracer.trace_llm_call(
         name=f"arbitrate-conflict-{field.title}",
         model_id=model_id,
@@ -248,12 +256,18 @@ def _arbitrate(
     return candidates[0]
 
 
-def _arbitration_text(field: Field, candidates: list["data.Extraction"]) -> str:
+def _arbitration_text(
+    field: Field, candidates: list["data.Extraction"], text: str
+) -> str:
     lines = [f"Champ : {field.title}", f"Définition : {field.definition}", ""]
-    lines += [
-        f"Candidat {i} : {candidate.extraction_text}"
-        for i, candidate in enumerate(candidates, start=1)
-    ]
+    for i, candidate in enumerate(candidates, start=1):
+        page_number, snippet = _locate(
+            text, candidate.char_interval.start_pos, candidate.char_interval.end_pos
+        )
+        lines.append(
+            f"Candidat {i} : {candidate.extraction_text} "
+            f'(page {page_number}, contexte : "{snippet}")'
+        )
     return "\n".join(lines)
 
 
@@ -271,8 +285,11 @@ def _arbitration_example() -> "data.ExampleData":
     text = (
         "Champ : Montant total\n"
         "Définition : Montant total dû au titre du contrat.\n\n"
-        "Candidat 1 : 12 000 EUR HT\n"
-        "Candidat 2 : voir grille tarifaire en annexe"
+        'Candidat 1 : 12 000 EUR HT (page 1, contexte : "...le montant total '
+        'dû au titre du présent contrat est de 12 000 EUR HT...")\n'
+        'Candidat 2 : voir grille tarifaire en annexe (page 3, contexte : '
+        '"...pour les prestations complémentaires, voir grille tarifaire en '
+        'annexe...")'
     )
     return data.ExampleData(
         text=text,
@@ -348,7 +365,7 @@ def _build_example(fields: list[Field]) -> "data.ExampleData | None":
 
 def _locate(text: str, start_pos: int, end_pos: int) -> tuple[int, str]:
     page_number = len(PAGE_SEPARATOR_RE.findall(text[:start_pos])) + 1
-    snippet = text[max(0, start_pos - _CONTEXT_CHARS) : end_pos + _CONTEXT_CHARS]
+    snippet = text[max(0, start_pos - _CONTEXT_CHARS): end_pos + _CONTEXT_CHARS]
     snippet = PAGE_SEPARATOR_RE.sub(" ", snippet)
     snippet = " ".join(snippet.split())
     return page_number, snippet
