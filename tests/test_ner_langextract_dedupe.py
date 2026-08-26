@@ -175,6 +175,24 @@ def test_extract_sets_type_error_when_value_not_convertible(monkeypatch):
     assert results[0].type_error is not None
 
 
+def test_extract_infers_oui_for_bool_field_regardless_of_llm_attribute(monkeypatch):
+    text = "Une pénalité de retard de 5% du montant des travaux est prévue."
+    candidate = data.Extraction(
+        extraction_class="Pénalité",
+        extraction_text="Une pénalité de retard de 5% du montant des travaux est prévue.",
+        char_interval=data.CharInterval(start_pos=0, end_pos=len(text)),
+    )
+    annotated = data.AnnotatedDocument(extractions=[candidate], text=text)
+    monkeypatch.setattr(ner_langextract.langextract, "extract", lambda **kw: annotated)
+    fields = [Field(id=1, key="penalite", title="Pénalité", definition="d", type="bool")]
+
+    results = LangExtractNerExtractor().extract(text, fields)
+
+    assert len(results) == 1
+    assert results[0].typed_value == "oui"
+    assert results[0].type_error is None
+
+
 def test_extract_falls_back_to_extraction_text_when_attributes_missing(monkeypatch):
     text = "Âge : 42."
     candidate = data.Extraction(

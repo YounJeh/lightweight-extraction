@@ -15,13 +15,12 @@ _TYPE_INSTRUCTIONS = {
     "text": "",
     "int": " (nombre entier, ex. 30)",
     "float": " (nombre décimal, ex. 3.5)",
-    "bool": " (oui/non)",
+    "bool": "",
     "date": " (date au format ISO AAAA-MM-JJ)",
 }
 
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
 _ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
-_BOOL_TOKEN_RE = re.compile(r"\b(oui|non|vrai|faux|true|false)\b", re.IGNORECASE)
 
 
 def _typed_hint(example: str, field_type: FieldType) -> str | None:
@@ -29,16 +28,17 @@ def _typed_hint(example: str, field_type: FieldType) -> str | None:
     représente la valeur typée attendue — pour montrer au LLM, via le
     few-shot, que attributes['value'] doit être une valeur étroite/typée et
     non une recopie de extraction_text. None si rien n'est trouvé (le champ
-    few-shot reste alors sans attributs, comme avant)."""
+    few-shot reste alors sans attributs, comme avant).
+
+    Sans objet pour "bool" : un champ booléen (has_*) est une détection de
+    présence, jamais recopié tel quel dans le texte source, donc il n'y a
+    pas de sous-chaîne à isoler — voir _typed_value."""
     if field_type in ("int", "float"):
         match = _NUMBER_RE.search(example)
         return match.group(0).replace(",", ".") if match else None
     if field_type == "date":
         match = _ISO_DATE_RE.search(example)
         return match.group(0) if match else None
-    if field_type == "bool":
-        match = _BOOL_TOKEN_RE.search(example)
-        return match.group(0).lower() if match else None
     return None
 
 
@@ -47,6 +47,19 @@ def _typed_attribute(extraction: "data.Extraction") -> str | None:
     et non vide — None sinon (l'appelant retombe alors sur extraction_text)."""
     value = (extraction.attributes or {}).get("value")
     return value if isinstance(value, str) and value else None
+
+
+def _typed_value(field: Field, chosen: "data.Extraction") -> str:
+    """Valeur typée à exposer pour ce champ. Pour "bool", ne dépend jamais du
+    LLM : un champ booléen n'atteint ce point que s'il a un candidat groundé
+    non vide (voir _group_grounded_candidates), donc sa seule présence ici
+    vaut "oui" — demander au LLM de le reformuler via attributes['value']
+    n'a pas de sens (il n'y a pas de "oui" littéral à recopier dans le
+    contrat) et produisait un typed_value = extraction_text en repli,
+    toujours rejeté par type_coercion.validate."""
+    if field.type == "bool":
+        return "oui" if chosen.extraction_text else "non"
+    return _typed_attribute(chosen) or chosen.extraction_text
 
 
 class LangExtractNerExtractor:
@@ -123,7 +136,7 @@ class LangExtractNerExtractor:
             page_number, text_position = _locate(
                 text, chosen.char_interval.start_pos, chosen.char_interval.end_pos
             )
-            raw_value = _typed_attribute(chosen) or chosen.extraction_text
+            raw_value = _typed_value(field, chosen)
             type_error = type_coercion.validate(raw_value, field.type)
             results.append(
                 ExtractionResult(
@@ -301,9 +314,10 @@ def _prompt_description(fields: list[Field]) -> str:
 
 def _example_attributes(field: Field) -> dict[str, str] | None:
     """attributes['value'] du few-shot pour ce champ — None pour les champs
-    text (pas de valeur typée à distinguer) ou si aucun indice n'a pu être
-    isolé dans l'exemple (voir _typed_hint)."""
-    if field.type == "text":
+    text/bool (pas de valeur typée à distinguer par le LLM, voir
+    _typed_value) ou si aucun indice n'a pu être isolé dans l'exemple (voir
+    _typed_hint)."""
+    if field.type in ("text", "bool"):
         return None
     hint = _typed_hint(field.examples[0].context, field.type)
     return {"value": hint} if hint else None
