@@ -40,3 +40,9 @@ dist/
 
 # Logs
 *.log
+
+notes.md
+
+DATASET GOLD.csv
+
+data_test/
