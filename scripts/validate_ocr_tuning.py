@@ -92,16 +92,17 @@ A_CONFIGS = [
     {"name": "dpi72", "ocr_dpi": 72, "area_skip_threshold": None},
 ]
 
-# Seuil B isolé -- dpi=150 (référence), plusieurs candidats bracketant la
-# zone observée dans docs/ideas/validation-optimisation-ocr.md : la page 12
-# de référence (104__DEVIS, à préserver) a img_area=0.0164 ; les logos
-# Tournan/Super-U (à éliminer si possible) sont à 0.026-0.039.
+# Seuil B isolé -- dpi=150 (référence). Portée réduite à 2 candidats qui
+# bracketent la zone observée dans docs/ideas/validation-optimisation-ocr.md :
+# la page 12 de référence (104__DEVIS, à préserver) a img_area=0.0164 ; les
+# logos Tournan/Super-U (à éliminer si possible) sont à 0.026-0.039.
+# 0.02 : juste au-dessus de la page 12, ne devrait toucher aucun logo.
+# 0.05 : au-dessus de tous les logos connus, devrait tous les éliminer.
+# Suffisant pour répondre à la question "un seuil praticable existe-t-il" ;
+# affiner avec des valeurs intermédiaires seulement si le résultat le justifie.
 B_CONFIGS = [
     {"name": "threshold_0.02", "ocr_dpi": 150, "area_skip_threshold": 0.02},
-    {"name": "threshold_0.03", "ocr_dpi": 150, "area_skip_threshold": 0.03},
     {"name": "threshold_0.05", "ocr_dpi": 150, "area_skip_threshold": 0.05},
-    {"name": "threshold_0.10", "ocr_dpi": 150, "area_skip_threshold": 0.10},
-    {"name": "threshold_0.20", "ocr_dpi": 150, "area_skip_threshold": 0.20},
 ]
 
 CACHE_DIR = Path(__file__).resolve().parent / "_ocr_tuning_cache"
