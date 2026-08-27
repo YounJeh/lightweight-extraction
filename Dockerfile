@@ -33,4 +33,8 @@ RUN uv pip uninstall opencv-python opencv-python-headless \
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["uv", "run", "python", "-m", "app.main"]
+# --no-sync : sans ça, "uv run" resynchronise l'environnement sur uv.lock à
+# chaque démarrage du conteneur (uv.lock déclare toujours opencv-python, via
+# rapidocr) — ça réinstallerait la variante GUI et annulerait le fix
+# ci-dessus à chaque nouvelle instance/redémarrage.
+CMD ["uv", "run", "--no-sync", "python", "-m", "app.main"]

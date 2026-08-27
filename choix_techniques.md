@@ -130,6 +130,20 @@ correctif) · désinstaller uniquement `opencv-python` sans réinstaller
 `opencv-python-headless` à neuf (risque de supprimer les fichiers headless
 réellement utilisés, cf. ci-dessus).
 
+**Round 2 — même erreur après le premier correctif :** le premier
+`Dockerfile` (`CMD ["uv", "run", "python", "-m", "app.main"]`) n'a pas
+suffi — logs Cloud Run : `import cv2` replante avec le même
+`ImportError: libxcb.so.1`. Cause : `uv run` **resynchronise
+l'environnement sur `uv.lock` à chaque démarrage du conteneur** (pas juste
+au build) — `uv.lock` déclare toujours `opencv-python` (dépendance
+transitive de `rapidocr`, jamais retirée du lock, seulement désinstallée
+manuellement du `.venv`), donc `uv run` la réinstalle silencieusement à
+chaque instance/redémarrage, annulant le nettoyage fait à l'étape `RUN`
+précédente. Confirmé en local (venv jetable) : `uv run` sans flag
+réinstalle bien `opencv-python` ("Installed 6 packages") ; `uv run
+--no-sync` ne touche à rien. Fix : `CMD ["uv", "run", "--no-sync",
+"python", "-m", "app.main"]`.
+
 **Réf :** [Dockerfile](Dockerfile) · [.dockerignore](.dockerignore) ·
 [specs/deploy-cloud-run.md](specs/deploy-cloud-run.md)
 
