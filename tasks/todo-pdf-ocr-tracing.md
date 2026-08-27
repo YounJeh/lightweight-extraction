@@ -143,15 +143,18 @@ que d'ajouter un filtre maison sur la longueur de texte natif.
 
 ---
 
-## Checkpoint: Fondation OCR (après Tasks 1-2)
-- [ ] `uv sync` installe l'environnement sans erreur
-- [ ] `uv run pytest -m "not live"` passe intégralement, aucune régression
-- [ ] Manuel : page 12 de `104__DEVIS_25110230_VERSION_A03.pdf` produit
-      désormais du texte exploitable
-- [ ] Manuel : sortie inchangée en qualité sur un PDF texte existant du
-      dataset gold (pas de régression du moteur layout sur les pages
-      non scannées)
-- [ ] Revue avec l'utilisateur avant de continuer
+## Checkpoint: Fondation OCR (après Tasks 1-2) ✅
+- [x] `uv sync` installe l'environnement sans erreur
+- [x] `uv run pytest -m "not live"` passe (173 passed, 1 échec pré-existant
+      sans rapport, confirmé par `git stash` — voir Task 1)
+- [x] Manuel : page 12 de `104__DEVIS_25110230_VERSION_A03.pdf` produit
+      désormais du texte exploitable (~17 600 caractères de CGV)
+- [x] Manuel : `test_extract_text_returns_real_content_for_each_page`
+      confirme l'absence de régression sur un PDF texte natif (contenu +
+      ordre des pages inchangés)
+- [x] Revue avec l'utilisateur : décision de garder le comportement OCR natif
+      de PyMuPDF4LLM tel quel (OCR déclenché sur quasi toutes les pages à
+      cause des logos, pas seulement les pages scannées — voir Task 2)
 
 ---
 

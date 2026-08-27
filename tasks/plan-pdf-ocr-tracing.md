@@ -97,19 +97,23 @@ taille réduite du scope, autant rester séquentiel comme pour
 
 ## Task List
 
-### Phase 1: Fondation OCR
+### Phase 1: Fondation OCR ✅
 
-- [ ] Task 1: Dépendance RapidOCR + réactivation layout/OCR (`ocr_language="fra"`)
-- [ ] Task 2: Signal par page natif vs OCR
+- [x] Task 1: Dépendance RapidOCR + réactivation layout/OCR (`ocr_language="fra"`)
+- [x] Task 2: Signal par page natif vs OCR
 
-### Checkpoint: Fondation OCR
-- [ ] `uv sync` installe l'environnement sans erreur
-- [ ] `uv run pytest -m "not live"` passe intégralement, aucune régression
-- [ ] Manuel : page 12 de `104__DEVIS_25110230_VERSION_A03.pdf` produit
-      désormais du texte exploitable (plus 11 caractères)
-- [ ] Manuel : sortie inchangée en qualité sur un PDF texte existant
-      (non-régression du moteur layout sur les documents non scannés)
-- [ ] Revue avec l'utilisateur avant de continuer
+### Checkpoint: Fondation OCR ✅
+- [x] `uv sync` installe l'environnement sans erreur
+- [x] `uv run pytest -m "not live"` passe, aucune régression (1 échec
+      pré-existant sans rapport, confirmé par `git stash`)
+- [x] Manuel : page 12 de `104__DEVIS_25110230_VERSION_A03.pdf` produit
+      désormais du texte exploitable (~17 600 caractères, plus 11)
+- [x] Manuel : sortie inchangée en qualité sur un PDF texte existant
+- [x] Revue avec l'utilisateur : **écart important découvert** — l'OCR se
+      déclenche sur quasi toutes les pages (logos/en-têtes), pas seulement
+      les pages scannées ; comportement natif gardé tel quel (décision
+      utilisateur, voir `choix_techniques.md` et `todo-pdf-ocr-tracing.md`
+      Task 2)
 
 ### Phase 2: Tracing Langfuse dédié
 
