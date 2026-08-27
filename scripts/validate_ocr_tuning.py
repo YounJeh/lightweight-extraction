@@ -12,6 +12,8 @@ Usage :
     uv run --no-sync python scripts/validate_ocr_tuning.py
 """
 
+import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -80,14 +82,119 @@ def value_present(text: str, value: str) -> bool:
     return _normalize_text(value) in _normalize_text(text)
 
 
-if __name__ == "__main__":
-    rows = load_gold_values()
-    by_file: dict[str, int] = {}
-    for source_file, _field_key, _value in rows:
-        by_file[source_file] = by_file.get(source_file, 0) + 1
+# Palier A (dpi) isolé -- seuil B désactivé, dpi=150 = comportement actuel
+# de l'app (référence).
+A_CONFIGS = [
+    {"name": "dpi150_baseline", "ocr_dpi": 150, "area_skip_threshold": None},
+    {"name": "dpi120", "ocr_dpi": 120, "area_skip_threshold": None},
+    {"name": "dpi100", "ocr_dpi": 100, "area_skip_threshold": None},
+    {"name": "dpi90", "ocr_dpi": 90, "area_skip_threshold": None},
+    {"name": "dpi72", "ocr_dpi": 72, "area_skip_threshold": None},
+]
 
-    print(f"{len(rows)} valeurs gold non nulles, {len(by_file)} documents")
-    for source_file, count in sorted(by_file.items()):
-        exists = (DATA_TEST_DIR / source_file).exists()
-        flag = "" if exists else "  <-- FICHIER INTROUVABLE"
-        print(f"  {count:2d}  {source_file}{flag}")
+# Seuil B isolé -- dpi=150 (référence), plusieurs candidats bracketant la
+# zone observée dans docs/ideas/validation-optimisation-ocr.md : la page 12
+# de référence (104__DEVIS, à préserver) a img_area=0.0164 ; les logos
+# Tournan/Super-U (à éliminer si possible) sont à 0.026-0.039.
+B_CONFIGS = [
+    {"name": "threshold_0.02", "ocr_dpi": 150, "area_skip_threshold": 0.02},
+    {"name": "threshold_0.03", "ocr_dpi": 150, "area_skip_threshold": 0.03},
+    {"name": "threshold_0.05", "ocr_dpi": 150, "area_skip_threshold": 0.05},
+    {"name": "threshold_0.10", "ocr_dpi": 150, "area_skip_threshold": 0.10},
+    {"name": "threshold_0.20", "ocr_dpi": 150, "area_skip_threshold": 0.20},
+]
+
+CACHE_DIR = Path(__file__).resolve().parent / "_ocr_tuning_cache"
+RESULTS_PATH = CACHE_DIR / "results.jsonl"
+
+
+def _load_done_keys(results_path: Path) -> set[tuple[str, str]]:
+    if not results_path.exists():
+        return set()
+    done = set()
+    for line in results_path.read_text().splitlines():
+        row = json.loads(line)
+        done.add((row["source_file"], row["config"]))
+    return done
+
+
+def run_matrix(
+    configs: list[dict],
+    source_files: list[str],
+    *,
+    cache_dir: Path = CACHE_DIR,
+    results_path: Path = RESULTS_PATH,
+) -> None:
+    """Extrait chaque (source_file, config) une seule fois, met le texte en
+    cache sur disque (`cache_dir/<source_file>__<config>.md`) et append une
+    ligne JSON par résultat dans `results_path` (temps + texte présent/non)
+    -- relançable sans recalcul : les couples déjà présents dans
+    `results_path` sont sautés."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    done = _load_done_keys(results_path)
+    gold_rows = load_gold_values()
+
+    with results_path.open("a") as out:
+        for source_file in source_files:
+            gold_for_file = [
+                (key, value) for f, key, value in gold_rows if f == source_file
+            ]
+            pdf_bytes = (DATA_TEST_DIR / source_file).read_bytes()
+
+            for config in configs:
+                if (source_file, config["name"]) in done:
+                    continue
+
+                t0 = time.time()
+                text = extract_with_config(
+                    pdf_bytes,
+                    ocr_dpi=config["ocr_dpi"],
+                    area_skip_threshold=config["area_skip_threshold"],
+                )
+                elapsed = time.time() - t0
+
+                text_path = cache_dir / f"{source_file}__{config['name']}.md"
+                text_path.write_text(text)
+
+                missing = [key for key, value in gold_for_file if not value_present(text, value)]
+                row = {
+                    "source_file": source_file,
+                    "config": config["name"],
+                    "elapsed_seconds": round(elapsed, 1),
+                    "gold_values_total": len(gold_for_file),
+                    "gold_values_missing": missing,
+                }
+                out.write(json.dumps(row, ensure_ascii=False) + "\n")
+                out.flush()
+                print(
+                    f"{source_file:55s} {config['name']:18s} "
+                    f"{elapsed:6.1f}s  manquantes: {missing or '-'}"
+                )
+
+
+def _cli() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "command", choices=["list", "matrix-a", "matrix-b"], default="list", nargs="?"
+    )
+    args = parser.parse_args()
+
+    if args.command == "list":
+        rows = load_gold_values()
+        by_file: dict[str, int] = {}
+        for source_file, _field_key, _value in rows:
+            by_file[source_file] = by_file.get(source_file, 0) + 1
+        print(f"{len(rows)} valeurs gold non nulles, {len(by_file)} documents")
+        for source_file, count in sorted(by_file.items()):
+            exists = (DATA_TEST_DIR / source_file).exists()
+            flag = "" if exists else "  <-- FICHIER INTROUVABLE"
+            print(f"  {count:2d}  {source_file}{flag}")
+        return
+
+    source_files = sorted({f for f, _k, _v in load_gold_values()})
+    configs = A_CONFIGS if args.command == "matrix-a" else B_CONFIGS
+    run_matrix(configs, source_files)
+
+
+if __name__ == "__main__":
+    _cli()

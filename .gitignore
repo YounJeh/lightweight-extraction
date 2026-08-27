@@ -50,3 +50,5 @@ DATASET GOLD.csv
 # ignorés explicitement plutôt que le dossier entier.
 data_test/ITM Vitr* - March* de travaux - ENTECH - lot PV.pdf
 data_test/SKM_C300i26022410480.pdf
+# Cache local du script de validation OCR (scripts/validate_ocr_tuning.py)
+scripts/_ocr_tuning_cache/
