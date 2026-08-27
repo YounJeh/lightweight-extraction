@@ -246,7 +246,7 @@ défaut en usage réel.
 
 ---
 
-## Task 5: Évaluateurs item-level (`scripts/gold_matching.py`)
+## Task 5: Évaluateurs item-level (`scripts/gold_matching.py`) ✅
 
 **Description:** `scripts/gold_matching.py` : fonction de matching normalisé
 par type de champ (texte insensible casse/espaces ; numérique — tolérance à
@@ -260,18 +260,25 @@ coût (lus depuis les `usage_details`/`cost_details` de la trace). Câblé comme
 évaluateur item-level de `run_experiment` (`Evaluation(name=..., value=...)`
 par métrique).
 
+**Note d'implémentation :** `typed_value` préféré à `value` pour la
+comparaison (valeur déjà nettoyée par le pipeline, cf.
+`app/tools/ner_langextract.py::_typed_value`). `human_validation` posé comme
+`Evaluation` item-level (pas seulement lu depuis `item.metadata`) pour que
+l'évaluateur run-level (Task 6) puisse filtrer sans requête supplémentaire.
+
 **Acceptance criteria:**
-- [ ] Cas nominal : valeur extraite == valeur gold (après normalisation) → TP
-- [ ] Gold `null`, valeur extraite non vide → FP seul
-- [ ] Gold non vide, rien extrait → FN seul
-- [ ] Gold `null`, rien extrait → TN, exclu du calcul P/R
-- [ ] Valeur extraite différente de la valeur gold → 1 FP + 1 FN
-- [ ] `pourcentage_acompte` gold `30`, valeur extraite `"30 %"` (ou
+- [x] Cas nominal : valeur extraite == valeur gold (après normalisation) → TP
+- [x] Gold `null`, valeur extraite non vide → FP seul
+- [x] Gold non vide, rien extrait → FN seul
+- [x] Gold `null`, rien extrait → TN, exclu du calcul P/R
+- [x] Valeur extraite différente de la valeur gold → 1 FP + 1 FN
+- [x] `pourcentage_acompte` gold `30`, valeur extraite `"30 %"` (ou
       équivalent) → match (tolérance numérique)
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_gold_matching.py` — tous les cas
-      ci-dessus couverts, hors réseau
+- [x] Tests: `uv run pytest -v tests/test_gold_matching.py` (16 passed) +
+      `tests/test_gold_dataset_eval.py` (10 tests évaluateur item-level) —
+      tous les cas ci-dessus couverts, hors réseau
 
 **Dependencies:** Task 4
 
@@ -284,7 +291,7 @@ par métrique).
 
 ---
 
-## Task 6: Évaluateurs run-level (agrégats, bucket `human_validation`)
+## Task 6: Évaluateurs run-level (agrégats, bucket `human_validation`) ✅
 
 **Description:** Évaluateur run-level agrégeant les `Evaluation` item-level
 en scores globaux : P/R/F1 macro (moyenne inter-champs) et micro (agrégée),
@@ -296,20 +303,49 @@ exacte (deux jeux de scores calculés dans le même évaluateur vs deux Datasets
 séparés) tranchée ici selon ce que permet l'API `run_experiment` vérifiée à
 Task 3-4.
 
+**Note d'implémentation — coût non mesurable :** `cost_usd_total` posé à
+`0.0` avec un commentaire explicite plutôt qu'omis. Découverte en
+implémentant : LangExtract n'expose aucune info d'usage token dans son objet
+de retour, donc `trace_llm_call` (`app/tools/langfuse_tracer.py`) ne pose
+jamais `usage_details`/`cost_details` sur ses generations — gap déjà
+documenté (`tasks/todo-langfuse-tracing.md`, Task 6 post-launch), confirmé
+indépendant de ce chantier. Nécessiterait d'instrumenter LangExtract plus
+profondément (hors scope).
+
+**Découverte du run réel — bug pipeline préexistant, pas de ce chantier :**
+`document_id: 8` (`104__DEVIS_25110230_VERSION_A03.pdf`, déjà connu pour ses
+soucis d'OCR, voir `choix_techniques.md`) échoue avec `ValueError: Source
+tokens and extraction tokens cannot be empty.` pendant l'arbitrage LLM
+(`arbitrate-conflict-Pourcentage d'acompte`, logique de dédup décrite dans
+`choix_techniques.md`). Bug latent dans `app/tools/ner_langextract.py`, hors
+scope de ce chantier (non traité ici) — mais la CI l'a détecté exactement
+comme prévu : `run_experiment` a géré l'échec sans interrompre les 13 autres
+documents (comportement du SDK, voir Task 4), et `documents_evaluated: 13`
+reflète fidèlement l'exclusion. Ce document reste dans le Dataset Langfuse
+(sync inchangée) et réapparaîtra dans un futur run une fois le bug corrigé.
+
 **Acceptance criteria:**
-- [ ] Les scores run-level apparaissent sur le Dataset Run dans l'UI Langfuse
-- [ ] Le score P/R/F1 "principal" ne prend en compte que les documents
+- [x] Les scores run-level apparaissent sur le Dataset Run dans l'UI Langfuse
+- [x] Le score P/R/F1 "principal" ne prend en compte que les documents
       `human_validation: true`
-- [ ] Un score/comptage séparé existe pour les documents `human_validation:
-      false` (actuellement 0 sur les 14, mais le mécanisme doit rester
-      générique — testé avec un cas simulé où au moins un document est à
-      `false`)
-- [ ] Split OCR/non-OCR visible séparément dans les métriques de latence
+- [x] Un score/comptage séparé existe pour les documents `human_validation:
+      false` (actuellement 0 sur les 14, mais le mécanisme reste générique —
+      testé avec un cas simulé où au moins un document est à `false`,
+      `test_run_evaluator_excludes_unvalidated_documents_from_main_metrics`)
+- [x] Split OCR/non-OCR visible séparément dans les métriques de latence
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_gold_dataset_eval.py` — agrégation
-      testée sur des résultats d'item simulés (pas de vrai run réseau)
-- [ ] Manuel : un run réel confirme les scores run-level dans l'UI Langfuse
+- [x] Tests: `tests/test_gold_dataset_eval.py` (5 tests dédiés à
+      l'agrégation run-level, résultats d'item simulés, hors réseau) +
+      `uv run pytest -v -m "not live"` (215 passed, 1 échec pré-existant
+      sans rapport, 1 deselected)
+- [x] Manuel : run réel confirmé — `documents_evaluated: 13`,
+      `f1_macro: 0.478`, `precision_micro: 0.429`, `recall_micro: 0.625`,
+      `exact_match_accuracy: 0.077`, `grounding_accuracy: 0.931` (27/29),
+      `latency_p50_seconds: 21.6`, `latency_p95_seconds: 60.8`,
+      `documents_with_ocr: 12`, `documents_without_ocr: 1`,
+      `cost_usd_total: 0.0` (commentée) — Dataset Run :
+      https://cloud.langfuse.com/project/cmt1cflz104nvad0g35njubp0/datasets/cmtbkest500w5ad0fuzsrgoqr/runs/fa33d487-54f7-4301-9473-b9b66b8ac34b
 
 **Dependencies:** Task 5
 
@@ -322,8 +358,8 @@ Task 3-4.
 ---
 
 ## Checkpoint: Métriques (après Tasks 5-6)
-- [ ] `uv run pytest -v tests/test_gold_matching.py tests/test_gold_dataset_eval.py` passe
-- [ ] Un run réel affiche les scores item-level et run-level attendus dans
+- [x] `uv run pytest -v tests/test_gold_matching.py tests/test_gold_dataset_eval.py` passe
+- [x] Un run réel affiche les scores item-level et run-level attendus dans
       l'UI Langfuse
 - [ ] Revue avec l'utilisateur avant de continuer
 
