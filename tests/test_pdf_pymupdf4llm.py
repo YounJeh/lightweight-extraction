@@ -28,10 +28,10 @@ def test_extract_text_marks_page_boundaries():
 
     text = PyMuPDF4LlmTextExtractor().extract_text(pdf_bytes)
 
-    assert "--- end of page=0 ---" in text
-    assert "--- end of page=1 ---" in text
-    assert text.index("Page une") < text.index("end of page=0")
-    assert text.index("end of page=0") < text.index("Page deux")
+    assert "--- end of page.page_number=1 ---" in text
+    assert "--- end of page.page_number=2 ---" in text
+    assert text.index("Page une") < text.index("end of page.page_number=1")
+    assert text.index("end of page.page_number=1") < text.index("Page deux")
 
 
 def test_extract_text_marks_single_page_boundary():
@@ -40,4 +40,4 @@ def test_extract_text_marks_single_page_boundary():
     text = PyMuPDF4LlmTextExtractor().extract_text(pdf_bytes)
 
     assert "Seule page du document" in text
-    assert "--- end of page=0 ---" in text
+    assert "--- end of page.page_number=1 ---" in text

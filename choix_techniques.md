@@ -30,3 +30,48 @@ SDK LLM dédié (inutile, un seul point d'accès LLM suffit) · augmenter
 
 **Réf :** [specs/dedupe-extraction-results.md](specs/dedupe-extraction-results.md) ·
 [tests/test_ner_langextract_dedupe.py](tests/test_ner_langextract_dedupe.py)
+
+---
+
+## OCR des pages scannées (PyMuPDF4LLM + RapidOCR)
+
+**Contexte :** le chemin texte léger de PyMuPDF4LLM
+(`use_layout(False)`) ne fait aucun OCR — une page photocopiée/scannée sans
+couche texte (ex. page 12 de `104__DEVIS_25110230_VERSION_A03.pdf`, une
+photocopie de CGV) ne produisait que le texte accessoire de la page (11
+caractères), rien d'exploitable pour le NER.
+
+**Décision** (`app/tools/pdf_pymupdf4llm.py`) : réactivation du moteur
+layout (`use_layout(True)`), OCR géré nativement par PyMuPDF4LLM en mode
+"si nécessaire" (`use_ocr` par défaut — une seule page OCRisée sur les 12 du
+PDF de test, pas le document entier). Backend RapidOCR (`rapidocr`, pas
+`rapidocr-onnxruntime`, préféré nativement par PyMuPDF4LLM quand les deux
+sont installés) : détection *et* reconnaissance faites par RapidOCR, aucune
+dépendance Tesseract sur ce chemin. `ocr_language="fra"` passé en dur
+(pas de variable d'environnement) — décision utilisateur.
+
+**Écarts découverts en implémentation :**
+- `rapidocr` tire `opencv-python` (non headless), qui exige `libGL.so.1`
+  absent des environnements serveur/CI sans X11 → ajout de
+  `opencv-python-headless` comme dépendance directe pour forcer un `cv2`
+  sans cette dépendance système (les deux packages installent au même
+  chemin ; l'ordre alphabétique du lock fait gagner la variante headless,
+  vérifié stable sur `uv sync` à froid).
+- `ocr_language="fra"` est en réalité un **no-op** avec RapidOCR : ce kwarg
+  n'est utilisé que sur le chemin Tesseract "detection-only" de PyMuPDF4LLM ;
+  RapidOCR utilise son propre modèle de reconnaissance multilingue sans
+  sélecteur de langue dans cette intégration. Gardé quand même (intention
+  explicite, filet si le chemin Tesseract est utilisé un jour).
+- Réactiver le moteur layout change le format des séparateurs de page
+  (`--- end of page=N ---` 0-indexé → `--- end of page.page_number=N ---`
+  1-indexé) — `PAGE_SEPARATOR_RE` mis à jour ; sans impact sur la logique de
+  comptage de page dans `LangExtractNerExtractor._locate`.
+
+**Écarté :** OCR via vision-LLM (Gemini) — coût par appel supplémentaire,
+point d'accès LLM en plus · Tesseract/PaddleOCR — dépendance système binaire
+(Tesseract) ou moins mature côté PyMuPDF4LLM · `ocr_language` configurable
+via `.env` — pas de besoin multi-langue identifié pour l'instant.
+
+**Réf :** [docs/ideas/pdf-extraction-ocr-tracing.md](docs/ideas/pdf-extraction-ocr-tracing.md) ·
+[tasks/plan-pdf-ocr-tracing.md](tasks/plan-pdf-ocr-tracing.md) ·
+[tests/test_pdf_pymupdf4llm.py](tests/test_pdf_pymupdf4llm.py)
