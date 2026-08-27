@@ -212,7 +212,7 @@ loguer deux fois, déjà porté par `ner_extraction`).
 
 ---
 
-## Task 4: Span racine partagé + branchement `routes/extraction.py`
+## Task 4: Span racine partagé + branchement `routes/extraction.py` ✅
 
 **Description:** Injecter un `Tracer` dans `register_extraction_routes`
 (nouveau paramètre optionnel, défaut `build_tracer()` — même pattern que
@@ -227,33 +227,78 @@ utiliser son propre `build_tracer()` par défaut (les deux renvoient le même
 type de tracer, donc compatible tant que le span racine est ouvert au bon
 endroit).
 
+**Notes à l'implémentation :**
+- `Tracer.trace_run(*, source_filename)` ajouté (Protocol + NoOpTracer +
+  LangfuseTracer) : span `"extraction_run"`, flush dans son `finally` — cette
+  méthode devient le vrai point d'entrée/racine de la trace, ouverte dans
+  `routes/extraction.py::post` autour des deux appels
+  (`pdf_extractor.extract_text` puis `ner_extractor.extract`).
+- `PyMuPDF4LlmTextExtractor` devient tracer-aware (constructeur
+  `tracer: Tracer | None = None`, même pattern que
+  `LangExtractNerExtractor`) et appelle lui-même `trace_pdf_extraction` en
+  interne — le `Protocol` `extract_text(pdf_bytes) -> str` reste inchangé,
+  la route n'a pas besoin de connaître `last_pages_ocr` (accès direct
+  impossible de toute façon si un autre `PdfTextExtractor` est injecté, ex.
+  `MockPdfTextExtractor`).
+- **Bug découvert et corrigé pendant l'implémentation :** `pages_ocr`
+  ne peut pas être passé correctement à l'ouverture du span
+  `trace_pdf_extraction` (avant que `to_markdown()` ne tourne, donc
+  `last_pages_ocr` est encore vide à ce moment). Ajout de
+  `ObservationHandle.set_metadata(metadata)` (Protocol + `_NoOpSpan` +
+  `_SpanHandle`, même principe que `set_output`) pour mettre à jour les
+  metadata *après* l'extraction, une fois `last_pages_ocr` réellement
+  peuplé — tout en gardant le span ouvert pendant toute la durée réelle de
+  l'OCR (utile pour voir le coût temps dans Langfuse).
+- `app/main.py` inchangé — chaque composant (`pdf_extractor`, `ner_extractor`,
+  route) résout son propre `build_tracer()` par défaut ; comme tous
+  partagent le même client Langfuse singleton sous-jacent
+  (`get_client()`), le nesting OTEL fonctionne même avec des instances
+  Python `LangfuseTracer` différentes.
+- **Limite acceptée (non vérifiable sans compte Langfuse Cloud réel) :**
+  `trace_run` n'appelle pas `propagate_attributes(trace_name=...)` — c'est
+  `trace_extraction` (nested) qui pose le nom de la trace
+  (`"ner_extraction"`), donc un span enfant portera le même nom que la trace
+  elle-même dans le dashboard. Cosmétique, pas fonctionnel ; à revisiter en
+  Task 5 si ça s'avère confus en usage réel.
+
 **Acceptance criteria:**
-- [ ] `uv run python -m app.main` démarre sans erreur, avec ou sans clés
+- [x] `uv run python -m app.main` démarre sans erreur, avec ou sans clés
       Langfuse dans `.env`
-- [ ] Un upload PDF déclenche un span racine unique contenant `pdf_extraction`
+- [x] Un upload PDF déclenche un span racine unique contenant `pdf_extraction`
       puis `ner_extraction` comme enfants (vérifié via fake client : un seul
-      appel `start_as_current_observation` racine, les deux autres imbriqués)
-- [ ] Aucune régression sur `tests/test_extraction_routes.py`
+      appel `start_as_current_observation` racine, les deux autres imbriqués
+      — `test_trace_pdf_extraction_and_trace_extraction_nest_inside_trace_run`)
+- [x] Aucune régression sur `tests/test_extraction_routes.py` (17 passed)
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v -m "not live"`
-- [ ] Manuel: smoke test démarrage de `create_app` avec injection réelle
+- [x] Tests: `uv run pytest -v -m "not live"` (180 passed, 1 échec
+      pré-existant sans rapport)
+- [x] Manuel: smoke test bout-en-bout — upload réel de
+      `104__DEVIS_25110230_VERSION_A03.pdf` via `TestClient` (vrai
+      `PyMuPDF4LlmTextExtractor`, `MockNerExtractor` pour éviter un appel
+      Gemini payant) → `status: 200`, log confirme l'OCR sur les 12 pages,
+      run persisté et consultable
 
 **Dependencies:** Task 3
 
 **Files likely touched:**
+- `app/tools/tracer.py`
+- `app/tools/langfuse_tracer.py`
+- `app/tools/pdf_pymupdf4llm.py`
 - `app/routes/extraction.py`
-- `app/main.py`
-- `tests/test_extraction_routes.py`
+- `tests/test_tracer.py`
+- `tests/test_langfuse_tracer.py`
+- `tests/test_pdf_pymupdf4llm.py`
 
 **Estimated scope:** S-M (branchement ciblé, mais touche le point d'entrée
 de la route)
 
 ---
 
-## Checkpoint: Tracing bout-en-bout (après Tasks 3-4)
-- [ ] `uv run pytest -m "not live"` passe sans réseau ni clé Langfuse
-- [ ] Test unitaire (fake client) confirme que `pdf_extraction` et
+## Checkpoint: Tracing bout-en-bout (après Tasks 3-4) ✅
+- [x] `uv run pytest -m "not live"` passe sans réseau ni clé Langfuse
+      (180 passed, 1 échec pré-existant sans rapport)
+- [x] Test unitaire (fake client) confirme que `pdf_extraction` et
       `ner_extraction` sont bien deux spans d'une même trace, pas deux traces
       séparées
 - [ ] Revue avec l'utilisateur avant de continuer

@@ -4,6 +4,8 @@ import pymupdf
 import pymupdf4llm
 from pymupdf4llm.helpers.document_layout import select_ocr_function
 
+from app.tools.tracer import Tracer, build_tracer
+
 # GNN-based layout engine, needed for OCR: a scanned/photocopied page (no
 # text layer) is otherwise silently skipped by the lightweight "rag" path
 # (see choix_techniques.md — page 12 of a real devis PDF returned 11 chars
@@ -33,21 +35,42 @@ class PyMuPDF4LlmTextExtractor:
     `last_pages_ocr` exposes, after a call to `extract_text`, the 1-indexed
     page numbers that actually triggered OCR (empty list if none did) — for
     tracing, without changing the Protocol's `extract_text` signature. Reset
-    at the start of every call."""
+    at the start of every call.
 
-    def __init__(self):
+    Traces itself via a `Tracer` (same pattern as `LangExtractNerExtractor`)
+    — nests inside whatever span is active when `extract_text` is called
+    (see `Tracer.trace_run`, opened by the extraction route), so it doesn't
+    need `source_filename` to still show up correctly in Langfuse."""
+
+    def __init__(self, tracer: Tracer | None = None):
         self.last_pages_ocr: list[int] = []
+        self._tracer = tracer or build_tracer()
 
     def extract_text(self, pdf_bytes: bytes) -> str:
         self.last_pages_ocr = []
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         try:
-            return pymupdf4llm.to_markdown(
-                doc,
-                page_separators=True,
+            with self._tracer.trace_pdf_extraction(
+                engine="pymupdf4llm",
+                use_layout=True,
                 ocr_language=_OCR_LANGUAGE,
-                ocr_function=self._tracking_ocr_function(),
-            )
+                pages_ocr=self.last_pages_ocr,
+                page_count=doc.page_count,
+                source_filename=None,
+            ) as trace:
+                text = pymupdf4llm.to_markdown(
+                    doc,
+                    page_separators=True,
+                    ocr_language=_OCR_LANGUAGE,
+                    ocr_function=self._tracking_ocr_function(),
+                )
+                # last_pages_ocr is only populated *during* to_markdown, so
+                # the pages_ocr passed above (at span-open time) is stale —
+                # send the real value now that OCR has actually run, while
+                # keeping the span's duration tied to the real work above.
+                trace.set_metadata({"pages_ocr": self.last_pages_ocr})
+                trace.set_output(text)
+                return text
         finally:
             doc.close()
 

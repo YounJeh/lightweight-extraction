@@ -3,6 +3,7 @@ from fasthtml.common import P, RedirectResponse, UploadFile
 from app.extraction_repository import ExtractionRunRepository
 from app.repository import FieldRepository
 from app.tools import NerExtractor, PdfTextExtractor
+from app.tools.tracer import Tracer, build_tracer
 from app.ui.components import (
     error_banner,
     extraction_form,
@@ -18,7 +19,9 @@ def register_extraction_routes(
     run_repo: ExtractionRunRepository,
     pdf_extractor: PdfTextExtractor,
     ner_extractor: NerExtractor,
+    tracer: Tracer | None = None,
 ):
+    tracer = tracer or build_tracer()
     def _extraction_page_with_error(message: str):
         return page(
             "Extraction",
@@ -46,10 +49,11 @@ def register_extraction_routes(
             return _extraction_page_with_error("sélectionne au moins un champ à extraire.")
 
         pdf_bytes = await pdf.read()
-        text = pdf_extractor.extract_text(pdf_bytes)
-        results = ner_extractor.extract(
-            text, selected_fields, source_filename=pdf.filename
-        )
+        with tracer.trace_run(source_filename=pdf.filename):
+            text = pdf_extractor.extract_text(pdf_bytes)
+            results = ner_extractor.extract(
+                text, selected_fields, source_filename=pdf.filename
+            )
 
         run = run_repo.create_run(pdf.filename, results)
         return RedirectResponse(f"/extraction/runs/{run.id}", status_code=303)

@@ -8,9 +8,13 @@ import app.tools.langfuse_tracer as module
 class _FakeSpan:
     def __init__(self):
         self.output = None
+        self.metadata = None
 
-    def update(self, *, output):
-        self.output = output
+    def update(self, *, output=None, metadata=None):
+        if output is not None:
+            self.output = output
+        if metadata is not None:
+            self.metadata = metadata
 
 
 class _FakeClient:
@@ -193,4 +197,67 @@ def test_trace_pdf_extraction_nested_inside_trace_extraction(monkeypatch):
             pass
 
     assert [o["as_type"] for o in fake_client.observations] == ["span", "span"]
+    assert fake_client.flushed is True
+
+
+def test_trace_pdf_extraction_set_metadata_updates_the_span(monkeypatch):
+    fake_client, _captured = _patch_client_and_propagate(monkeypatch)
+
+    tracer = module.LangfuseTracer()
+    with tracer.trace_pdf_extraction(
+        engine="pymupdf4llm",
+        use_layout=True,
+        ocr_language="fra",
+        pages_ocr=[],
+        page_count=12,
+        source_filename=None,
+    ) as handle:
+        handle.set_metadata({"pages_ocr": [12]})
+
+    assert fake_client.observations[0]["span"].metadata == {"pages_ocr": [12]}
+
+
+def test_trace_run_opens_a_root_span_and_flushes(monkeypatch):
+    fake_client, _captured = _patch_client_and_propagate(monkeypatch)
+
+    tracer = module.LangfuseTracer()
+    with tracer.trace_run(source_filename="devis.pdf") as handle:
+        handle.set_output(None)
+
+    assert len(fake_client.observations) == 1
+    obs = fake_client.observations[0]
+    assert obs["as_type"] == "span"
+    assert obs["name"] == "extraction_run"
+    assert obs["input"] == "devis.pdf"
+    assert fake_client.flushed is True
+
+
+def test_trace_pdf_extraction_and_trace_extraction_nest_inside_trace_run(monkeypatch):
+    fake_client, _captured = _patch_client_and_propagate(monkeypatch)
+
+    tracer = module.LangfuseTracer()
+    with tracer.trace_run(source_filename="devis.pdf"):
+        with tracer.trace_pdf_extraction(
+            engine="pymupdf4llm",
+            use_layout=True,
+            ocr_language="fra",
+            pages_ocr=[],
+            page_count=1,
+            source_filename=None,
+        ):
+            pass
+        with tracer.trace_extraction(
+            text="x",
+            provider="google",
+            model_id=None,
+            field_titles=[],
+            source_filename="devis.pdf",
+        ):
+            pass
+
+    assert [o["name"] for o in fake_client.observations] == [
+        "extraction_run",
+        "pdf_extraction",
+        "ner_extraction",
+    ]
     assert fake_client.flushed is True

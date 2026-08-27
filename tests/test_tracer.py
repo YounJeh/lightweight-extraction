@@ -48,7 +48,13 @@ def test_noop_tracer_trace_pdf_extraction_does_not_raise():
         page_count=12,
         source_filename="devis.pdf",
     ) as handle:
+        handle.set_metadata({"pages_ocr": [12]})
         handle.set_output("texte extrait...")
+
+
+def test_noop_tracer_trace_run_does_not_raise():
+    with NoOpTracer().trace_run(source_filename="devis.pdf") as handle:
+        handle.set_output(None)
 
 
 def test_build_tracer_returns_noop_when_langfuse_keys_absent(monkeypatch):
