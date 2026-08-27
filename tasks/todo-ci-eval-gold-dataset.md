@@ -143,7 +143,7 @@ install opencv-python-headless`), sans rapport avec ce chantier.
 
 ---
 
-## Task 3: `scripts/gold_dataset_sync.py`
+## Task 3: `scripts/gold_dataset_sync.py` ✅
 
 **Description:** Vérifier d'abord l'API exacte du SDK Langfuse pour
 créer/upserter des items de Dataset (nom de la méthode, gestion d'un id
@@ -154,21 +154,32 @@ n'existe pas, puis upsert un item par `document_id` (input = `source_file` +
 liste des champs à extraire ; expected_output = `annotations` ; metadata =
 `human_validation` + `evidence.page` par champ).
 
+**Note d'implémentation :** API vérifiée contre le SDK réel avant de coder
+(lecture de `langfuse/_client/client.py`/`datasets.py` installés, plus un
+test empirique en direct contre le projet Langfuse de l'utilisateur) :
+`create_dataset(name=...)` idempotent par nom (deux appels → même id) ;
+`create_dataset_item(id=...)` "Upserts if an item with id already exists"
+(docstring SDK). Id d'item préfixé (`gold-devis-{document_id}`) car les ids
+doivent être globalement uniques, pas seulement par dataset.
+
 **Acceptance criteria:**
-- [ ] Exécuter le script deux fois de suite est idempotent (14 items au
-      total après la 2e exécution, pas 28)
-- [ ] Modifier une valeur dans le YAML puis relancer le script met à jour
-      l'item correspondant côté Langfuse (pas un nouvel item)
-- [ ] Le script fonctionne sans accès réseau à Gemini (aucun appel LLM ici,
+- [x] Exécuter le script deux fois de suite est idempotent (14 items au
+      total après la 2e exécution, pas 28) — vérifié en réel via
+      `langfuse-cli api dataset-items list --dataset-name gold-devis`
+      (`totalItems: 14` après deux runs)
+- [x] Modifier une valeur dans le YAML puis relancer le script met à jour
+      l'item correspondant côté Langfuse (pas un nouvel item) — couvert par
+      `tests/test_gold_dataset_sync.py::test_sync_rerun_updates_a_changed_document`
+- [x] Le script fonctionne sans accès réseau à Gemini (aucun appel LLM ici,
       seulement l'API Langfuse)
 
 **Verification:**
-- [ ] Manuel : `uv run python scripts/gold_dataset_sync.py` (deux fois) +
-      vérification dans l'UI Langfuse ou via `langfuse-cli api dataset-items
-      list --dataset-name gold-devis`
-- [ ] Tests: `uv run pytest -v -m "not live"` passe (le script lui-même
-      n'a pas forcément de test automatisé s'il ne fait qu'orchestrer des
-      appels SDK déjà couverts par ailleurs — à évaluer à l'implémentation)
+- [x] Manuel : `uv run python scripts/gold_dataset_sync.py` (deux fois) +
+      vérification via `langfuse-cli api dataset-items list --dataset-name
+      gold-devis`
+- [x] Tests: `tests/test_gold_dataset_sync.py` (4 tests, client Langfuse
+      factice, hors réseau) + `uv run pytest -v -m "not live"` (188 passed,
+      1 échec pré-existant sans rapport, 1 deselected)
 
 **Dependencies:** Task 0
 
@@ -179,7 +190,7 @@ liste des champs à extraire ; expected_output = `annotations` ; metadata =
 
 ---
 
-## Task 4: `scripts/gold_dataset_eval.py` — task callable + `run_experiment` sans évaluateurs
+## Task 4: `scripts/gold_dataset_eval.py` — task callable + `run_experiment` sans évaluateurs ✅
 
 **Description:** Écrire le `task` passé à `dataset.run_experiment(...)` :
 pour chaque item, lit le PDF correspondant dans `data_test/`, appelle
@@ -191,16 +202,33 @@ les `Field` seedés en Task 2), retourne les `ExtractionResult`. Câble
 correctement sur chaque item et produit un Dataset Run visible, avant
 d'ajouter la couche de scoring.
 
+**Note d'implémentation :** `max_concurrency=3` par défaut dans `run_eval`
+(pas la valeur par défaut du SDK, 50) — OCR coûteux en CPU/mémoire par
+document, pas de bénéfice à paralléliser largement 14 docs. Extracteurs
+injectables (`pdf_extractor`/`ner_extractor` optionnels sur `build_task`)
+pour tester le câblage hors réseau, tout en laissant les vraies classes par
+défaut en usage réel.
+
 **Acceptance criteria:**
-- [ ] Exécuter le script produit un Dataset Run Langfuse avec 14 traces
+- [x] Exécuter le script produit un Dataset Run Langfuse avec 14 traces
       (une par document), chacune montrant `pdf_extraction` + `ner_extraction`
-      imbriqués (même structure que l'app en production)
-- [ ] Un échec sur un document (PDF illisible, erreur LLM) n'interrompt pas
-      les 13 autres — erreurs capturées et reportées, pas de crash global
+      imbriqués (même structure que l'app en production) — vérifié en réel :
+      `experiment-item-run > experiment-item-task > pdf_extraction +
+      ner_extraction > extract-fields (generation)`, via l'API `observations`
+- [x] Un échec sur un document (PDF illisible, erreur LLM) n'interrompt pas
+      les 13 autres — comportement du SDK (`run_experiment`, "Failed items
+      are handled gracefully"), pas de code custom nécessaire ; les 14
+      documents du run réel se sont exécutés sans erreur
 
 **Verification:**
-- [ ] Manuel : `uv run python scripts/gold_dataset_eval.py` + vérification
-      du Dataset Run dans l'UI Langfuse (14 traces liées au run)
+- [x] Manuel : `uv run python scripts/gold_dataset_eval.py` (arrière-plan,
+      ~7 min avec OCR réel) → Dataset Run
+      `gold-devis-eval - 2026-08-27T13:38:47.859123Z`, 14 items confirmés via
+      `client.get_dataset_run(...)` (14 `dataset_run_items`, chacun avec un
+      `trace_id`)
+- [x] Tests: `tests/test_gold_dataset_eval.py` (6 tests, extracteurs
+      factices, hors réseau) + `uv run pytest -v -m "not live"` (190 passed,
+      1 échec pré-existant sans rapport, 1 deselected)
 
 **Dependencies:** Task 1, Task 2, Task 3
 
@@ -212,8 +240,8 @@ d'ajouter la couche de scoring.
 ---
 
 ## Checkpoint: Pipeline branché (après Tasks 3-4)
-- [ ] `scripts/gold_dataset_sync.py` : Dataset `gold-devis` avec 14 items
-- [ ] `scripts/gold_dataset_eval.py` : Dataset Run visible dans l'UI Langfuse
+- [x] `scripts/gold_dataset_sync.py` : Dataset `gold-devis` avec 14 items
+- [x] `scripts/gold_dataset_eval.py` : Dataset Run visible dans l'UI Langfuse
 - [ ] Revue avec l'utilisateur avant de continuer
 
 ---
