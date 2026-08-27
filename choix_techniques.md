@@ -70,7 +70,8 @@ distinction "propre" natif/OCR par page.
   `opencv-python-headless` comme dépendance directe pour forcer un `cv2`
   sans cette dépendance système (les deux packages installent au même
   chemin ; l'ordre alphabétique du lock fait gagner la variante headless,
-  vérifié stable sur `uv sync` à froid).
+  vérifié stable sur `uv sync` à froid **en local uniquement — voir incident
+  ci-dessous, ce pari ne tient pas sur le buildpack Cloud Run**).
 - `ocr_language="fra"` est en réalité un **no-op** avec RapidOCR : ce kwarg
   n'est utilisé que sur le chemin Tesseract "detection-only" de PyMuPDF4LLM ;
   RapidOCR utilise son propre modèle de reconnaissance multilingue sans
@@ -85,6 +86,52 @@ distinction "propre" natif/OCR par page.
 point d'accès LLM en plus · Tesseract/PaddleOCR — dépendance système binaire
 (Tesseract) ou moins mature côté PyMuPDF4LLM · `ocr_language` configurable
 via `.env` — pas de besoin multi-langue identifié pour l'instant.
+
+---
+
+## Incident : `ImportError: libxcb.so.1` en production (Cloud Run)
+
+**Contexte :** premier déploiement avec l'OCR (voir section précédente)
+cassé en production dès le premier upload d'un PDF réel
+(`data_test/26-0743 Tournan V1 2026-03-20.pdf`) — `500 Internal Server
+Error`, logs Cloud Run :
+`ImportError: libxcb.so.1: cannot open shared object file`, remontant à
+`import cv2` déclenché par `rapidocr`. Le pari sur l'ordre d'installation
+(`opencv-python-headless` gagnant `opencv-python` via l'ordre alphabétique
+du lock, vérifié stable en local avec `uv sync`) ne tient pas sur le build
+Cloud Run source-based (buildpacks) — probablement un mécanisme
+d'installation différent (export vers `requirements.txt` + `pip install`,
+sans garantie d'ordre alphabétique), qui fait gagner la variante GUI
+(`opencv-python`, dépend de `libGL`/`libxcb`, absents d'un environnement
+serveur) plutôt que la variante headless.
+
+**Décision :** passage à un `Dockerfile` explicite à la racine (déjà
+anticipé comme repli dans `specs/deploy-cloud-run.md`) plutôt que de
+continuer à parier sur l'ordre d'installation du buildpack. Après
+`uv sync --frozen`, désinstallation **des deux** variantes puis
+réinstallation de la seule `opencv-python-headless` — désinstaller
+uniquement `opencv-python` ne suffit pas : les deux paquets installent aux
+mêmes chemins (`cv2/`), donc le `RECORD` de `opencv-python` peut lister des
+fichiers que `opencv-python-headless` a effectivement écrits en dernier ; le
+désinstaller seul risquerait de supprimer les fichiers headless réellement
+utilisés. Séquence validée dans un environnement virtuel jetable avant
+d'écrire le `Dockerfile` (`uv pip uninstall opencv-python
+opencv-python-headless && uv pip install opencv-python-headless`, `import
+cv2` propre après coup). Confirmé via `ldd` que `opencv-python-headless`
+n'a aucune dépendance système au-delà de la glibc de base (toutes ses libs
+tierces — `libavif`, `libpng`, `libopenblas`, etc. — sont embarquées dans le
+wheel) : `python:3.13-slim` suffit, aucun paquet système supplémentaire
+nécessaire.
+
+**Écarté :** continuer à parier sur l'ordre d'installation buildpack (déjà
+prouvé peu fiable) · changer de backend OCR pour éviter la dépendance
+`opencv-python` de `rapidocr` (remise en cause plus large, hors scope d'un
+correctif) · désinstaller uniquement `opencv-python` sans réinstaller
+`opencv-python-headless` à neuf (risque de supprimer les fichiers headless
+réellement utilisés, cf. ci-dessus).
+
+**Réf :** [Dockerfile](Dockerfile) · [.dockerignore](.dockerignore) ·
+[specs/deploy-cloud-run.md](specs/deploy-cloud-run.md)
 
 **Réf :** [docs/ideas/pdf-extraction-ocr-tracing.md](docs/ideas/pdf-extraction-ocr-tracing.md) ·
 [tasks/plan-pdf-ocr-tracing.md](tasks/plan-pdf-ocr-tracing.md) ·
