@@ -9,26 +9,29 @@
 # d'installation.
 FROM python:3.13-slim
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Épinglé (pas :latest) pour un build reproductible — aligné sur la version
+# utilisée pour valider ce Dockerfile.
+COPY --from=ghcr.io/astral-sh/uv:0.12.3 /uv /uvx /bin/
 
 WORKDIR /app
 
 # Étape séparée pour profiter du cache Docker : un changement de code seul
 # (sans toucher pyproject.toml/uv.lock) ne réinstalle pas toute la stack
-# OCR/CV (~150 Mo, la partie la plus lente de ce sync).
+# OCR/CV (~150 Mo, la partie la plus lente de ce sync) ni ne relance le fix
+# opencv ci-dessous. Avec [tool.uv] package = false (pyproject.toml), rien
+# ne dépend du code source pour la résolution/installation des dépendances
+# — un seul `uv sync` suffit, pas besoin d'un second après `COPY . .`.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
-
-COPY . .
-RUN uv sync --frozen --no-dev
-
 # Désinstaller puis réinstaller à neuf, pas juste désinstaller
 # opencv-python : les deux paquets installent des fichiers au même chemin
 # (cv2/), donc le RECORD de opencv-python peut lister des fichiers que
 # opencv-python-headless a effectivement écrits en dernier — le désinstaller
 # seul risquerait de supprimer les fichiers headless réellement utilisés.
-RUN uv pip uninstall opencv-python opencv-python-headless \
+RUN uv sync --frozen --no-dev \
+    && uv pip uninstall opencv-python opencv-python-headless \
     && uv pip install opencv-python-headless
+
+COPY . .
 
 ENV PORT=8080
 EXPOSE 8080

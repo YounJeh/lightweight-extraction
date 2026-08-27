@@ -22,6 +22,6 @@ data/
 data_test/
 tests/data/
 notes.md
-"DATASET GOLD.csv"
+DATASET GOLD.csv
 
 .devcontainer/

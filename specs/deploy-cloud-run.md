@@ -14,7 +14,9 @@ qui sert l'app fonctionnelle (gestion des champs + extraction PDF/NER) sans
 qu'aucune clé API n'apparaisse dans le code, l'image ou les logs.
 
 ## Tech Stack
-- Runtime : Python 3.12, python-fasthtml (ASGI/uvicorn via `fasthtml.serve()`)
+- Runtime : Python 3.13 (`python:3.13-slim` dans le `Dockerfile`, aligné sur
+  `.python-version` — `pyproject.toml` autorise `>=3.12`), python-fasthtml
+  (ASGI/uvicorn via `fasthtml.serve()`)
 - Déploiement : Cloud Run, build via `Dockerfile` à la racine (pas buildpacks
   — nécessaire depuis l'ajout de l'OCR, voir "Incident" dans
   `choix_techniques.md` : le build source-based ne garantit pas que
