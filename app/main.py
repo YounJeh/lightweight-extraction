@@ -2,6 +2,7 @@ import sqlite3
 
 from fasthtml.common import Link, Meta, RedirectResponse, fast_app, serve
 
+from app.auth import basic_auth_beforeware
 from app.config import load_env
 from app.db import DEFAULT_DB_PATH, get_connection, init_db
 from app.extraction_repository import ExtractionRunRepository
@@ -23,6 +24,7 @@ def create_app(
     init_db(conn)
     app, _ = fast_app(
         pico=False,
+        before=basic_auth_beforeware(),
         hdrs=(
             Meta(name="viewport", content="width=device-width, initial-scale=1"),
             Link(rel="stylesheet", href="/static/style.css"),
