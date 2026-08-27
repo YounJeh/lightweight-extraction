@@ -39,6 +39,18 @@ def test_noop_tracer_trace_llm_call_does_not_raise():
         handle.set_output([{"field": "x", "value": "y"}])
 
 
+def test_noop_tracer_trace_pdf_extraction_does_not_raise():
+    with NoOpTracer().trace_pdf_extraction(
+        engine="pymupdf4llm",
+        use_layout=True,
+        ocr_language="fra",
+        pages_ocr=[12],
+        page_count=12,
+        source_filename="devis.pdf",
+    ) as handle:
+        handle.set_output("texte extrait...")
+
+
 def test_build_tracer_returns_noop_when_langfuse_keys_absent(monkeypatch):
     monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
     monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)

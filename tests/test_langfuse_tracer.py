@@ -19,10 +19,19 @@ class _FakeClient:
         self.observations: list[dict] = []
 
     @contextmanager
-    def start_as_current_observation(self, *, as_type, name, input, model=None):
+    def start_as_current_observation(
+        self, *, as_type, name, input, model=None, metadata=None
+    ):
         span = _FakeSpan()
         self.observations.append(
-            {"as_type": as_type, "name": name, "input": input, "model": model, "span": span}
+            {
+                "as_type": as_type,
+                "name": name,
+                "input": input,
+                "model": model,
+                "metadata": metadata,
+                "span": span,
+            }
         )
         yield span
 
@@ -132,4 +141,56 @@ def test_trace_llm_call_nested_inside_trace_extraction(monkeypatch):
             pass
 
     assert [o["as_type"] for o in fake_client.observations] == ["span", "generation"]
+    assert fake_client.flushed is True
+
+
+def test_trace_pdf_extraction_opens_a_span_with_metadata_and_no_flush(monkeypatch):
+    fake_client, _captured = _patch_client_and_propagate(monkeypatch)
+
+    tracer = module.LangfuseTracer()
+    with tracer.trace_pdf_extraction(
+        engine="pymupdf4llm",
+        use_layout=True,
+        ocr_language="fra",
+        pages_ocr=[12],
+        page_count=12,
+        source_filename="devis.pdf",
+    ) as handle:
+        handle.set_output("texte extrait...")
+
+    assert len(fake_client.observations) == 1
+    obs = fake_client.observations[0]
+    assert obs["as_type"] == "span"
+    assert obs["name"] == "pdf_extraction"
+    assert obs["input"] == "devis.pdf"
+    assert obs["metadata"] == {
+        "engine": "pymupdf4llm",
+        "use_layout": True,
+        "ocr_language": "fra",
+        "pages_ocr": [12],
+        "page_count": 12,
+    }
+    assert obs["span"].output == "texte extrait..."
+    # pas de flush ici — nested sous le span racine de l'appelant (Task 4)
+    assert fake_client.flushed is False
+
+
+def test_trace_pdf_extraction_nested_inside_trace_extraction(monkeypatch):
+    fake_client, _captured = _patch_client_and_propagate(monkeypatch)
+
+    tracer = module.LangfuseTracer()
+    with tracer.trace_extraction(
+        text="x", provider="google", model_id=None, field_titles=[], source_filename=None
+    ):
+        with tracer.trace_pdf_extraction(
+            engine="pymupdf4llm",
+            use_layout=True,
+            ocr_language="fra",
+            pages_ocr=[],
+            page_count=1,
+            source_filename=None,
+        ):
+            pass
+
+    assert [o["as_type"] for o in fake_client.observations] == ["span", "span"]
     assert fake_client.flushed is True

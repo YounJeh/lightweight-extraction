@@ -158,7 +158,7 @@ que d'ajouter un filtre maison sur la longueur de texte natif.
 
 ---
 
-## Task 3: `Tracer.trace_pdf_extraction` (Protocol + NoOpTracer + LangfuseTracer)
+## Task 3: `Tracer.trace_pdf_extraction` (Protocol + NoOpTracer + LangfuseTracer) ✅
 
 **Description:** Ajouter au `Protocol` `Tracer` (`app/tools/tracer.py`) une
 méthode `trace_pdf_extraction(*, engine: str, use_layout: bool, ocr_language:
@@ -170,17 +170,34 @@ ouvre un span `as_type="span"`, `name="pdf_extraction"`, avec les infos
 moteur/OCR en `metadata` (pas en `input`/`output` — pas de texte source à
 loguer deux fois, déjà porté par `ner_extraction`).
 
+**Notes à l'implémentation :**
+- Signature finale : `page_count: int` remplace `pages_natif: list[int]` — le
+  compte total de pages suffit avec `pages_ocr`, pas besoin de lister les
+  pages natives explicitement (`page_count - len(pages_ocr)` suffit si
+  besoin côté dashboard).
+- Metadata passée directement via `start_as_current_observation(...,
+  metadata=...)` — vérifié que le SDK Langfuse installé (`langfuse==4.14.5`)
+  accepte ce kwarg nativement sur `start_as_current_observation`, pas besoin
+  de `propagate_attributes` (qui sert aux tags/metadata de la trace racine,
+  pas d'un span enfant) — plus simple que ce qui était anticipé dans le plan.
+- `input=source_filename` (peut être `None`) plutôt que rien — cohérent avec
+  le fait que `set_output` reste disponible sur le handle pour y poser le
+  texte extrait si besoin plus tard.
+
 **Acceptance criteria:**
-- [ ] `NoOpTracer().trace_pdf_extraction(...)` s'utilise en `with ...:` sans
+- [x] `NoOpTracer().trace_pdf_extraction(...)` s'utilise en `with ...:` sans
       lever, quels que soient les kwargs
-- [ ] `LangfuseTracer.trace_pdf_extraction` ouvre bien un span nommé
+- [x] `LangfuseTracer.trace_pdf_extraction` ouvre bien un span nommé
       `"pdf_extraction"` avec `as_type="span"` et les metadata attendues
       (vérifié via fake client, même pattern que
       `tests/test_langfuse_tracer.py`)
-- [ ] Aucun appel réseau réel déclenché par les tests offline
+- [x] Aucun appel réseau réel déclenché par les tests offline
 
 **Verification:**
-- [ ] Tests: `uv run pytest -v tests/test_tracer.py tests/test_langfuse_tracer.py`
+- [x] Tests: `uv run pytest -v tests/test_tracer.py tests/test_langfuse_tracer.py`
+      (15 passed)
+- [x] Non-régression : `uv run pytest -m "not live"` (176 passed, 1 échec
+      pré-existant sans rapport)
 
 **Dependencies:** Task 2
 

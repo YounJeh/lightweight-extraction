@@ -67,3 +67,37 @@ class LangfuseTracer:
             as_type="generation", name=name, input=prompt, model=model_id
         ) as generation:
             yield _SpanHandle(generation)
+
+    @contextmanager
+    def trace_pdf_extraction(
+        self,
+        *,
+        engine: str,
+        use_layout: bool,
+        ocr_language: str,
+        pages_ocr: list[int],
+        page_count: int,
+        source_filename: str | None = None,
+    ):
+        """Étape PDF -> texte, distincte du span "ner_extraction". Metadata
+        (pas tags/propagate_attributes comme trace_extraction — celui-ci
+        n'est pas la racine de la trace, voir Task 4 de
+        tasks/plan-pdf-ocr-tracing.md) passée directement à
+        start_as_current_observation, qui l'accepte nativement. Pas de flush
+        ici : nested sous le span racine ouvert par l'appelant (route
+        d'extraction), qui flush une fois l'ensemble terminé — même
+        principe que trace_llm_call sous trace_extraction."""
+        metadata = {
+            "engine": engine,
+            "use_layout": use_layout,
+            "ocr_language": ocr_language,
+            "pages_ocr": pages_ocr,
+            "page_count": page_count,
+        }
+        with self._client.start_as_current_observation(
+            as_type="span",
+            name="pdf_extraction",
+            input=source_filename,
+            metadata=metadata,
+        ) as span:
+            yield _SpanHandle(span)

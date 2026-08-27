@@ -26,6 +26,17 @@ class Tracer(Protocol):
         prompt: str,
     ) -> AbstractContextManager[ObservationHandle]: ...
 
+    def trace_pdf_extraction(
+        self,
+        *,
+        engine: str,
+        use_layout: bool,
+        ocr_language: str,
+        pages_ocr: list[int],
+        page_count: int,
+        source_filename: str | None,
+    ) -> AbstractContextManager[ObservationHandle]: ...
+
 
 class _NoOpSpan:
     def set_output(self, output: Any) -> None:
@@ -39,6 +50,9 @@ class NoOpTracer:
         return nullcontext(_NoOpSpan())
 
     def trace_llm_call(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
+        return nullcontext(_NoOpSpan())
+
+    def trace_pdf_extraction(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
         return nullcontext(_NoOpSpan())
 
 
