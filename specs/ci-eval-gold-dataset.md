@@ -109,29 +109,43 @@ si nécessaire) plutôt que les recopier.
   gitignorés) ; committer une clé API/Langfuse en clair.
 
 ## Success Criteria
-- [ ] Les 14 PDF référencés par `tests/data/dataset_gold_devis.yaml`
+- [x] Les 14 PDF référencés par `tests/data/dataset_gold_devis.yaml`
       (document_id 9 inclus) sont committés dans `data_test/`, le reste du
       dossier reste gitignoré.
-- [ ] `uv run python scripts/gold_dataset_sync.py` crée/met à jour un Dataset
-      Langfuse `gold-devis` avec un item par `document_id` (14 items).
-- [ ] `uv run python scripts/gold_dataset_eval.py` rejoue le pipeline réel sur
-      les 14 documents et produit un Dataset Run Langfuse consultable dans
+- [x] `uv run python scripts/gold_dataset_sync.py` crée/met à jour un Dataset
+      Langfuse `gold-devis` avec un item par `document_id` (14 items) —
+      idempotent, vérifié en réel.
+- [x] `uv run python scripts/gold_dataset_eval.py` rejoue le pipeline réel sur
+      les documents et produit un Dataset Run Langfuse consultable dans
       l'UI, avec :
       - un score par item : précision/recall/F1 par champ, exact-match
-        document, latence, coût ;
+        document, latence ;
       - des scores run-level : P/R/F1 macro et micro, exact-match accuracy
-        globale, coût total/moyen, latence p50/p95, split OCR/non-OCR,
-        grounding accuracy ;
+        globale, latence p50/p95, split OCR/non-OCR, grounding accuracy ;
       - les documents `human_validation: false` exclus des métriques
         principales et comptés à part.
+      Vérifié en réel : 13/14 documents évalués (`document_id: 8` en échec —
+      bug préexistant du pipeline détecté par la CI, voir
+      `choix_techniques.md` § "Bug connu", pas un défaut de ce chantier).
+      **Coût** non satisfait tel qu'imaginé initialement : posé à `0.0` avec
+      un commentaire explicite — LangExtract n'expose aucune info d'usage
+      token, gap d'instrumentation préexistant et indépendant de ce chantier
+      (voir `tasks/todo-langfuse-tracing.md`).
 - [ ] Le workflow GitHub Actions `eval-gold-dataset.yml` (`workflow_dispatch`,
       input `LLM_MODEL` optionnel) exécute les deux scripts et affiche un
       résumé (tableau des métriques run-level + lien vers le run Langfuse)
-      dans `$GITHUB_STEP_SUMMARY`.
-- [ ] `uv run pytest -v -m "not live"` passe intégralement, y compris les
-      nouveaux tests de matching/agrégation.
+      dans `$GITHUB_STEP_SUMMARY`. Code écrit et validé localement (YAML,
+      lecture croisée) ; run réel en attente du push de la branche + des
+      secrets de repo GitHub (à créer par l'utilisateur — voir Task 7 de
+      `tasks/todo-ci-eval-gold-dataset.md`).
+- [x] `uv run pytest -v -m "not live"` passe intégralement, y compris les
+      nouveaux tests de matching/agrégation (215 passed, 1 échec pré-existant
+      sans rapport avec ce chantier).
 - [ ] Deux runs successifs du workflow sont comparables dans la vue "Dataset
-      Runs" de l'UI Langfuse, sans action manuelle supplémentaire.
+      Runs" de l'UI Langfuse, sans action manuelle supplémentaire — vérifié
+      en local (deux runs `scripts/gold_dataset_eval.py` distincts,
+      comparables via l'API Langfuse) ; comparaison depuis un run GitHub
+      Actions encore à vérifier.
 
 ## Open Questions
 Aucune bloquante restante — voir `docs/ideas/ci-eval-gold-dataset.md` pour

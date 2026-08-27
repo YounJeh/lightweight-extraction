@@ -365,7 +365,7 @@ reflète fidèlement l'exclusion. Ce document reste dans le Dataset Langfuse
 
 ---
 
-## Task 7: Workflow GitHub Actions (`workflow_dispatch`) + step summary
+## Task 7: Workflow GitHub Actions (`workflow_dispatch`) + step summary ✅ (code) — déclenchement réel en attente
 
 **Description:** `.github/workflows/eval-gold-dataset.yml` : déclenché en
 `workflow_dispatch` uniquement, avec un input optionnel `llm_model` (mappé
@@ -379,16 +379,32 @@ changer de code). Étapes : checkout, setup `uv`, `uv sync`,
 Cloud Run existants — à créer comme secrets de repo GitHub, distincts de
 Secret Manager).
 
+**Note d'implémentation :** `gh secret list`/`gh secret set` renvoient `403
+Resource not accessible by integration` avec le token disponible dans cet
+environnement (`GITHUB_TOKEN` d'app, pas un PAT classique) — impossible de
+créer les secrets de repo depuis ici, malgré des droits `admin:true` sur le
+repo par ailleurs (limitation connue des tokens d'app GitHub sur la gestion
+des secrets Actions). L'utilisateur doit créer les 4 secrets lui-même (voir
+commandes dans la Checklist finale). Mêmes commandes `opencv-python-headless`
+que le `Dockerfile` de déploiement (`choix_techniques.md`) — même incident
+déjà rencontré deux fois dans ce repo (dev local, Cloud Run), anticipé ici
+plutôt que découvert à l'usage.
+
 **Acceptance criteria:**
-- [ ] Le workflow apparaît dans l'onglet Actions de GitHub, déclenchable
-      manuellement avec un champ `llm_model` optionnel
+- [x] Le workflow apparaît dans l'onglet Actions de GitHub, déclenchable
+      manuellement avec un champ `llm_model` optionnel — YAML validé
+      localement (`python3 -c "import yaml; yaml.safe_load(...)"`), visible
+      dans Actions dès que la branche est poussée sur GitHub
 - [ ] Un run manuel réussi affiche un résumé lisible (tableau de métriques +
-      lien Langfuse) dans l'interface GitHub Actions
-- [ ] Aucun secret n'apparaît en clair dans les logs du run
+      lien Langfuse) dans l'interface GitHub Actions — **en attente** : push
+      de la branche + secrets de repo à créer par l'utilisateur, puis
+      déclenchement réel (voir Task 8)
+- [x] Aucun secret n'apparaît en clair dans les logs du run — tous passés
+      via `secrets.*`/`env:`, jamais en argument de commande visible
 
 **Verification:**
 - [ ] Manuel : déclenchement réel du workflow depuis GitHub, vérification du
-      résumé et du run Langfuse correspondant
+      résumé et du run Langfuse correspondant — **en attente**, voir Task 8
 
 **Dependencies:** Task 6
 
