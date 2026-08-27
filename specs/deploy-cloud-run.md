@@ -15,7 +15,12 @@ qu'aucune clé API n'apparaisse dans le code, l'image ou les logs.
 
 ## Tech Stack
 - Runtime : Python 3.12, python-fasthtml (ASGI/uvicorn via `fasthtml.serve()`)
-- Déploiement : Cloud Run, source-based (buildpacks — pas de Dockerfile a priori)
+- Déploiement : Cloud Run, build via `Dockerfile` à la racine (pas buildpacks
+  — nécessaire depuis l'ajout de l'OCR, voir "Incident" dans
+  `choix_techniques.md` : le build source-based ne garantit pas que
+  `opencv-python-headless` l'emporte sur `opencv-python`)
+- Mémoire : 2 Gi (RapidOCR/OpenCV/onnxruntime ont une empreinte réelle — un
+  document réel a dépassé 1 Gi, voir `choix_techniques.md`)
 - Secrets : Google Secret Manager (clés API Gemini/OpenAI/Langfuse + identifiants Basic Auth)
 - Projet GCP : `extraction-pv` (numéro 783442504013), compte youn.jehanno@gmail.com
 - Région : `europe-west9` (Paris)
@@ -28,7 +33,7 @@ facturable/sensible) :
 gcloud auth login
 gcloud config set project extraction-pv
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com --quiet
-gcloud run deploy extraction-pv --source . --region europe-west9 --allow-unauthenticated --quiet
+gcloud run deploy extraction-pv --source . --region europe-west9 --memory=2Gi --allow-unauthenticated --clear-base-image --quiet
 ```
 
 Tests (inchangé, local) :
@@ -49,9 +54,9 @@ tests/test_auth.py           → tests du middleware d'authentification (nouveau
 specs/deploy-cloud-run.md    → cette spec
 tasks/plan-deploy-cloud-run.md, tasks/todo-deploy-cloud-run.md → Phase 2/3 (suite)
 ```
-Pas de Dockerfile (buildpacks) sauf échec de la détection automatique du
-projet `uv` — fallback : Dockerfile minimal à la racine (`uv sync --frozen`
-puis `CMD`).
+`Dockerfile` + `.dockerignore` à la racine (ajoutés après le passage à
+l'OCR — voir "Incident" dans `choix_techniques.md`), pas de build buildpack
+source-based.
 
 ## Code Style
 Le repo utilise des closures + enregistrement explicite de route (voir

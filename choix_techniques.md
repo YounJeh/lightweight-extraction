@@ -144,6 +144,19 @@ réinstalle bien `opencv-python` ("Installed 6 packages") ; `uv run
 --no-sync` ne touche à rien. Fix : `CMD ["uv", "run", "--no-sync",
 "python", "-m", "app.main"]`.
 
+**Effet de bord local — `uv run pytest` peut casser `cv2` dans ce
+`.venv` :** le même mécanisme touche le poste de dev. Tout `uv run <cmd>`
+lancé ici (y compris `uv run pytest`) resynchronise sur `uv.lock` et peut
+réinstaller `opencv-python` (GUI) par-dessus `opencv-python-headless`,
+faisant échouer les tests OCR avec `ImportError: libGL.so.1` — observé en
+pratique pendant cette session. Pas de fix pyproject.toml propre possible
+(aucun mécanisme `uv`/pip pour qu'un paquet en "remplace" un autre par
+nom). Si `uv run pytest` échoue avec cette erreur, relancer :
+```bash
+uv pip uninstall opencv-python opencv-python-headless && uv pip install opencv-python-headless
+uv run --no-sync pytest -v -m "not live"
+```
+
 **Réf :** [Dockerfile](Dockerfile) · [.dockerignore](.dockerignore) ·
 [specs/deploy-cloud-run.md](specs/deploy-cloud-run.md)
 
