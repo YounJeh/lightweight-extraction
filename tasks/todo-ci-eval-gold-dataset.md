@@ -365,7 +365,7 @@ reflète fidèlement l'exclusion. Ce document reste dans le Dataset Langfuse
 
 ---
 
-## Task 7: Workflow GitHub Actions (`workflow_dispatch`) + step summary ✅ (code) — déclenchement réel en attente
+## Task 7: Workflow GitHub Actions (`workflow_dispatch`) + step summary ✅
 
 **Description:** `.github/workflows/eval-gold-dataset.yml` : déclenché en
 `workflow_dispatch` uniquement, avec un input optionnel `llm_model` (mappé
@@ -390,21 +390,34 @@ que le `Dockerfile` de déploiement (`choix_techniques.md`) — même incident
 déjà rencontré deux fois dans ce repo (dev local, Cloud Run), anticipé ici
 plutôt que découvert à l'usage.
 
+**Note d'implémentation — quota Gemini gratuit :** le premier run réel
+(utilisateur) a échoué au 2e document avec `429 RESOURCE_EXHAUSTED` (quota
+gratuit Gemini, 5 req/min sur `gemini-3.5-flash`). Le mécanisme de choix de
+modèle existait déjà (`llm_model` → `LLM_MODEL`,
+`app/tools/ner_langextract.py::_api_key_for` route vers OpenAI si le modèle
+commence par `gpt-4`/`gpt-5`), mais `OPENAI_API_KEY` n'était pas transmis à
+l'étape d'éval — corrigé (commit `c3f0725`, poussé directement sur `main`
+après confirmation utilisateur, la PR #6 étant déjà mergée). Utilisateur a
+ensuite relancé avec `llm_model=gpt-4o-mini` (déjà la référence pour le
+déploiement Cloud Run, voir README).
+
 **Acceptance criteria:**
 - [x] Le workflow apparaît dans l'onglet Actions de GitHub, déclenchable
-      manuellement avec un champ `llm_model` optionnel — YAML validé
-      localement (`python3 -c "import yaml; yaml.safe_load(...)"`), visible
-      dans Actions dès que la branche est poussée sur GitHub
-- [ ] Un run manuel réussi affiche un résumé lisible (tableau de métriques +
-      lien Langfuse) dans l'interface GitHub Actions — **en attente** : push
-      de la branche + secrets de repo à créer par l'utilisateur, puis
-      déclenchement réel (voir Task 8)
-- [x] Aucun secret n'apparaît en clair dans les logs du run — tous passés
-      via `secrets.*`/`env:`, jamais en argument de commande visible
+      manuellement avec un champ `llm_model` optionnel — confirmé enregistré
+      (`state: active`) une fois présent sur `main`
+- [x] Un run manuel réussi affiche un résumé lisible (tableau de métriques +
+      lien Langfuse) dans l'interface GitHub Actions — 2 runs `success`
+      confirmés (`gh run list`), résumé vérifié via les logs du job
+- [x] Aucun secret n'apparaît en clair dans les logs du run — confirmé :
+      `LANGFUSE_BASE_URL` (partie de l'URL du Dataset Run affichée dans le
+      résumé) apparaît masquée (`***`) dans les logs GitHub Actions,
+      masquage automatique des secrets fonctionnel
 
 **Verification:**
-- [ ] Manuel : déclenchement réel du workflow depuis GitHub, vérification du
-      résumé et du run Langfuse correspondant — **en attente**, voir Task 8
+- [x] Manuel : 2 runs réels déclenchés depuis GitHub Actions (`gh run list`
+      — `success`, 6-8 min chacun), résultats confirmés via les logs du job
+      et l'API Langfuse (`get_dataset_runs` — 4 runs au total sur
+      `gold-devis`, dont ces 2)
 
 **Dependencies:** Task 6
 
@@ -415,7 +428,7 @@ plutôt que découvert à l'usage.
 
 ---
 
-## Task 8: Vérification manuelle bout-en-bout + housekeeping
+## Task 8: Vérification manuelle bout-en-bout + housekeeping ✅
 
 **Description:** Déclencher le workflow réel une fois (voir Task 7),
 confirmer que le Dataset Run est comparable à un run précédent dans la vue
@@ -426,18 +439,31 @@ de `specs/ci-eval-gold-dataset.md`. Évaluer si `choix_techniques.md` doit
 l'application — cette CI est de l'outillage, probablement hors scope de ce
 fichier, à confirmer plutôt que deviner).
 
+**Note d'implémentation :** `choix_techniques.md` finalement mis à jour
+(Task 8, housekeeping intermédiaire) — pas pour la CI elle-même (outillage,
+hors scope confirmé), mais pour le bug d'arbitrage LLM que la CI a permis de
+découvrir dans `app/tools/ner_langextract.py` (cœur de l'application). Fait
+notable du run GitHub Actions réel : `document_id: 8`
+(`104__DEVIS_25110230_VERSION_A03.pdf`), en échec avec Gemini lors du
+premier run local, est passé sans erreur avec `gpt-4o-mini` (14/14 documents
+évalués sur le run GitHub Actions, contre 13/14 en local) — observation
+seule, pas de conclusion tirée sur la cause sans investigation plus poussée.
+
 **Acceptance criteria:**
-- [ ] Deux runs successifs du workflow sont comparables dans l'UI Langfuse
-      sans action manuelle supplémentaire
-- [ ] `README.md` documente le déclenchement de l'éval et où consulter les
+- [x] Deux runs successifs du workflow sont comparables dans l'UI Langfuse
+      sans action manuelle supplémentaire — 4 runs au total confirmés sur le
+      dataset `gold-devis` via `client.get_dataset_runs()` (2 locaux + 2
+      déclenchés depuis GitHub Actions)
+- [x] `README.md` documente le déclenchement de l'éval et où consulter les
       résultats
-- [ ] Tous les success criteria de `specs/ci-eval-gold-dataset.md` sont
+- [x] Tous les success criteria de `specs/ci-eval-gold-dataset.md` sont
       cochés ou explicitement justifiés
 
 **Verification:**
-- [ ] Manuel : relecture croisée `specs/ci-eval-gold-dataset.md` § Success
-      Criteria vs état réel
-- [ ] Tests: `uv run pytest -v -m "not live"` passe intégralement
+- [x] Manuel : relecture croisée `specs/ci-eval-gold-dataset.md` § Success
+      Criteria vs état réel — tous cochés (voir spec)
+- [x] Tests: `uv run pytest -v -m "not live"` (215 passed, 1 échec
+      pré-existant sans rapport, 1 deselected)
 
 **Dependencies:** Task 7
 
@@ -450,6 +476,6 @@ fichier, à confirmer plutôt que deviner).
 ---
 
 ## Checkpoint: Complete (après Task 8)
-- [ ] Tous les success criteria de `specs/ci-eval-gold-dataset.md` sont cochés
-- [ ] Deux runs successifs du workflow sont comparables dans l'UI Langfuse
+- [x] Tous les success criteria de `specs/ci-eval-gold-dataset.md` sont cochés
+- [x] Deux runs successifs du workflow sont comparables dans l'UI Langfuse
 - [ ] Revue finale avec l'utilisateur

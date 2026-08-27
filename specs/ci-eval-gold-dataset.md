@@ -131,21 +131,22 @@ si nécessaire) plutôt que les recopier.
       un commentaire explicite — LangExtract n'expose aucune info d'usage
       token, gap d'instrumentation préexistant et indépendant de ce chantier
       (voir `tasks/todo-langfuse-tracing.md`).
-- [ ] Le workflow GitHub Actions `eval-gold-dataset.yml` (`workflow_dispatch`,
+- [x] Le workflow GitHub Actions `eval-gold-dataset.yml` (`workflow_dispatch`,
       input `LLM_MODEL` optionnel) exécute les deux scripts et affiche un
       résumé (tableau des métriques run-level + lien vers le run Langfuse)
-      dans `$GITHUB_STEP_SUMMARY`. Code écrit et validé localement (YAML,
-      lecture croisée) ; run réel en attente du push de la branche + des
-      secrets de repo GitHub (à créer par l'utilisateur — voir Task 7 de
-      `tasks/todo-ci-eval-gold-dataset.md`).
+      dans `$GITHUB_STEP_SUMMARY`. Vérifié en réel : 2 runs `success` déclenchés
+      depuis l'onglet Actions (`gh run list`). Ajustement post-merge :
+      `OPENAI_API_KEY` manquait dans les secrets transmis à l'étape d'éval —
+      corrigé après que le quota gratuit Gemini (5 req/min) a bloqué le
+      premier run réel de l'utilisateur ; `llm_model=gpt-4o-mini` utilisé
+      ensuite avec succès (14/14 documents évalués).
 - [x] `uv run pytest -v -m "not live"` passe intégralement, y compris les
       nouveaux tests de matching/agrégation (215 passed, 1 échec pré-existant
       sans rapport avec ce chantier).
-- [ ] Deux runs successifs du workflow sont comparables dans la vue "Dataset
-      Runs" de l'UI Langfuse, sans action manuelle supplémentaire — vérifié
-      en local (deux runs `scripts/gold_dataset_eval.py` distincts,
-      comparables via l'API Langfuse) ; comparaison depuis un run GitHub
-      Actions encore à vérifier.
+- [x] Deux runs successifs du workflow sont comparables dans la vue "Dataset
+      Runs" de l'UI Langfuse, sans action manuelle supplémentaire — 4 runs
+      au total sur `gold-devis` (2 locaux + 2 GitHub Actions), confirmés via
+      `client.get_dataset_runs()`.
 
 ## Open Questions
 Aucune bloquante restante — voir `docs/ideas/ci-eval-gold-dataset.md` pour
