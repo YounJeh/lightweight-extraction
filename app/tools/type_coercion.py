@@ -3,8 +3,8 @@ from datetime import date
 
 from app.models import FieldType
 
-_TRUE_TOKENS = {"oui", "vrai", "true", "1"}
-_FALSE_TOKENS = {"non", "faux", "false", "0"}
+TRUE_TOKENS = {"oui", "vrai", "true", "1"}
+FALSE_TOKENS = {"non", "faux", "false", "0"}
 
 
 def _convertible(
@@ -40,7 +40,7 @@ def validate(raw: str, field_type: FieldType) -> str | None:
         # Ne jamais utiliser bool(str) : toute chaîne non vide est truthy en
         # Python, y compris "non" — d'où cette table de tokens explicite.
         token = stripped.lower()
-        if token in _TRUE_TOKENS or token in _FALSE_TOKENS:
+        if token in TRUE_TOKENS or token in FALSE_TOKENS:
             return None
         return f"« {raw} » n'est pas un booléen reconnu (oui/non, vrai/faux, true/false, 1/0)"
 

@@ -19,6 +19,7 @@ from app.repository import FieldRepository  # noqa: E402
 from app.tools.ner_langextract import LangExtractNerExtractor  # noqa: E402
 from app.tools.pdf_pymupdf4llm import PyMuPDF4LlmTextExtractor  # noqa: E402
 from scripts.gold_dataset_sync import DATASET_NAME  # noqa: E402
+from scripts.gold_matching import classify_field  # noqa: E402
 
 GOLD_FIELDS_CSV = (
     Path(__file__).resolve().parent.parent / "tests" / "data" / "gold_devis_fields.csv"
@@ -82,6 +83,71 @@ def build_task(
     return task
 
 
+def build_field_evaluator(fields_by_key: dict[str, Field]):
+    """Évaluateur item-level : compare `output` (résultats d'extraction du
+    pipeline réel, indexés par `field_title`) à `expected_output` (annotations
+    gold, indexées par `field_key`) pour chaque champ demandé, et renvoie un
+    score TP/FP/FN/TN par champ (`match:{field_key}`) + un exact-match
+    document (`exact_match`) + le statut `human_validation` du document
+    (voir metadata posée par `gold_dataset_sync.sync_gold_dataset`), pour que
+    l'évaluateur run-level (Task 6) puisse exclure les documents non validés
+    des métriques principales sans requête supplémentaire.
+
+    `typed_value` préféré à `value` pour la comparaison — c'est la valeur
+    déjà nettoyée par le pipeline (voir `app/tools/ner_langextract.py`),
+    plus proche de ce que le gold encode que le texte groundé brut."""
+    from langfuse.experiment import Evaluation
+
+    title_to_key = {field.title: field.key for field in fields_by_key.values()}
+
+    def field_evaluator(
+        *, output=None, expected_output=None, metadata=None, **kwargs
+    ) -> list[Evaluation]:
+        output_by_key = {
+            title_to_key[result["field_title"]]: result
+            for result in (output or [])
+            if result["field_title"] in title_to_key
+        }
+
+        evaluations: list[Evaluation] = []
+        exact_match = True
+        for field_key, annotation in (expected_output or {}).items():
+            field = fields_by_key.get(field_key)
+            if field is None:
+                continue
+
+            extracted = output_by_key.get(field_key) or {}
+            outcomes = classify_field(
+                field_key=field_key,
+                field_type=field.type,
+                gold_value=annotation.get("value"),
+                gold_page=(annotation.get("evidence") or {}).get("page"),
+                extracted_value=extracted.get("typed_value") or extracted.get("value"),
+                extracted_page=extracted.get("page_number"),
+            )
+            for outcome in outcomes:
+                if outcome.kind not in ("tp", "tn"):
+                    exact_match = False
+                evaluations.append(
+                    Evaluation(
+                        name=f"match:{field_key}",
+                        value=outcome.kind,
+                        metadata={"grounding_match": outcome.grounding_match},
+                    )
+                )
+
+        evaluations.append(Evaluation(name="exact_match", value=exact_match))
+        evaluations.append(
+            Evaluation(
+                name="human_validation",
+                value=bool((metadata or {}).get("human_validation")),
+            )
+        )
+        return evaluations
+
+    return field_evaluator
+
+
 def run_eval(client: Any = None, *, max_concurrency: int = 3):
     """Rejoue le pipeline réel sur les 14 items du Dataset Langfuse
     `gold-devis` (déjà synchronisé par `gold_dataset_sync.py`) via
@@ -102,6 +168,7 @@ def run_eval(client: Any = None, *, max_concurrency: int = 3):
     return dataset.run_experiment(
         name="gold-devis-eval",
         task=task,
+        evaluators=[build_field_evaluator(fields_by_key)],
         max_concurrency=max_concurrency,
     )
 

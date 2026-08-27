@@ -1,7 +1,12 @@
 from types import SimpleNamespace
 
 from app.models import Field
-from scripts.gold_dataset_eval import GOLD_FIELDS_CSV, build_task, load_gold_fields
+from scripts.gold_dataset_eval import (
+    GOLD_FIELDS_CSV,
+    build_field_evaluator,
+    build_task,
+    load_gold_fields,
+)
 
 _EXPECTED_KEYS = {
     "numero_devis",
@@ -134,3 +139,81 @@ def test_build_task_resolves_only_the_fields_listed_for_this_item(tmp_path):
     task(item=item)
 
     assert ner_extractor.received["fields"] == [numero]
+
+
+def _evaluations_by_name(evaluations):
+    return {ev.name: ev for ev in evaluations}
+
+
+def test_field_evaluator_marks_exact_match_true_when_all_fields_match():
+    field = _numero_devis_field()
+    evaluator = build_field_evaluator({"numero_devis": field})
+
+    evaluations = evaluator(
+        output=[{"field_title": "Numéro de devis", "typed_value": "n°6952", "page_number": 1}],
+        expected_output={
+            "numero_devis": {"value": "n°6952", "evidence": {"page": 1, "text": None}}
+        },
+        metadata={"human_validation": True, "document_id": 3},
+    )
+
+    by_name = _evaluations_by_name(evaluations)
+    assert by_name["match:numero_devis"].value == "tp"
+    assert by_name["match:numero_devis"].metadata == {"grounding_match": True}
+    assert by_name["exact_match"].value is True
+    assert by_name["human_validation"].value is True
+
+
+def test_field_evaluator_marks_exact_match_false_on_a_wrong_value():
+    field = _numero_devis_field()
+    evaluator = build_field_evaluator({"numero_devis": field})
+
+    evaluations = evaluator(
+        output=[{"field_title": "Numéro de devis", "typed_value": "AUTRE", "page_number": 1}],
+        expected_output={
+            "numero_devis": {"value": "n°6952", "evidence": {"page": 1, "text": None}}
+        },
+        metadata={"human_validation": True},
+    )
+
+    by_name = _evaluations_by_name(evaluations)
+    kinds = [ev.value for ev in evaluations if ev.name == "match:numero_devis"]
+    assert set(kinds) == {"fp", "fn"}
+    assert by_name["exact_match"].value is False
+
+
+def test_field_evaluator_handles_a_field_with_no_extraction_at_all():
+    field = _numero_devis_field()
+    evaluator = build_field_evaluator({"numero_devis": field})
+
+    evaluations = evaluator(
+        output=[],
+        expected_output={
+            "numero_devis": {"value": "n°6952", "evidence": {"page": 1, "text": None}}
+        },
+        metadata={"human_validation": False},
+    )
+
+    by_name = _evaluations_by_name(evaluations)
+    assert by_name["match:numero_devis"].value == "fn"
+    assert by_name["exact_match"].value is False
+    assert by_name["human_validation"].value is False
+
+
+def test_field_evaluator_true_negative_does_not_break_exact_match():
+    field = Field(
+        id=2, key="pourcentage_solde", title="Pourcentage du solde", definition="d", type="int"
+    )
+    evaluator = build_field_evaluator({"pourcentage_solde": field})
+
+    evaluations = evaluator(
+        output=[],
+        expected_output={
+            "pourcentage_solde": {"value": None, "evidence": {"page": None, "text": None}}
+        },
+        metadata={"human_validation": True},
+    )
+
+    by_name = _evaluations_by_name(evaluations)
+    assert by_name["match:pourcentage_solde"].value == "tn"
+    assert by_name["exact_match"].value is True
