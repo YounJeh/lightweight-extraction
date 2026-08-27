@@ -96,6 +96,35 @@ uv run pytest -v -m live
 uv run python scripts/reset_db.py
 ```
 
+## Éval du pipeline sur le dataset gold
+
+Rejoue le pipeline d'extraction réel (PDF → NER) sur le dataset gold versionné
+([tests/data/dataset_gold_devis.yaml](tests/data/dataset_gold_devis.yaml)) et
+trace précision/recall/F1 par champ, latence et grounding dans un Dataset
+Langfuse `gold-devis`, comparable d'un run à l'autre — voir
+[specs/ci-eval-gold-dataset.md](specs/ci-eval-gold-dataset.md) pour la spec
+complète.
+
+En local (nécessite les clés Gemini + Langfuse dans `.env`) :
+
+```console
+uv run python scripts/gold_dataset_sync.py   # sync YAML -> Dataset Langfuse
+uv run python scripts/gold_dataset_eval.py   # rejoue le pipeline + scores
+```
+
+En CI : workflow GitHub Actions
+[eval-gold-dataset.yml](.github/workflows/eval-gold-dataset.yml), déclenché
+manuellement (`workflow_dispatch`, onglet Actions), avec un champ `llm_model`
+optionnel pour comparer des modèles sans changer de code. Secrets de repo
+requis (`Settings > Secrets and variables > Actions`) :
+`GOOGLE_GENERATIVE_AI_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`,
+`LANGFUSE_BASE_URL`. Résultats consultables dans l'UI Langfuse (Datasets >
+`gold-devis` > Runs) et dans le résumé du run GitHub Actions.
+
+Reporting seul pour l'instant, pas de gate bloquant — le dataset gold est
+encore petit (14 documents). Le coût par appel Gemini n'est pas mesurable
+avec l'instrumentation actuelle (LangExtract n'expose pas l'usage token).
+
 ## Déploiement Cloud Run
 
 L'app est déployable sur [Cloud Run](https://cloud.google.com/run) (projet

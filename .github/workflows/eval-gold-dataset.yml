@@ -1,0 +1,73 @@
+name: Éval dataset gold
+
+# Déclenchement manuel uniquement — le run rappelle le vrai modèle Gemini
+# sur chaque document du dataset gold (coût réel), pas de gate bloquant à
+# ce stade (reporting seul, voir specs/ci-eval-gold-dataset.md).
+on:
+  workflow_dispatch:
+    inputs:
+      llm_model:
+        description: "LLM_MODEL (optionnel) — vide = défaut LangExtract"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.3"
+
+      - name: Installer Python (voir .python-version)
+        run: uv python install
+
+      - name: Installer les dépendances
+        run: uv sync --frozen --no-dev
+
+      - name: Forcer opencv-python-headless
+        # uv.lock déclare toujours opencv-python (dépendance transitive de
+        # rapidocr) — sans ce fix, cv2 casse avec ImportError: libGL.so.1
+        # sur un runner sans serveur X. Même incident déjà rencontré en
+        # local et sur Cloud Run (voir choix_techniques.md) ; mêmes
+        # commandes que le Dockerfile de déploiement.
+        run: |
+          uv pip uninstall opencv-python opencv-python-headless
+          uv pip install opencv-python-headless
+
+      - name: Synchroniser le dataset gold vers Langfuse
+        env:
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+        run: uv run --no-sync python scripts/gold_dataset_sync.py
+
+      - name: Rejouer le pipeline sur le dataset gold
+        env:
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+          LLM_MODEL: ${{ inputs.llm_model }}
+        run: |
+          set -euo pipefail
+          uv run --no-sync python scripts/gold_dataset_eval.py | tee eval-output.txt
+
+      - name: Résumé
+        if: always()
+        run: |
+          {
+            echo "## Résultat — éval dataset gold"
+            echo ""
+            echo '```'
+            cat eval-output.txt 2>/dev/null || echo "(aucune sortie — l'étape d'éval a échoué avant impression, voir les logs ci-dessus)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

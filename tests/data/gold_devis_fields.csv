@@ -1,0 +1,7 @@
+section,label,Nom,Définition,Type,exemple valeur,Exemple texte,source
+devis_contrat,numero_devis,Numéro de devis,Numéro d'identification du devis (N°),TEXT,,test,
+devis_contrat,nom_societe,Nom de la société,Nom de la société qui a rédigé le contrat pour ENTECH,TEXT,,test,
+devis_contrat,pourcentage_acompte,Pourcentage d’acompte,"Pourcentage du prix HT du marché devant être payé à titre d’acompte lors de la signature du devis, du contrat ou de la commande.",INT,,30,
+devis_contrat,pourcentage_solde,Pourcentage du solde,"Pourcentage du prix HT du marché restant à payer après l’acompte, généralement à l’achèvement, à la réception des travaux ou lors de l’émission de la facture récapitulative.",INT,,70,
+devis_contrat,delai_paiement_solde_jours,Délai de paiement du solde,"Délais accordé à l’acheteur pour régler le solde à compter de l’événement contractuellement prévu, tel que la réception de la facture, l’achèvement ou la réception des travaux.",TEXT,,30 jours,
+devis_contrat,duree_validite_offre,Durée de validité de l'offre,"Durée pendant laquelle l'offre, le devis ou la proposition commerciale reste valable et peut être accepté par le client à compter de sa date d’émission.",TEXT,,1 mois,

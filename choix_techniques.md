@@ -163,3 +163,24 @@ uv run --no-sync pytest -v -m "not live"
 **Réf :** [docs/ideas/pdf-extraction-ocr-tracing.md](docs/ideas/pdf-extraction-ocr-tracing.md) ·
 [tasks/plan-pdf-ocr-tracing.md](tasks/plan-pdf-ocr-tracing.md) ·
 [tests/test_pdf_pymupdf4llm.py](tests/test_pdf_pymupdf4llm.py)
+
+---
+
+## Bug connu : arbitrage LLM en échec sur certains documents
+
+**Contexte :** la CI d'évaluation sur le dataset gold
+(`scripts/gold_dataset_eval.py`) a révélé, sur un run réel,
+`ValueError: Source tokens and extraction tokens cannot be empty.` pendant
+l'arbitrage LLM (`_arbitrate`, voir section "Déduplication" ci-dessus) sur
+`104__DEVIS_25110230_VERSION_A03.pdf` — déjà connu pour ses soucis d'OCR
+(section OCR ci-dessus). Cause probable : un des candidats en conflit a un
+texte source vide/non groundé après OCR, ce que le second appel
+`langextract.extract()` ne tolère pas.
+
+**Décision :** non corrigé dans ce chantier (hors scope CI) — documenté ici
+pour qu'un futur correctif touchant `app/tools/ner_langextract.py` ait le
+contexte. Le pipeline ne plante pas silencieusement : l'échec remonte
+(exception), la CI l'isole sans bloquer les autres documents.
+
+**Réf :** [specs/ci-eval-gold-dataset.md](specs/ci-eval-gold-dataset.md) ·
+[tasks/todo-ci-eval-gold-dataset.md](tasks/todo-ci-eval-gold-dataset.md)

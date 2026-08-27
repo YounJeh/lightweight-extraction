@@ -45,4 +45,8 @@ notes.md
 
 DATASET GOLD.csv
 
-data_test/
+# data_test/ : seuls les PDF référencés par tests/data/dataset_gold_devis.yaml
+# sont committés (voir specs/ci-eval-gold-dataset.md) — les autres restent
+# ignorés explicitement plutôt que le dossier entier.
+data_test/ITM Vitr* - March* de travaux - ENTECH - lot PV.pdf
+data_test/SKM_C300i26022410480.pdf
