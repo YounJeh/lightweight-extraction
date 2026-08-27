@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       llm_model:
-        description: "LLM_MODEL (optionnel) — vide = défaut LangExtract"
+        description: "LLM_MODEL (optionnel, ex. gpt-4o-mini) — vide = défaut LangExtract (Gemini)"
         required: false
         default: ""
 
@@ -52,7 +52,12 @@ jobs:
 
       - name: Rejouer le pipeline sur le dataset gold
         env:
+          # LangExtract route vers OpenAI si LLM_MODEL commence par gpt-4/
+          # gpt-5, sinon Gemini par défaut (app/tools/ner_langextract.py::
+          # _api_key_for) — les deux clés sont passées, seule celle du
+          # provider actif est utilisée.
           GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
           LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
