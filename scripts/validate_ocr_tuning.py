@@ -172,12 +172,74 @@ def run_matrix(
                 )
 
 
+def _load_results(results_path: Path = RESULTS_PATH) -> list[dict]:
+    if not results_path.exists():
+        return []
+    return [json.loads(line) for line in results_path.read_text().splitlines() if line.strip()]
+
+
+def report(
+    results_path: Path = RESULTS_PATH, baseline_config: str = "dpi150_baseline"
+) -> None:
+    """Résumé par config : temps total, valeurs gold manquantes, et surtout
+    les *nouvelles* régressions -- valeurs présentes à `baseline_config`
+    (comportement actuel de l'app) mais absentes dans cette config, pour ne
+    pas confondre une régression introduite par le changement testé avec
+    une valeur que le pipeline ratait déjà avant (voir Open Questions,
+    docs/ideas/validation-optimisation-ocr.md)."""
+    rows = _load_results(results_path)
+    if not rows:
+        print(f"Aucun résultat dans {results_path} -- lancer matrix-a/matrix-b d'abord.")
+        return
+
+    by_config: dict[str, list[dict]] = {}
+    for row in rows:
+        by_config.setdefault(row["config"], []).append(row)
+
+    baseline_missing = {
+        row["source_file"]: set(row["gold_values_missing"])
+        for row in by_config.get(baseline_config, [])
+    }
+    if not baseline_missing:
+        print(f"Pas de résultats pour la config de référence '{baseline_config}' -- ")
+        print("les nouvelles régressions ne peuvent pas être distinguées des pertes préexistantes.")
+
+    header = f"{'config':18s} {'docs':>4s} {'temps total':>12s} {'manquantes':>12s} {'régressions':>12s}"
+    print(header)
+    print("-" * len(header))
+    for config_name, config_rows in sorted(by_config.items()):
+        total_time = sum(r["elapsed_seconds"] for r in config_rows)
+        total_values = sum(r["gold_values_total"] for r in config_rows)
+        total_missing = sum(len(r["gold_values_missing"]) for r in config_rows)
+
+        regressions: list[tuple[str, list[str]]] = []
+        for r in config_rows:
+            already_missing = baseline_missing.get(r["source_file"], set())
+            new = [k for k in r["gold_values_missing"] if k not in already_missing]
+            if new:
+                regressions.append((r["source_file"], new))
+
+        print(
+            f"{config_name:18s} {len(config_rows):4d} {total_time:10.1f}s  "
+            f"{total_missing:3d}/{total_values:<7d} {len(regressions):5d} documents"
+        )
+        for source_file, keys in regressions:
+            print(f"    RÉGRESSION  {source_file}  ->  {keys}")
+
+
 def _cli() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=["list", "matrix-a", "matrix-b"], default="list", nargs="?"
+        "command",
+        choices=["list", "matrix-a", "matrix-b", "report"],
+        default="list",
+        nargs="?",
     )
     args = parser.parse_args()
+
+    if args.command == "report":
+        report()
+        return
 
     if args.command == "list":
         rows = load_gold_values()
