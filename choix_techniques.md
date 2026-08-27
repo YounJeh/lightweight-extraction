@@ -43,12 +43,26 @@ caractères), rien d'exploitable pour le NER.
 
 **Décision** (`app/tools/pdf_pymupdf4llm.py`) : réactivation du moteur
 layout (`use_layout(True)`), OCR géré nativement par PyMuPDF4LLM en mode
-"si nécessaire" (`use_ocr` par défaut — une seule page OCRisée sur les 12 du
-PDF de test, pas le document entier). Backend RapidOCR (`rapidocr`, pas
+"si nécessaire" (`use_ocr` par défaut). Backend RapidOCR (`rapidocr`, pas
 `rapidocr-onnxruntime`, préféré nativement par PyMuPDF4LLM quand les deux
 sont installés) : détection *et* reconnaissance faites par RapidOCR, aucune
 dépendance Tesseract sur ce chemin. `ocr_language="fra"` passé en dur
 (pas de variable d'environnement) — décision utilisateur.
+
+**Correction (Task 2) — le mode "si nécessaire" n'est pas aussi ciblé
+qu'espéré :** vérifié avec `make_ocr_decision`/`analyze_page` sur le PDF de
+test réel, `needs_ocr=True` sur les **12 pages** du document, pas seulement
+la page 12 photocopiée — de petites images (logo/en-tête, `img_area` ~2-12%)
+et graphiques vectoriels présents sur chaque page suffisent à déclencher la
+décision. Le texte natif n'est jamais écrasé (l'OCR ne traite que les zones
+sans texte lisible, `exec_ocr_full` exclut explicitement les spans de "bon"
+texte avant de construire l'image à OCRiser), mais RapidOCR tourne bel et
+bien sur la quasi-totalité des pages de ce document (~2 min sur ce PDF de 12
+pages), pas juste sur la page scannée. Décision utilisateur (Task 2) :
+garder ce comportement natif de PyMuPDF4LLM tel quel plutôt que d'ajouter un
+filtre maison (seuil de texte natif) — le signal `pages_ocr` tracé côté
+Langfuse (Task 3-4) reflétera donc fidèlement cette réalité plutôt qu'une
+distinction "propre" natif/OCR par page.
 
 **Écarts découverts en implémentation :**
 - `rapidocr` tire `opencv-python` (non headless), qui exige `libGL.so.1`

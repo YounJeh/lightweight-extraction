@@ -58,9 +58,11 @@ mode "OCR si nécessaire", pas sur toutes les pages).
 - [x] Build: `uv sync`
 - [x] Manuel: page 12 de `104__DEVIS_25110230_VERSION_A03.pdf` passe de 11
       caractères (`"Page 12/12"`) à ~17 600 caractères de texte réel (CGV).
-      Log `pymupdf4llm` confirme qu'une seule page (`page.number=11`, la
-      12e) a déclenché l'OCR sur les 12 pages du document — comportement
-      ciblé, pas d'OCR systématique.
+      **Correction (Task 2) :** contrairement à ce qui était noté ici
+      initialement, l'OCR se déclenche en réalité sur les 12 pages du
+      document (logo/en-tête présents sur chaque page), pas seulement la
+      page 12 — voir `choix_techniques.md`. Le texte natif n'est pas écrasé,
+      mais ce n'est pas le comportement "ciblé" annoncé au départ.
 - [x] Non-régression : `uv run pytest -m "not live"` — 171 passed, 1 échec
       pré-existant sans rapport (`test_post_fields_import_replaces_definition_on_same_key`,
       lié à une modification locale non commitée de `DATASET GOLD.csv`
@@ -78,7 +80,7 @@ mode "OCR si nécessaire", pas sur toutes les pages).
 
 ---
 
-## Task 2: Signal par page natif vs OCR
+## Task 2: Signal par page natif vs OCR ✅
 
 **Description:** Spike : déterminer si PyMuPDF4LLM expose un moyen fiable de
 savoir, page par page, si l'OCR a été déclenché sur le chemin layout (ex. en
@@ -91,27 +93,51 @@ heuristique documenté dans le plan (comparer, page par page via `pymupdf`, la
 longueur du texte natif à celle du texte final) et documenter ce choix dans
 `choix_techniques.md`.
 
+**Hook retenu :** `select_ocr_function()` (fonction publique de
+`pymupdf4llm.helpers.document_layout`, celle-là même que PyMuPDF4LLM utilise
+en interne pour résoudre l'engine OCR par défaut) est appelée une fois par
+`extract_text`, puis enveloppée dans une closure qui enregistre
+`page.number + 1` dans `self.last_pages_ocr` avant de déléguer à la fonction
+réelle — passée explicitement comme `ocr_function=` à `to_markdown`. Pas de
+repli heuristique nécessaire : le hook existe et est fiable (n'est appelé
+que quand `make_ocr_decision`, interne à PyMuPDF4LLM, décide qu'une page en
+a besoin).
+
+**Découverte importante (corrige une affirmation erronée de la Task 1) :**
+vérifié sur le PDF réel que le hook enregistre les **12 pages** comme
+OCRisées, pas seulement la page 12 — `needs_ocr=True` sur chaque page à
+cause de petites images (logo/en-tête) et graphiques vectoriels présents
+partout dans le document, pas seulement sur la page effectivement
+photocopiée. Le texte natif n'est jamais écrasé (voir
+`choix_techniques.md`), mais le signal `last_pages_ocr` reflète cette
+réalité — sur ce document, il vaut `[1..12]`, pas `[12]`. Confirmé avec
+l'utilisateur (Task 2) : comportement natif de la lib gardé tel quel plutôt
+que d'ajouter un filtre maison sur la longueur de texte natif.
+
 **Acceptance criteria:**
-- [ ] Sur un PDF mixte (une page texte natif + une page image-only, comme
-      `tests/pdf_fixtures.py`), le mécanisme retenu identifie correctement
-      quelle page a nécessité l'OCR
-- [ ] Le `Protocol` `PdfTextExtractor.extract_text(pdf_bytes) -> str` n'est
-      pas modifié — le signal est porté par un canal séparé sur
-      `PyMuPDF4LlmTextExtractor`
-- [ ] Mécanisme retenu (hook vs heuristique) documenté avec la raison du choix
+- [x] Sur un PDF mixte (une page texte natif + une page image-only,
+      construite en mémoire dans le test), le mécanisme retenu identifie
+      correctement quelle page a nécessité l'OCR
+- [x] Le `Protocol` `PdfTextExtractor.extract_text(pdf_bytes) -> str` n'est
+      pas modifié — le signal est porté par un canal séparé
+      (`last_pages_ocr`) sur `PyMuPDF4LlmTextExtractor`
+- [x] Mécanisme retenu (hook `ocr_function`, pas d'heuristique) documenté
 
 **Verification:**
-- [ ] Tests: nouveau test dans `tests/test_pdf_pymupdf4llm.py` sur un PDF
-      mixte natif/scanné construit en mémoire (comme `_build_pdf`)
-- [ ] Manuel: vérifier sur `104__DEVIS_25110230_VERSION_A03.pdf` que seule la
-      page 12 (et pas les 11 autres) est signalée comme OCRisée
+- [x] Tests: `tests/test_pdf_pymupdf4llm.py` — 2 nouveaux tests sur un PDF
+      mixte natif/scanné construit en mémoire (`_build_mixed_pdf`) : le hook
+      identifie bien la page scannée (`last_pages_ocr == [2]`), et se
+      réinitialise correctement entre deux appels
+- [x] Manuel: sur `104__DEVIS_25110230_VERSION_A03.pdf`,
+      `last_pages_ocr == [1, 2, ..., 12]` — voir découverte ci-dessus, pas
+      `[12]` comme attendu initialement dans ce plan
 
 **Dependencies:** Task 1
 
 **Files likely touched:**
 - `app/tools/pdf_pymupdf4llm.py`
 - `tests/test_pdf_pymupdf4llm.py`
-- `choix_techniques.md` *(si repli heuristique retenu)*
+- `choix_techniques.md`
 
 **Estimated scope:** M (spike + implémentation, incertitude technique réelle)
 

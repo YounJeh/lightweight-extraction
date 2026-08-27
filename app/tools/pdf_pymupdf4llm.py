@@ -2,6 +2,7 @@ import re
 
 import pymupdf
 import pymupdf4llm
+from pymupdf4llm.helpers.document_layout import select_ocr_function
 
 # GNN-based layout engine, needed for OCR: a scanned/photocopied page (no
 # text layer) is otherwise silently skipped by the lightweight "rag" path
@@ -27,13 +28,43 @@ _OCR_LANGUAGE = "fra"
 class PyMuPDF4LlmTextExtractor:
     """PdfTextExtractor backed by PyMuPDF4LLM. Page boundaries are preserved
     in the returned text via PyMuPDF4LLM's native page separators, so
-    grounding can recover page numbers without changing this Protocol."""
+    grounding can recover page numbers without changing this Protocol.
+
+    `last_pages_ocr` exposes, after a call to `extract_text`, the 1-indexed
+    page numbers that actually triggered OCR (empty list if none did) — for
+    tracing, without changing the Protocol's `extract_text` signature. Reset
+    at the start of every call."""
+
+    def __init__(self):
+        self.last_pages_ocr: list[int] = []
 
     def extract_text(self, pdf_bytes: bytes) -> str:
+        self.last_pages_ocr = []
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         try:
             return pymupdf4llm.to_markdown(
-                doc, page_separators=True, ocr_language=_OCR_LANGUAGE
+                doc,
+                page_separators=True,
+                ocr_language=_OCR_LANGUAGE,
+                ocr_function=self._tracking_ocr_function(),
             )
         finally:
             doc.close()
+
+    def _tracking_ocr_function(self):
+        """Wraps PyMuPDF4LLM's own OCR engine resolution (same one it would
+        pick internally if `ocr_function=None`) to record, in
+        `last_pages_ocr`, which pages it actually gets called for — it's
+        only invoked per-page when `make_ocr_decision` (internal to
+        PyMuPDF4LLM) decides that page needs it, so this is a real signal,
+        not a guess. Returns None if no OCR engine is available, matching
+        the "no OCR" behavior `ocr_function=None` would have had."""
+        base_ocr_function = select_ocr_function()
+        if not callable(base_ocr_function):
+            return None
+
+        def wrapped(page, **kwargs):
+            self.last_pages_ocr.append(page.number + 1)
+            return base_ocr_function(page, **kwargs)
+
+        return wrapped
