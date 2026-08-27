@@ -1,3 +1,5 @@
+import asyncio
+
 from fasthtml.common import P, RedirectResponse, UploadFile
 
 from app.extraction_repository import ExtractionRunRepository
@@ -22,6 +24,7 @@ def register_extraction_routes(
     tracer: Tracer | None = None,
 ):
     tracer = tracer or build_tracer()
+
     def _extraction_page_with_error(message: str):
         return page(
             "Extraction",
@@ -50,7 +53,13 @@ def register_extraction_routes(
 
         pdf_bytes = await pdf.read()
         with tracer.trace_run(source_filename=pdf.filename):
-            text = pdf_extractor.extract_text(pdf_bytes)
+            # extract_text can take minutes on a scanned PDF (OCR) — run it
+            # off the event loop so it doesn't freeze the whole server for
+            # every other request in the meantime. asyncio.to_thread
+            # propagates the active contextvars (including the OTEL span
+            # opened by trace_run above), so pdf_extraction still nests
+            # correctly under it.
+            text = await asyncio.to_thread(pdf_extractor.extract_text, pdf_bytes)
             results = ner_extractor.extract(
                 text, selected_fields, source_filename=pdf.filename
             )

@@ -84,8 +84,7 @@ class LangfuseTracer:
     ):
         """Étape PDF -> texte, distincte du span "ner_extraction". Metadata
         (pas tags/propagate_attributes comme trace_extraction — celui-ci
-        n'est pas la racine de la trace, voir Task 4 de
-        tasks/plan-pdf-ocr-tracing.md) passée directement à
+        n'est pas la racine de la trace) passée directement à
         start_as_current_observation, qui l'accepte nativement. Pas de flush
         ici : nested sous le span racine ouvert par l'appelant (route
         d'extraction), qui flush une fois l'ensemble terminé — même
@@ -114,10 +113,10 @@ class LangfuseTracer:
         d'en ouvrir chacun une séparée. Ne pose pas trace_name via
         propagate_attributes ici : c'est trace_extraction (nested) qui s'en
         charge déjà (le nom de la trace reste "ner_extraction" dans le
-        dashboard Langfuse, un span enfant portera le même nom que la trace
-        — accepté, voir tasks/todo-pdf-ocr-tracing.md Task 4). Flush dans le
-        finally comme trace_extraction — redondant si trace_extraction
-        flush aussi en dessous, mais flush() est sans risque à rappeler."""
+        dashboard Langfuse, un span enfant portera le même nom que la
+        trace — accepté). Flush dans le finally comme trace_extraction —
+        redondant si trace_extraction flush aussi en dessous, mais flush()
+        est sans risque à rappeler."""
         try:
             with self._client.start_as_current_observation(
                 as_type="span", name="extraction_run", input=source_filename

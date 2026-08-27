@@ -11,7 +11,8 @@ from app.tools.tracer import Tracer, build_tracer
 # (see choix_techniques.md — page 12 of a real devis PDF returned 11 chars
 # of text). use_ocr defaults to "select" mode (OCR only pages that need it),
 # so this doesn't mean OCR-ing every page of every document.
-pymupdf4llm.use_layout(True)
+_USE_LAYOUT = True
+pymupdf4llm.use_layout(_USE_LAYOUT)
 
 # Native PyMuPDF4LLM page-separator format (page_separators=True), reused by
 # LangExtractNerExtractor to map character offsets back to a page number.
@@ -47,14 +48,20 @@ class PyMuPDF4LlmTextExtractor:
         self._tracer = tracer or build_tracer()
 
     def extract_text(self, pdf_bytes: bytes) -> str:
-        self.last_pages_ocr = []
+        # Local, not self.last_pages_ocr, while the OCR hook below is
+        # populating it — two concurrent extract_text calls on the same
+        # instance would otherwise race on shared instance state (the hook
+        # closure would read whichever self.last_pages_ocr the *other* call
+        # last reset). self.last_pages_ocr is only assigned once, at the
+        # end, from the local.
+        pages_ocr: list[int] = []
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
         try:
             with self._tracer.trace_pdf_extraction(
                 engine="pymupdf4llm",
-                use_layout=True,
+                use_layout=_USE_LAYOUT,
                 ocr_language=_OCR_LANGUAGE,
-                pages_ocr=self.last_pages_ocr,
+                pages_ocr=pages_ocr,
                 page_count=doc.page_count,
                 source_filename=None,
             ) as trace:
@@ -62,32 +69,33 @@ class PyMuPDF4LlmTextExtractor:
                     doc,
                     page_separators=True,
                     ocr_language=_OCR_LANGUAGE,
-                    ocr_function=self._tracking_ocr_function(),
+                    ocr_function=self._tracking_ocr_function(pages_ocr),
                 )
-                # last_pages_ocr is only populated *during* to_markdown, so
-                # the pages_ocr passed above (at span-open time) is stale —
-                # send the real value now that OCR has actually run, while
-                # keeping the span's duration tied to the real work above.
-                trace.set_metadata({"pages_ocr": self.last_pages_ocr})
+                # pages_ocr is only populated *during* to_markdown, so the
+                # value passed above (at span-open time) is stale — send the
+                # real value now that OCR has actually run, while keeping
+                # the span's duration tied to the real work above.
+                trace.set_metadata({"pages_ocr": pages_ocr})
                 trace.set_output(text)
+                self.last_pages_ocr = pages_ocr
                 return text
         finally:
             doc.close()
 
-    def _tracking_ocr_function(self):
+    def _tracking_ocr_function(self, pages_ocr: list[int]):
         """Wraps PyMuPDF4LLM's own OCR engine resolution (same one it would
-        pick internally if `ocr_function=None`) to record, in
-        `last_pages_ocr`, which pages it actually gets called for — it's
-        only invoked per-page when `make_ocr_decision` (internal to
-        PyMuPDF4LLM) decides that page needs it, so this is a real signal,
-        not a guess. Returns None if no OCR engine is available, matching
-        the "no OCR" behavior `ocr_function=None` would have had."""
+        pick internally if `ocr_function=None`) to record, into `pages_ocr`,
+        which pages it actually gets called for — it's only invoked
+        per-page when `make_ocr_decision` (internal to PyMuPDF4LLM) decides
+        that page needs it, so this is a real signal, not a guess. Returns
+        None if no OCR engine is available, matching the "no OCR" behavior
+        `ocr_function=None` would have had."""
         base_ocr_function = select_ocr_function()
         if not callable(base_ocr_function):
             return None
 
         def wrapped(page, **kwargs):
-            self.last_pages_ocr.append(page.number + 1)
+            pages_ocr.append(page.number + 1)
             return base_ocr_function(page, **kwargs)
 
         return wrapped

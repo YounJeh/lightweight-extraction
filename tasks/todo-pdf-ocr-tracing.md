@@ -4,6 +4,57 @@ Plan de référence : [tasks/plan-pdf-ocr-tracing.md](plan-pdf-ocr-tracing.md)
 
 ---
 
+## Task 6 (revue de code, avant merge de la PR #4) ✅
+
+**Description :** `/code-review-and-quality` sur le diff de la branche
+(Tasks 1-4). Corrigés :
+
+- **Race condition** (`PyMuPDF4LlmTextExtractor`) : `_tracking_ocr_function`
+  écrivait dans `self.last_pages_ocr` (état d'instance partagé) au lieu
+  d'une liste locale fermée par le closure — deux `extract_text` concurrents
+  sur la même instance pouvaient mélanger les pages OCRisées de deux
+  documents différents. Fix : liste locale `pages_ocr` par appel,
+  `self.last_pages_ocr` assigné une seule fois à la fin.
+- **Appel bloquant** (`routes/extraction.py`) : `extract_text` (jusqu'à
+  ~2 min avec l'OCR, voir Task 2) tournait en synchrone dans le handler
+  `async def post`, gelant toute la boucle d'événements FastHTML pour
+  toutes les requêtes pendant ce temps. Fix : `await
+  asyncio.to_thread(pdf_extractor.extract_text, pdf_bytes)` — propage les
+  contextvars actives (dont le span OTEL de `trace_run`), donc
+  `pdf_extraction` continue de se nicher correctement dans la trace.
+  C'est ce changement qui rend la race condition ci-dessus réellement
+  exploitable (avant, l'appli étant bloquante, deux extractions ne
+  pouvaient jamais tourner en même temps) — les deux fixes vont ensemble.
+- **Nits** : commentaires dans `langfuse_tracer.py` référençant les
+  fichiers `tasks/plan-pdf-ocr-tracing.md`/`tasks/todo-pdf-ocr-tracing.md`
+  (éphémères, risque de rot) retirés — le raisonnement tient seul. Ligne
+  vide manquante dans `routes/extraction.py`. Constante `_USE_LAYOUT`
+  introduite pour éviter la duplication `True`/`True` entre
+  `pymupdf4llm.use_layout(...)` et les metadata de `trace_pdf_extraction`.
+
+**Non corrigé, noté FYI** : le contournement `opencv-python` +
+`opencv-python-headless` (Task 1) repose sur un ordre d'installation
+déterministe (`uv sync`) non vérifié sur un déploiement Cloud Run réel — à
+confirmer au prochain déploiement.
+
+**Verification:**
+- [x] Tests: `uv run pytest -m "not live"` (180 passed, 1 échec pré-existant
+      sans rapport)
+- [x] Manuel: smoke test bout-en-bout via `TestClient` sur le PDF réel après
+      le passage à `asyncio.to_thread` — `status 200`,
+      `last_pages_ocr == [1..12]` correct
+
+**Dependencies:** Task 4
+
+**Files likely touched:**
+- `app/tools/pdf_pymupdf4llm.py`
+- `app/tools/langfuse_tracer.py`
+- `app/routes/extraction.py`
+
+**Estimated scope:** S (corrections ciblées, pas de nouveau comportement)
+
+---
+
 ## Task 1: Dépendance RapidOCR + réactivation layout/OCR (`ocr_language="fra"`) ✅
 
 **Description:** Ajouter le backend RapidOCR (ONNX, ex. `rapidocr-onnxruntime`
