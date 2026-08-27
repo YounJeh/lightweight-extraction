@@ -1,0 +1,27 @@
+.git/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+.env
+.env.*
+!.env.example
+.sesskey
+
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+data_test/
+tests/data/
+notes.md
+DATASET GOLD.csv
+
+.devcontainer/
