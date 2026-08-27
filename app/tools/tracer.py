@@ -6,6 +6,8 @@ from typing import Any, Protocol
 class ObservationHandle(Protocol):
     def set_output(self, output: Any) -> None: ...
 
+    def set_metadata(self, metadata: dict[str, Any]) -> None: ...
+
 
 class Tracer(Protocol):
     def trace_extraction(
@@ -26,9 +28,27 @@ class Tracer(Protocol):
         prompt: str,
     ) -> AbstractContextManager[ObservationHandle]: ...
 
+    def trace_pdf_extraction(
+        self,
+        *,
+        engine: str,
+        use_layout: bool,
+        ocr_language: str,
+        pages_ocr: list[int],
+        page_count: int,
+        source_filename: str | None,
+    ) -> AbstractContextManager[ObservationHandle]: ...
+
+    def trace_run(
+        self, *, source_filename: str | None
+    ) -> AbstractContextManager[ObservationHandle]: ...
+
 
 class _NoOpSpan:
     def set_output(self, output: Any) -> None:
+        pass
+
+    def set_metadata(self, metadata: dict[str, Any]) -> None:
         pass
 
 
@@ -39,6 +59,12 @@ class NoOpTracer:
         return nullcontext(_NoOpSpan())
 
     def trace_llm_call(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
+        return nullcontext(_NoOpSpan())
+
+    def trace_pdf_extraction(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
+        return nullcontext(_NoOpSpan())
+
+    def trace_run(self, **_kwargs) -> AbstractContextManager[_NoOpSpan]:
         return nullcontext(_NoOpSpan())
 
 

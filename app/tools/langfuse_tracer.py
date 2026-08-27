@@ -11,6 +11,9 @@ class _SpanHandle:
     def set_output(self, output: Any) -> None:
         self._span.update(output=output)
 
+    def set_metadata(self, metadata: dict[str, Any]) -> None:
+        self._span.update(metadata=metadata)
+
 
 class LangfuseTracer:
     """Tracer réel : une trace "ner_extraction" par appel, avec le texte
@@ -67,3 +70,57 @@ class LangfuseTracer:
             as_type="generation", name=name, input=prompt, model=model_id
         ) as generation:
             yield _SpanHandle(generation)
+
+    @contextmanager
+    def trace_pdf_extraction(
+        self,
+        *,
+        engine: str,
+        use_layout: bool,
+        ocr_language: str,
+        pages_ocr: list[int],
+        page_count: int,
+        source_filename: str | None = None,
+    ):
+        """Étape PDF -> texte, distincte du span "ner_extraction". Metadata
+        (pas tags/propagate_attributes comme trace_extraction — celui-ci
+        n'est pas la racine de la trace) passée directement à
+        start_as_current_observation, qui l'accepte nativement. Pas de flush
+        ici : nested sous le span racine ouvert par l'appelant (route
+        d'extraction), qui flush une fois l'ensemble terminé — même
+        principe que trace_llm_call sous trace_extraction."""
+        metadata = {
+            "engine": engine,
+            "use_layout": use_layout,
+            "ocr_language": ocr_language,
+            "pages_ocr": pages_ocr,
+            "page_count": page_count,
+        }
+        with self._client.start_as_current_observation(
+            as_type="span",
+            name="pdf_extraction",
+            input=source_filename,
+            metadata=metadata,
+        ) as span:
+            yield _SpanHandle(span)
+
+    @contextmanager
+    def trace_run(self, *, source_filename: str | None = None):
+        """Span racine partagé, ouvert par la route d'extraction, pour que
+        `pdf_extraction` (PyMuPDF4LlmTextExtractor) et `ner_extraction`
+        (LangExtractNerExtractor) — chacun résolvant son propre tracer via
+        build_tracer() — se nichent dans une seule et même trace au lieu
+        d'en ouvrir chacun une séparée. Ne pose pas trace_name via
+        propagate_attributes ici : c'est trace_extraction (nested) qui s'en
+        charge déjà (le nom de la trace reste "ner_extraction" dans le
+        dashboard Langfuse, un span enfant portera le même nom que la
+        trace — accepté). Flush dans le finally comme trace_extraction —
+        redondant si trace_extraction flush aussi en dessous, mais flush()
+        est sans risque à rappeler."""
+        try:
+            with self._client.start_as_current_observation(
+                as_type="span", name="extraction_run", input=source_filename
+            ) as span:
+                yield _SpanHandle(span)
+        finally:
+            self._client.flush()
