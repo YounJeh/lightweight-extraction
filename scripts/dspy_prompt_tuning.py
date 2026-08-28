@@ -131,3 +131,75 @@ def score_field_candidate(
         fp=fp,
         fn=fn,
     )
+
+
+@dataclass(frozen=True)
+class FailureExample:
+    """Un document où le candidat courant n'a pas matché le gold — donné en
+    contexte au proposeur DSPy pour orienter la prochaine variante."""
+
+    source_file: str
+    gold_value: str
+    extracted_value: str | None
+
+
+@dataclass(frozen=True)
+class FieldCandidate:
+    title: str
+    definition: str
+
+
+class ProposeFieldPrompt(dspy.Signature):
+    """Tu améliores un champ d'extraction NER pour un pipeline français
+    d'extraction de devis/contrats. Propose un nouveau titre (`new_title`)
+    et une nouvelle définition (`new_definition`), en français, plus clairs
+    et sans ambiguïté pour un LLM d'extraction — même sens métier que
+    l'original, mais reformulés pour réduire les erreurs listées dans
+    `failure_summary` (si vide, propose simplement une formulation
+    alternative à tester)."""
+
+    field_type: str = dspy.InputField()
+    current_title: str = dspy.InputField()
+    current_definition: str = dspy.InputField()
+    failure_summary: str = dspy.InputField(
+        desc="Échecs observés avec la formulation actuelle, un par ligne, vide si aucun"
+    )
+    new_title: str = dspy.OutputField()
+    new_definition: str = dspy.OutputField()
+
+
+def _format_failure_summary(failures: list[FailureExample]) -> str:
+    if not failures:
+        return ""
+    return "\n".join(
+        f"- {f.source_file} : attendu {f.gold_value!r}, extrait {f.extracted_value!r}"
+        for f in failures
+    )
+
+
+def propose_candidates(
+    field: Field,
+    *,
+    failures: list[FailureExample],
+    n: int,
+    lm: dspy.LM,
+) -> list[FieldCandidate]:
+    """Propose `n` variantes de `title`/`definition` pour `field`, en tenant
+    compte de `failures` (documents où la formulation courante a échoué).
+    Un appel LM par variante (température de `lm` régit la diversité entre
+    les appels — pas d'API de complétions multiples DSPy dédiée utilisée
+    ici, un `dspy.Predict` par candidat suffit et reste simple à tester)."""
+    predict = dspy.Predict(ProposeFieldPrompt)
+    failure_summary = _format_failure_summary(failures)
+
+    candidates = []
+    for _ in range(n):
+        result = predict(
+            field_type=field.type,
+            current_title=field.title,
+            current_definition=field.definition,
+            failure_summary=failure_summary,
+            lm=lm,
+        )
+        candidates.append(FieldCandidate(title=result.new_title, definition=result.new_definition))
+    return candidates

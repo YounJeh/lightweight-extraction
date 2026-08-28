@@ -1,9 +1,12 @@
 import pytest
+from dspy.utils import DummyLM
 
 from app.models import ExtractionResult, Field
 from scripts.dspy_prompt_tuning import (
+    FailureExample,
     build_dspy_lm,
     build_markdown_loader,
+    propose_candidates,
     score_field_candidate,
 )
 
@@ -179,6 +182,60 @@ def test_build_dspy_lm_routes_gemini_by_default(monkeypatch):
 def test_build_dspy_lm_requires_a_model_id():
     with pytest.raises(ValueError):
         build_dspy_lm(None)
+
+
+# --- propose_candidates -------------------------------------------------------
+
+
+def _numero_devis_field() -> Field:
+    return Field(
+        id=1,
+        key="numero_devis",
+        title="Numéro de devis",
+        definition="définition actuelle du numéro",
+        type="text",
+    )
+
+
+def test_propose_candidates_returns_n_candidates_from_a_dummy_lm():
+    lm = DummyLM(
+        [
+            {"new_title": "Titre A", "new_definition": "Def A"},
+            {"new_title": "Titre B", "new_definition": "Def B"},
+            {"new_title": "Titre C", "new_definition": "Def C"},
+        ]
+    )
+
+    candidates = propose_candidates(_numero_devis_field(), failures=[], n=3, lm=lm)
+
+    assert len(candidates) == 3
+    assert [c.title for c in candidates] == ["Titre A", "Titre B", "Titre C"]
+    assert all(c.definition for c in candidates)
+
+
+def test_propose_candidates_prompt_includes_current_field_state():
+    lm = DummyLM([{"new_title": "Titre A", "new_definition": "Def A"}])
+
+    propose_candidates(_numero_devis_field(), failures=[], n=1, lm=lm)
+
+    prompt_content = lm.history[0]["messages"][1]["content"]
+    assert "Numéro de devis" in prompt_content
+    assert "définition actuelle du numéro" in prompt_content
+    assert "text" in prompt_content
+
+
+def test_propose_candidates_prompt_includes_failure_summary():
+    lm = DummyLM([{"new_title": "Titre A", "new_definition": "Def A"}])
+    failures = [
+        FailureExample(source_file="a.pdf", gold_value="DEV-1", extracted_value="WRONG"),
+    ]
+
+    propose_candidates(_numero_devis_field(), failures=failures, n=1, lm=lm)
+
+    prompt_content = lm.history[0]["messages"][1]["content"]
+    assert "a.pdf" in prompt_content
+    assert "DEV-1" in prompt_content
+    assert "WRONG" in prompt_content
 
 
 def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):

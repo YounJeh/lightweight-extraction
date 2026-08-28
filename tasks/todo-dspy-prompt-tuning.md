@@ -234,29 +234,31 @@ par défaut en dur (voir `specs/pdf-ner-real.md`).
 
 ## Task 6 : `propose_candidates` — proposition de variantes via DSPy
 
-**Description :** `dspy.Signature` (ex. `ProposeFieldPrompt`) avec en
-entrée `field_type`, `current_title`, `current_definition`, et un résumé
-des échecs observés au round précédent (documents où le candidat actuel
-n'a pas matché le gold — texte source tronqué + valeur gold attendue,
-absent au premier round). En sortie : `new_title: str`,
-`new_definition: str`. Fonction `propose_candidates(field: Field, *,
-failures: list[FailureExample], n: int, lm: dspy.LM) -> list[FieldCandidate]`
-(`FieldCandidate` = dataclass `title: str`, `definition: str`) qui appelle
-le `dspy.Predict`/`dspy.ChainOfThought` correspondant `n` fois (ou via le
-paramètre de DSPy pour plusieurs complétions si disponible — à vérifier
-contre l'API réelle, Tâche 5).
+**Description (implémentée) :** `dspy.Signature` `ProposeFieldPrompt` avec
+en entrée `field_type`, `current_title`, `current_definition`,
+`failure_summary` (une ligne par échec — `source_file`/valeur gold/valeur
+extraite, chaîne vide si aucun échec, formatée par `_format_failure_summary`).
+En sortie : `new_title: str`, `new_definition: str`. Fonction
+`propose_candidates(field: Field, *, failures: list[FailureExample], n: int,
+lm: dspy.LM) -> list[FieldCandidate]` (`FieldCandidate` = dataclass `title:
+str`, `definition: str`) qui appelle `dspy.Predict(ProposeFieldPrompt)` `n`
+fois (un `dspy.Predict` simple, pas `ChainOfThought` — pas de raisonnement
+intermédiaire nécessaire pour reformuler un couple titre/définition ; la
+diversité entre les `n` appels vient de la température du `lm` passé,
+vérifié suffisant avec `dspy.utils.DummyLM` en test).
 
 **Acceptance criteria :**
-- [ ] Avec un LM factice DSPy (complétions fixées à l'avance, pas de
-      réseau), `propose_candidates(field, failures=[], n=3, lm=...)`
-      renvoie exactement 3 `FieldCandidate`, avec `title`/`definition` non
-      vides
-- [ ] Le prompt envoyé au LM factice contient bien `current_title`,
-      `current_definition`, et le `field_type` (assertion sur l'entrée
-      reçue par le faux LM)
+- [x] Avec un LM factice DSPy (`dspy.utils.DummyLM`, complétions fixées à
+      l'avance, pas de réseau), `propose_candidates(field, failures=[],
+      n=3, lm=...)` renvoie exactement 3 `FieldCandidate`, avec
+      `title`/`definition` non vides
+- [x] Le prompt envoyé au LM factice (`lm.history[0]["messages"]`) contient
+      bien `current_title`, `current_definition`, et le `field_type`
+- [x] `failures` non vide apparaît dans le prompt (`source_file`, valeur
+      gold, valeur extraite)
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k propose_candidates`
+- [x] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k propose_candidates`
       — LM factice uniquement, aucun appel réseau
 
 **Dependencies :** Task 5
@@ -270,7 +272,7 @@ contre l'API réelle, Tâche 5).
 ---
 
 ## Checkpoint : Phase 3
-- [ ] `uv run pytest -m "not live"` passe ; `propose_candidates` testé sans
+- [x] `uv run pytest -m "not live"` passe ; `propose_candidates` testé sans
       appel réseau
 
 ---
