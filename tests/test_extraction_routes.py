@@ -374,6 +374,44 @@ def test_run_page_shows_export_checkbox_and_placeholder_for_undetected_field(
     assert f'action="/extraction/runs/{run.id}/export-gold"' in response.text
 
 
+def test_export_gold_ignores_unknown_field_key(gold_client, field_repo, run_repo, gold_yaml_path):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    # "cle_obsolete" ne correspond à aucun champ connu (ex. champ renommé
+    # entre le rendu de la page et la soumission du formulaire) — doit être
+    # ignorée plutôt qu'écrite telle quelle dans le gold.
+    response = gold_client.post(
+        f"/extraction/runs/{run.id}/export-gold",
+        data={"export_fields": ["numero_devis", "cle_obsolete"], "value__cle_obsolete": "n'importe quoi"},
+    )
+
+    assert response.status_code == 200
+    data = yaml.safe_load(gold_yaml_path.read_text(encoding="utf-8"))
+    annotations = data["dataset"][0]["annotations"]
+    assert "cle_obsolete" not in annotations
+    assert annotations["numero_devis"]["value"] == "DEV-1"
+
+
+def test_export_gold_all_checked_keys_unknown_shows_error(gold_client, run_repo, gold_yaml_path):
+    run_repo.create_run("doc.pdf", [])
+    run = run_repo.list_runs()[0]
+    original = gold_yaml_path.read_text(encoding="utf-8")
+
+    response = gold_client.post(
+        f"/extraction/runs/{run.id}/export-gold",
+        data={"export_fields": ["cle_obsolete"]},
+    )
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert gold_yaml_path.read_text(encoding="utf-8") == original
+
+
 def test_export_gold_unknown_run_does_not_crash(gold_client):
     response = gold_client.post("/extraction/runs/999/export-gold", data={})
 

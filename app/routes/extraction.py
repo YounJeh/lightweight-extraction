@@ -103,7 +103,14 @@ def register_extraction_routes(
 
         annotations = {}
         for key in checked_keys:
-            result = results_by_title.get(key_to_title.get(key))
+            title = key_to_title.get(key)
+            if title is None:
+                # Clé cochée qui ne correspond plus à aucun champ connu
+                # (ex. champ renommé/supprimé entre le rendu de la page et
+                # la soumission) — jamais écrite dans le gold, plutôt qu'une
+                # clé orpheline silencieuse dans un fichier versionné.
+                continue
+            result = results_by_title.get(title)
             fallback = (result.typed_value or result.value) if result else ""
             raw_value = form.get(f"value__{key}")
             value = (raw_value if raw_value is not None else fallback).strip() or None
