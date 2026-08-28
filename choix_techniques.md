@@ -144,21 +144,31 @@ réinstalle bien `opencv-python` ("Installed 6 packages") ; `uv run
 --no-sync` ne touche à rien. Fix : `CMD ["uv", "run", "--no-sync",
 "python", "-m", "app.main"]`.
 
-**Effet de bord local — `uv run pytest` peut casser `cv2` dans ce
-`.venv` :** le même mécanisme touche le poste de dev. Tout `uv run <cmd>`
-lancé ici (y compris `uv run pytest`) resynchronise sur `uv.lock` et peut
-réinstaller `opencv-python` (GUI) par-dessus `opencv-python-headless`,
-faisant échouer les tests OCR avec `ImportError: libGL.so.1` — observé en
-pratique pendant cette session. Pas de fix pyproject.toml propre possible
-(aucun mécanisme `uv`/pip pour qu'un paquet en "remplace" un autre par
-nom). Si `uv run pytest` échoue avec cette erreur, relancer :
-```bash
-uv pip uninstall opencv-python opencv-python-headless && uv pip install opencv-python-headless
-uv run --no-sync pytest -v -m "not live"
-```
+**Effet de bord local, observé ensuite — `uv run` (sans `--no-sync`) peut
+casser `cv2` dans ce `.venv` :** le même mécanisme touche le poste de dev,
+pas seulement Cloud Run — `uv run python -m app.main` lancé normalement
+(README) a réinstallé `opencv-python` et fait planter un upload réel avec
+la même `ImportError` (`libGL.so.1` cette fois, variante locale de
+`libxcb.so.1`).
+
+**Round 3 — le vrai correctif, pas juste un contournement :** l'hypothèse
+"aucun fix `pyproject.toml` propre possible" (notée plus haut) était
+fausse — `uv` expose `[tool.uv] override-dependencies`, qui accepte un
+marqueur d'environnement. Avec
+`override-dependencies = ["opencv-python; python_version<'0'"]` (marqueur
+toujours faux), `opencv-python` n'est **jamais résolu du tout**, quelle que
+soit la dépendance qui le demande — vérifié dans `uv.lock` (aucune entrée
+`opencv-python`, seulement `-headless`) et en réel (`uv run` répété sans
+`--no-sync` reste stable). Élimine le besoin de coexistence/pari sur
+l'ordre d'installation à la racine, pas seulement au niveau du `Dockerfile`
+ou du poste de dev. `CMD ["uv", "run", "--no-sync", ...]` du `Dockerfile`
+n'est donc plus nécessaire à la correction (gardé tel quel comme
+optimisation de démarrage — évite une vérification de sync réseau à chaque
+instance).
 
 **Réf :** [Dockerfile](Dockerfile) · [.dockerignore](.dockerignore) ·
-[specs/deploy-cloud-run.md](specs/deploy-cloud-run.md)
+[specs/deploy-cloud-run.md](specs/deploy-cloud-run.md) ·
+[pyproject.toml](pyproject.toml)
 
 **Réf :** [docs/ideas/pdf-extraction-ocr-tracing.md](docs/ideas/pdf-extraction-ocr-tracing.md) ·
 [tasks/plan-pdf-ocr-tracing.md](tasks/plan-pdf-ocr-tracing.md) ·
