@@ -1,755 +1,614 @@
 dataset:
-  - document_id: 1
-    source_file: DEV-1NT2605-0384_1ENTECH29 1.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "DEV-1NT2605-0384"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "ADALTRA"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: "30 jours"
-        evidence:
-          text: null
-          page: 2
-
-      duree_validite_offre:
-        value: "30/05/2026"
-        evidence:
-          text: null
-          page: 1
-
-
-  - document_id: 2
-    source_file: 26-0727 Super U Exincourt V1 2026-03-19.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "26-0727/V1"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "ADIWATT"
-        evidence:
-          text: null
-          page: 6
-
-      pourcentage_acompte:
-        value: 30
-        evidence:
-          text: null
-          page: 7
-
-      pourcentage_solde:
-        value: 70
-        evidence:
-          text: null
-          page: 8
-
-      delai_paiement_solde_jours:
-        value: "30 jours"
-        evidence:
-          text: null
-          page: 8
-
-      duree_validite_offre:
-        value: "1 mois"
-        evidence:
-          text: null
-          page: 4
-
-
-  - document_id: 3
-    source_file: Devis n° 6952.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "n°6952"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "S.C.B.M."
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: "un mois"
-        evidence:
-          text: null
-          page: 4
-
-
-  - document_id: 4
-    source_file: 26-PC-0323 REACTU 25-JC-0009 ENTECH SE.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "26-PC-0323 REACTU 25-JC-0009"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "TRANSFO MATELEC"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: "1 MOIS"
-        evidence:
-          text: null
-          page: 1
-
-
-  - document_id: 5
-    source_file: Offre modules.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      nom_societe:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-
-  - document_id: 6
-    source_file: Offre BRIAND Métal - 50588-1-A_-_ENTECH_-_EXINCODIS-OMBRIERES.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "50588-1-A"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "BRIAND CONSTRUCTION METALLIQUE"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 15
-        evidence:
-          text: null
-          page: 2
-
-      pourcentage_solde:
-        value: 75
-        evidence:
-          text: null
-          page: 2
-
-      delai_paiement_solde_jours:
-        value: "30 jours"
-        evidence:
-          text: null
-          page: 2
-
-      duree_validite_offre:
-        value: "30 jours"
-        evidence:
-          text: null
-          page: 2
-
-
-  - document_id: 7
-    source_file: Alt'Ancre x ESE - Super U - VRD.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "DV26040005"
-        evidence:
-          text: null
-          page: A
-
-      nom_societe:
-        value: "ALT'ANCRE"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 40
-        evidence:
-          text: null
-          page: 2
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: "30j"
-        evidence:
-          text: null
-          page: 2
-
-      duree_validite_offre:
-        value: "03/05/2026"
-        evidence:
-          text: null
-          page: 2
-
-
-  - document_id: 8
-    source_file: 104__DEVIS_25110230_VERSION_A03.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "25110230.A03"
-        evidence:
-          text: null
-          page: 11
-
-      nom_societe:
-        value: "GIRARD HERVOUET"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 30
-        evidence:
-          text: null
-          page: 12
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: "30 jours"
-        evidence:
-          text: null
-          page: 12
-
-      duree_validite_offre:
-        value: "15 jours"
-        evidence:
-          text: null
-          page: 11
-
-
-  - document_id: 9
-    source_file: doc09044720260611193518.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      nom_societe:
-        value: "PRISER"
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-
-  - document_id: 10
-    source_file: Devis - S01736.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "S01736"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "TITAN PREFA"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 30
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: "45 jours"
-        evidence:
-          text: null
-          page: 3
-
-      duree_validite_offre:
-        value: "un mois"
-        evidence:
-          text: null
-          page: 3
-
-
-  - document_id: 11
-    source_file: 26-0743 Tournan V1 2026-03-20.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "26-0743/V1"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "Adiwatt"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 30
-        evidence:
-          text: null
-          page: 7
-
-      pourcentage_solde:
-        value: 70
-        evidence:
-          text: null
-          page: 8
-
-      delai_paiement_solde_jours:
-        value: "30 jours"
-        evidence:
-          text: null
-          page: 8
-
-      duree_validite_offre:
-        value: "1 (un) mois"
-        evidence:
-          text: null
-          page: 7
-
-
-  - document_id: 12
-    source_file: DE ENTECH.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "DE367"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "FLAMTEC"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: "21/04/2026"
-        evidence:
-          text: null
-          page: 1
-
-
-  - document_id: 13
-    source_file: Devis DVGP25-00413.00 (Version _ C) - ENTECH.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "DVGP25-00413"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "GUINDE"
-        evidence:
-          text: null
-          page: 3
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: "3 mois"
-        evidence:
-          text: null
-          page: 3
-
-
-  - document_id: 14
-    source_file: OFR2603012513 - ENTECH.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "OFR2603012513"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "mobasolar"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: "15 jours"
-        evidence:
-          text: null
-          page: 1
-
-
-  - document_id: 15
-    source_file: Devis KM LOCATION détaillé 11-001569, ENTECH SE.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: 11-001569
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: Kiloutou Module
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      duree_validite_offre:
-        value: "29/03/2026"
-        evidence:
-          text: null
-          page: 1
-
-
-  - document_id: 16
-    source_file: Devis n°63505 - ENTECH - PDL - Poste D_24_1224_IMPL_1000 - Département 01_DDN.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "63505"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "SOTRELEC"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 30
-        evidence:
-          text: null
-          page: 3
-
-      pourcentage_solde:
-        value: 30
-        evidence:
-          text: null
-          page: 3
-
-      delai_paiement_solde_jours:
-        value: "45 jours"
-        evidence:
-          text: null
-          page: 4
-
-      duree_validite_offre:
-        value: "1 mois"
-        evidence:
-          text: null
-          page: 3
-
-
-  - document_id: 17
-    source_file: Q42-2508667-02-Offre Commerciale et Technique dossier A_24_1224_ENTECH.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis: 
-        value: "Q42-2508667-02"
-        evidence:
-          text: null
-          page: 2
-
-      nom_societe:
-        value: "ORMAZABAL"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: 20
-        evidence:
-          text: null
-          page: 20
-
-      pourcentage_solde:
-        value: 80
-        evidence:
-          text: null
-          page: 20
-
-      delai_paiement_solde_jours:
-        value: "45 jours"
-        evidence:
-          text: null
-          page: 20
-
-      duree_validite_offre:
-        value: "1 mois"
-        evidence:
-          text: null
-          page: 18
-
-
-  - document_id: 18
-    source_file: 02_E2648_260527_01_VILLENEUVE - SUNROCK.pdf
-    human_validation: true
-
-    annotations:
-      numero_devis:
-        value: "E2648_260527_01"
-        evidence:
-          text: null
-          page: 1
-
-      nom_societe:
-        value: "Top Cable"
-        evidence:
-          text: null
-          page: 1
-
-      pourcentage_acompte:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      pourcentage_solde:
-        value: null
-        evidence:
-          text: null
-          page: null
-
-      delai_paiement_solde_jours:
-        value: "6 SEMAINES OUVREES"
-        evidence:
-          text: null
-          page: 1
-
-      duree_validite_offre:
-        value: "48 HEURES"
-        evidence:
-          text: null
-          page: 1
+- document_id: 1
+  source_file: DEV-1NT2605-0384_1ENTECH29 1.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DEV-1NT2605-0384
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: ADALTRA
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 2
+    duree_validite_offre:
+      value: 30/05/2026
+      evidence:
+        text: null
+        page: 1
+- document_id: 2
+  source_file: 26-0727 Super U Exincourt V1 2026-03-19.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 26-0727/V1
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: ADIWATT
+      evidence:
+        text: null
+        page: 6
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: null
+        page: 7
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: null
+        page: 8
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 8
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: null
+        page: 4
+- document_id: 3
+  source_file: Devis n° 6952.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: n°6952
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: S.C.B.M.
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: un mois
+      evidence:
+        text: null
+        page: 4
+- document_id: 4
+  source_file: 26-PC-0323 REACTU 25-JC-0009 ENTECH SE.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 26-PC-0323 REACTU 25-JC-0009
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: TRANSFO MATELEC
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 MOIS
+      evidence:
+        text: null
+        page: 1
+- document_id: 5
+  source_file: Offre modules.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: null
+      evidence:
+        text: null
+        page: null
+    nom_societe:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null
+- document_id: 6
+  source_file: Offre BRIAND Métal - 50588-1-A_-_ENTECH_-_EXINCODIS-OMBRIERES.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 50588-1-A
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: BRIAND CONSTRUCTION METALLIQUE
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 15
+      evidence:
+        text: null
+        page: 2
+    pourcentage_solde:
+      value: 75
+      evidence:
+        text: null
+        page: 2
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 2
+    duree_validite_offre:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 2
+- document_id: 7
+  source_file: Alt'Ancre x ESE - Super U - VRD.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DV26040005
+      evidence:
+        text: null
+        page: A
+    nom_societe:
+      value: ALT'ANCRE
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 40
+      evidence:
+        text: null
+        page: 2
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30j
+      evidence:
+        text: null
+        page: 2
+    duree_validite_offre:
+      value: 03/05/2026
+      evidence:
+        text: null
+        page: 2
+- document_id: 8
+  source_file: 104__DEVIS_25110230_VERSION_A03.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 25110230.A03
+      evidence:
+        text: null
+        page: 11
+    nom_societe:
+      value: GIRARD HERVOUET
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: null
+        page: 12
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 12
+    duree_validite_offre:
+      value: 15 jours
+      evidence:
+        text: null
+        page: 11
+- document_id: 9
+  source_file: doc09044720260611193518.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: null
+      evidence:
+        text: null
+        page: null
+    nom_societe:
+      value: PRISER
+      evidence:
+        text: null
+        page: null
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null
+- document_id: 10
+  source_file: Devis - S01736.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: S01736
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: TITAN PREFA
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: null
+        page: 1
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 45 jours
+      evidence:
+        text: null
+        page: 3
+    duree_validite_offre:
+      value: un mois
+      evidence:
+        text: null
+        page: 3
+- document_id: 11
+  source_file: 26-0743 Tournan V1 2026-03-20.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 26-0743/V1
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: Adiwatt
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: null
+        page: 7
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: null
+        page: 8
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 8
+    duree_validite_offre:
+      value: 1 (un) mois
+      evidence:
+        text: null
+        page: 7
+- document_id: 12
+  source_file: DE ENTECH.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DE367
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: FLAMTEC
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 21/04/2026
+      evidence:
+        text: null
+        page: 1
+- document_id: 13
+  source_file: Devis DVGP25-00413.00 (Version _ C) - ENTECH.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DVGP25-00413
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: GUINDE
+      evidence:
+        text: null
+        page: 3
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: null
+        page: 3
+- document_id: 14
+  source_file: OFR2603012513 - ENTECH.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: OFR2603012513
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: mobasolar
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 15 jours
+      evidence:
+        text: null
+        page: 1
+- document_id: 15
+  source_file: Devis KM LOCATION détaillé 11-001569, ENTECH SE.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 11-001569
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: Kiloutou Module
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 29/03/2026
+      evidence:
+        text: null
+        page: 1
+- document_id: 16
+  source_file: Devis n°63505 - ENTECH - PDL - Poste D_24_1224_IMPL_1000 - Département
+    01_DDN.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '63505'
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: SOTRELEC
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: null
+        page: 3
+    pourcentage_solde:
+      value: 30
+      evidence:
+        text: null
+        page: 3
+    delai_paiement_solde_jours:
+      value: 45 jours
+      evidence:
+        text: null
+        page: 4
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: null
+        page: null
+- document_id: 17
+  source_file: Q42-2508667-02-Offre Commerciale et Technique dossier A_24_1224_ENTECH.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: Q42-2508667-02
+      evidence:
+        text: null
+        page: 2
+    nom_societe:
+      value: ORMAZABAL
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: 20
+      evidence:
+        text: null
+        page: 20
+    pourcentage_solde:
+      value: 80
+      evidence:
+        text: null
+        page: 20
+    delai_paiement_solde_jours:
+      value: 45 jours
+      evidence:
+        text: null
+        page: 20
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: null
+        page: 18
+- document_id: 18
+  source_file: 02_E2648_260527_01_VILLENEUVE - SUNROCK.pdf
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: E2648_260527_01
+      evidence:
+        text: null
+        page: 1
+    nom_societe:
+      value: Top Cable
+      evidence:
+        text: null
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 6 SEMAINES OUVREES
+      evidence:
+        text: null
+        page: 1
+    duree_validite_offre:
+      value: 48 HEURES
+      evidence:
+        text: null
+        page: 1
