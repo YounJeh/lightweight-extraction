@@ -112,47 +112,47 @@ puis DSPy (proposition de variantes, avec un faux LM en test), puis la
 boucle d'optimisation + le CLI/export qui assemble tout.
 
 ### Phase 1 : Fondations sans LLM
-- [ ] Tâche 1 : promouvoir `precision_recall_f1` dans `gold_matching.py`
-- [ ] Tâche 2 : `scripts/dspy_markdown_cache.py` — cache disque par
+- [x] Tâche 1 : promouvoir `precision_recall_f1` dans `gold_matching.py`
+- [x] Tâche 2 : `scripts/dspy_markdown_cache.py` — cache disque par
       `source_file`
-- [ ] Tâche 3 : `slugify_title` — dérivation du `label` depuis `Nom`
+- [x] Tâche 3 : `slugify_title` — dérivation du `label` depuis `Nom`
 
 ### Checkpoint 1
-- [ ] `uv run pytest -m "not live"` passe
+- [x] `uv run pytest -m "not live"` passe
 
 ### Phase 2 : Scoring d'un champ (sans DSPy)
-- [ ] Tâche 4 : `score_field_candidate` — F1 d'un champ pour un
+- [x] Tâche 4 : `score_field_candidate` — F1 d'un champ pour un
       `title`/`definition` candidat, contre le dataset gold, avec un
       extracteur NER injecté (faux en test)
 
 ### Checkpoint 2
-- [ ] `uv run pytest -m "not live"` passe ; `score_field_candidate` prouvé
+- [x] `uv run pytest -m "not live"` passe ; `score_field_candidate` prouvé
       correct avec un faux extracteur déterministe (TP/FP/FN connus à la
       main)
 
 ### Phase 3 : Proposition de variantes via DSPy
-- [ ] Tâche 5 : ajout de la dépendance `dspy` + configuration du `dspy.LM`
+- [x] Tâche 5 : ajout de la dépendance `dspy` + configuration du `dspy.LM`
       (routing réutilisé depuis `ner_langextract`)
-- [ ] Tâche 6 : `propose_candidates` — `dspy.Signature`/`dspy.Predict` qui
+- [x] Tâche 6 : `propose_candidates` — `dspy.Signature`/`dspy.Predict` qui
       propose N variantes `title`/`definition` à partir de la valeur
       actuelle + des documents en échec
 
 ### Checkpoint 3
-- [ ] `uv run pytest -m "not live"` passe ; `propose_candidates` testé avec
+- [x] `uv run pytest -m "not live"` passe ; `propose_candidates` testé avec
       un LM factice (pas d'appel réseau)
 
 ### Phase 4 : Boucle d'optimisation + CLI/export
-- [ ] Tâche 7 : `optimize_field` — orchestre baseline → proposition →
+- [x] Tâche 7 : `optimize_field` — orchestre baseline → proposition →
       scoring → meilleure variante (éventuellement plusieurs rounds)
-- [ ] Tâche 8 : CLI `main()` — parcourt les champs demandés, écrit le CSV de
+- [x] Tâche 8 : CLI `main()` — parcourt les champs demandés, écrit le CSV de
       sortie + résumé stdout
 
 ### Checkpoint 4
-- [ ] `uv run pytest -m "not live"` passe intégralement (tout le chantier
+- [x] `uv run pytest -m "not live"` passe intégralement (tout le chantier
       reste couvert par des doubles à ce stade)
 
 ### Phase 5 : Exécution réelle de validation
-- [ ] Tâche 9 : lancer `scripts/dspy_prompt_tuning.py` pour de vrai (clé API
+- [x] Tâche 9 : lancer `scripts/dspy_prompt_tuning.py` pour de vrai (clé API
       requise dans l'environnement), sur un champ (`--field`), avec un
       budget réduit (`--n-candidates`/`--n-rounds` petits) — objectif :
       valider que le pipeline bout-en-bout tourne sans erreur et produit un
@@ -163,8 +163,8 @@ boucle d'optimisation + le CLI/export qui assemble tout.
       qui lui revient même si l'exécution en elle-même est désormais permise.
 
 ### Checkpoint final
-- [ ] `uv run pytest -m "not live"` passe intégralement
-- [ ] Tâche 9 exécutée avec succès (voir critères ci-dessus)
+- [x] `uv run pytest -m "not live"` passe intégralement
+- [x] Tâche 9 exécutée avec succès (voir critères ci-dessus)
 - [ ] Revue avec l'utilisateur
 - [ ] Proposer `/code-review-and-quality` puis une PR une fois la branche
       complète (convention CLAUDE.md)

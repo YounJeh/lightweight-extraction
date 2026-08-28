@@ -394,36 +394,63 @@ bout-en-bout (cache markdown, `score_field_candidate` sur du vrai texte
 LangExtract, `propose_candidates` sur un vrai LM, export CSV), pas produire
 un résultat définitif à adopter — budget volontairement réduit.
 
+**Exécutée** — run réel sur `numero_devis`, 3 documents gold (sous-ensemble
+volontaire pour un budget réduit), `n_candidates=2`, `n_rounds=1`.
+
+**Bug bloquant découvert et corrigé en cours de route (hors scope DSPy) :**
+`app/tools/ner_langextract.py` avait `examples=[example] if example else
+None,` commenté — modification non commitée déjà présente dans l'arbre de
+travail avant le début de cette session (visible dans le `git status`
+initial), qui cassait **tout** appel réel à `langextract.extract()`
+(`ValueError: Examples are required...`), pas seulement ce chantier.
+Confirmé avec l'utilisateur avant de toucher au fichier (hors scope de ce
+plan) puis restauré — le fichier redevient identique à `HEAD`, rien à
+committer pour ce fichier.
+
+**Résultat du run** : `numero_devis` — baseline (`"Numéro de devis"` /
+`"Numéro d'identification du devis (N°)"`) F1 = 0.333 -> meilleur candidat
+DSPy (`"Référence du devis"` / `"Identifiant unique du devis, qui peut
+être constitué de chiffres et de lettres, signé par 'n°' ou d'autres
+variantes."`) F1 = 0.667, `label` régénéré en `reference_devis`. Écrit dans
+`tasks/dspy-prompt-tuning-results.csv` (désormais gitignoré — sortie
+régénérée à chaque run, jamais une source de vérité versionnée). **Ce
+résultat est un smoke-test sur 3 documents seulement, pas une
+recommandation à adopter telle quelle** — un run complet (tous les
+documents gold, plus de candidats/rounds) reste à la discrétion de
+l'utilisateur.
+
 **Acceptance criteria :**
-- [ ] Le run se termine sans exception
-- [ ] Le CSV de sortie (`tasks/dspy-prompt-tuning-results.csv` ou chemin
-      `--output` choisi) est généré, reparsable par `import_fields`
-- [ ] `baseline_f1`/`best_f1` affichés sur stdout sont des nombres
-      plausibles entre 0 et 1 (pas de `NaN`, pas de valeur qui trahit un bug
-      de calcul — ex. F1 > 1)
-- [ ] Le cache markdown (`scripts/_dspy_markdown_cache/`) contient bien un
-      fichier par document gold utilisé, réutilisé si le script est relancé
-      une seconde fois (vérifiable par le temps d'exécution nettement plus
-      court au 2e run)
+- [x] Le run se termine sans exception (après correction du bug bloquant
+      ci-dessus)
+- [x] Le CSV de sortie est généré, reparsable par `import_fields` (vérifié :
+      `errors == []`, 6 champs relus)
+- [x] `baseline_f1`/`best_f1` affichés sur stdout sont des nombres
+      plausibles entre 0 et 1 (`0.333 -> 0.667`)
+- [x] Le cache markdown (`scripts/_dspy_markdown_cache/`) contient un
+      fichier par document utilisé (3/3) ; réutilisation vérifiée
+      directement (un `pdf_extractor` factice comptant ses appels, invoqué
+      via `build_markdown_loader` sur un fichier déjà en cache : 0 appel)
+      plutôt que par un 2e run complet (aurait consommé des appels LLM
+      réels supplémentaires pour rien)
 
 **Verification :**
-- [ ] Exécution manuelle du script (pas un test `pytest` — run réel,
+- [x] Exécution manuelle du script (pas un test `pytest` — run réel,
       volontairement hors suite automatisée)
 
 **Dependencies :** Task 8
 
 **Files likely touched :**
 - Aucun fichier de code (run de validation) — génère
-  `tasks/dspy-prompt-tuning-results.csv` et peuple
-  `scripts/_dspy_markdown_cache/`
+  `tasks/dspy-prompt-tuning-results.csv` (gitignoré) et peuple
+  `scripts/_dspy_markdown_cache/` (gitignoré)
 
 **Estimated scope :** XS (pas de code, exécution + lecture des résultats)
 
 ---
 
 ## Checkpoint final
-- [ ] `uv run pytest -m "not live"` passe intégralement
-- [ ] Tâche 9 exécutée avec succès
+- [x] `uv run pytest -m "not live"` passe intégralement
+- [x] Tâche 9 exécutée avec succès
 - [ ] Revue avec l'utilisateur
 - [ ] Proposer `/code-review-and-quality` puis une PR une fois la branche
       complète (convention CLAUDE.md)
