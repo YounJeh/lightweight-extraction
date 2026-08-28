@@ -1,0 +1,170 @@
+import pytest
+
+from app.models import ExtractionResult, Field
+from scripts.dspy_prompt_tuning import (
+    build_markdown_loader,
+    score_field_candidate,
+)
+
+
+class _FakeNerExtractor:
+    def __init__(self, results_by_source: dict[str, list[ExtractionResult]]):
+        self.results_by_source = results_by_source
+        self.calls: list[dict] = []
+
+    def extract(self, text, fields, *, source_filename=None):
+        self.calls.append({"text": text, "fields": fields, "source_filename": source_filename})
+        return self.results_by_source.get(source_filename, [])
+
+
+class _FakePdfExtractor:
+    def __init__(self, text: str):
+        self.text = text
+        self.call_count = 0
+
+    def extract_text(self, pdf_bytes: bytes) -> str:
+        self.call_count += 1
+        return self.text
+
+
+def _fields() -> list[Field]:
+    return [
+        Field(
+            id=1,
+            key="numero_devis",
+            title="Numéro de devis",
+            definition="définition actuelle du numéro",
+            type="text",
+        ),
+        Field(
+            id=2,
+            key="nom_societe",
+            title="Nom de la société",
+            definition="définition actuelle de la société",
+            type="text",
+        ),
+    ]
+
+
+# --- score_field_candidate ---------------------------------------------------
+
+
+def test_score_field_candidate_computes_tp_fp_fn():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-1", "evidence": {"page": 1}}},
+        },
+        {
+            "source_file": "b.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-2", "evidence": {"page": 1}}},
+        },
+        {
+            "source_file": "c.pdf",
+            "annotations": {"numero_devis": {"value": None, "evidence": {"page": None}}},
+        },
+    ]
+    results_by_source = {
+        "a.pdf": [
+            ExtractionResult(
+                field_title="Numéro candidat", value="DEV-1", typed_value="DEV-1", page_number=1
+            )
+        ],
+        "b.pdf": [
+            ExtractionResult(
+                field_title="Numéro candidat", value="WRONG", typed_value="WRONG", page_number=1
+            )
+        ],
+        "c.pdf": [],
+    }
+    extractor = _FakeNerExtractor(results_by_source)
+
+    score = score_field_candidate(
+        "numero_devis",
+        "Numéro candidat",
+        "nouvelle définition",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: f"markdown::{source_file}",
+    )
+
+    # a : match -> TP ; b : mauvaise valeur -> FP + FN ; c : gold vide, rien
+    # extrait -> TN (exclu du calcul precision/recall)
+    assert (score.tp, score.fp, score.fn) == (1, 1, 1)
+    assert score.precision == 0.5
+    assert score.recall == 0.5
+    assert score.f1 == pytest.approx(0.5)
+
+
+def test_score_field_candidate_leaves_other_fields_unchanged():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-1", "evidence": {"page": 1}}},
+        },
+    ]
+    extractor = _FakeNerExtractor(
+        {
+            "a.pdf": [
+                ExtractionResult(field_title="Titre candidat", value="DEV-1", typed_value="DEV-1")
+            ]
+        }
+    )
+
+    score_field_candidate(
+        "numero_devis",
+        "Titre candidat",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "markdown",
+    )
+
+    assert len(extractor.calls) == 1
+    fields_sent = {f.key: f for f in extractor.calls[0]["fields"]}
+    assert fields_sent["numero_devis"].title == "Titre candidat"
+    assert fields_sent["numero_devis"].definition == "définition candidate"
+    assert fields_sent["nom_societe"].title == "Nom de la société"
+    assert fields_sent["nom_societe"].definition == "définition actuelle de la société"
+
+
+def test_score_field_candidate_skips_documents_without_the_field_annotated():
+    gold_documents = [
+        {"source_file": "a.pdf", "annotations": {"nom_societe": {"value": "ADALTRA"}}},
+    ]
+    extractor = _FakeNerExtractor({})
+
+    score = score_field_candidate(
+        "numero_devis",
+        "Titre candidat",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "markdown",
+    )
+
+    assert extractor.calls == []
+    assert (score.tp, score.fp, score.fn) == (0, 0, 0)
+    assert score.f1 == 0.0
+
+
+# --- build_markdown_loader ----------------------------------------------------
+
+
+def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):
+    data_test_dir = tmp_path / "data_test"
+    data_test_dir.mkdir()
+    (data_test_dir / "devis.pdf").write_bytes(b"fake-pdf-bytes")
+    cache_dir = tmp_path / "cache"
+    pdf_extractor = _FakePdfExtractor("# markdown extrait")
+
+    load = build_markdown_loader(
+        data_test_dir=data_test_dir, pdf_extractor=pdf_extractor, cache_dir=cache_dir
+    )
+
+    assert load("devis.pdf") == "# markdown extrait"
+    assert load("devis.pdf") == "# markdown extrait"
+    assert pdf_extractor.call_count == 1

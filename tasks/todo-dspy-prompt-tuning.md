@@ -16,16 +16,16 @@ comportement, tous les appelants existants (`_field_metrics_evaluations`)
 inchangés.
 
 **Acceptance criteria :**
-- [ ] `gold_matching.precision_recall_f1(0, 0, 0)` renvoie `(None, None,
+- [x] `gold_matching.precision_recall_f1(0, 0, 0)` renvoie `(None, None,
       None)` (comportement inchangé, cas 0/0)
-- [ ] `gold_matching.precision_recall_f1` produit les mêmes valeurs que
+- [x] `gold_matching.precision_recall_f1` produit les mêmes valeurs que
       l'ancienne `_precision_recall_f1` sur les cas déjà couverts par les
       tests existants de `gold_dataset_eval.py`
-- [ ] `scripts/gold_dataset_eval.py` ne définit plus `_precision_recall_f1`
+- [x] `scripts/gold_dataset_eval.py` ne définit plus `_precision_recall_f1`
       localement
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_gold_dataset_eval.py tests/test_gold_matching.py`
+- [x] Tests : `uv run pytest -m "not live" tests/test_gold_dataset_eval.py tests/test_gold_matching.py`
 
 **Dependencies :** None
 
@@ -55,16 +55,16 @@ Ajouter `scripts/_dspy_markdown_cache/` au `.gitignore` (même bloc que
 `scripts/_ocr_tuning_cache/`).
 
 **Acceptance criteria :**
-- [ ] Premier appel sur un `source_file` absent du cache : `pdf_extractor`
+- [x] Premier appel sur un `source_file` absent du cache : `pdf_extractor`
       appelé une fois, fichier `.md` créé dans `cache_dir`
-- [ ] Deuxième appel sur le même `source_file` : `pdf_extractor` **non**
+- [x] Deuxième appel sur le même `source_file` : `pdf_extractor` **non**
       appelé (compteur d'appels à 0 sur un faux extracteur), contenu
       identique renvoyé
-- [ ] `cache_dir` inexistant au départ ne lève pas d'erreur (créé à la
+- [x] `cache_dir` inexistant au départ ne lève pas d'erreur (créé à la
       volée)
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_markdown_cache.py` — `cache_dir`
+- [x] Tests : `uv run pytest tests/test_dspy_markdown_cache.py` — `cache_dir`
       toujours un `tmp_path` de test, jamais `scripts/_dspy_markdown_cache/`
       réel
 
@@ -81,63 +81,74 @@ Ajouter `scripts/_dspy_markdown_cache/` au `.gitignore` (même bloc que
 
 ## Task 3 : `slugify_title` — dérivation du `label` depuis `Nom`
 
-**Description :** Fonction pure `slugify_title(title: str) -> str` (dans
-`scripts/dspy_prompt_tuning.py`, ou un module dédié `scripts/text_slug.py`
-si ça reste plus lisible séparé) : minuscules, accents retirés
-(normalisation Unicode NFKD + filtrage des diacritiques), toute séquence de
-caractères non alphanumériques remplacée par `_`, `_` de tête/queue
-retirés.
+**Description (implémentée dans `scripts/text_slug.py`, module dédié) :**
+Fonction pure `slugify_title(title: str) -> str` : accents retirés
+(NFKD + filtrage des marques combinantes), minuscules, **articles/
+prépositions français courants filtrés** (`de`, `du`, `des`, `la`, `le`,
+`l`, `d`...) — nécessaire pour matcher les labels existants (`"Nom de la
+société"` -> `nom_societe`, pas `nom_de_la_societe`), tout caractère non
+alphanumérique ASCII (y compris apostrophes typographiques ’, jamais
+simplement supprimées) traité comme séparateur.
 
 **Acceptance criteria :**
-- [ ] `slugify_title("Numéro de devis") == "numero_devis"` (label existant,
+- [x] `slugify_title("Numéro de devis") == "numero_devis"` (label existant,
       régression)
-- [ ] `slugify_title("Pourcentage d'acompte") == "pourcentage_d_acompte"`
-      ou équivalent cohérent avec le label existant `pourcentage_acompte`
-      — **si le résultat diverge du label actuel pour un `title` inchangé,
-      documenter l'écart dans le plan plutôt que forcer une correspondance
-      exacte artificielle** (le label actuel n'est pas nécessairement un
-      slug mécanique du title d'origine)
-- [ ] Titre avec espaces multiples/ponctuation (`"Délai  de paiement !"`)
+- [x] `slugify_title("Pourcentage d'acompte") == "pourcentage_acompte"` —
+      le filtrage des stopwords (`d`) suffit à matcher exactement le label
+      existant, pas besoin de l'échappatoire "écart documenté" envisagée
+      initialement
+- [x] Titre avec espaces multiples/ponctuation (`"Délai  de paiement !!"`)
       ne produit pas de `_` répétés ni de `_` en tête/queue
+- [x] **Écart documenté (attendu, pas un bug)** :
+      `slugify_title("Délai de paiement du solde") == "delai_paiement_solde"`
+      alors que le label existant est `delai_paiement_solde_jours` — voir
+      Architecture Decisions du plan
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k slugify` (ou
-      fichier de test dédié au module choisi)
+- [x] Tests : `uv run pytest tests/test_text_slug.py -q`
 
 **Dependencies :** None
 
 **Files likely touched :**
-- `scripts/dspy_prompt_tuning.py` (nouveau) ou `scripts/text_slug.py`
-  (nouveau)
-- fichier de test correspondant (nouveau)
+- `scripts/text_slug.py` (nouveau)
+- `tests/test_text_slug.py` (nouveau)
 
 **Estimated scope :** XS (fonction pure isolée)
 
 ---
 
 ## Checkpoint : Phase 1
-- [ ] `uv run pytest -m "not live"` passe
+- [x] `uv run pytest -m "not live"` passe
 
 ---
 
 ## Task 4 : `score_field_candidate` — F1 d'un champ pour un candidat
 
-**Description :** Dans `scripts/dspy_prompt_tuning.py`. Fonction
-`score_field_candidate(field_key: str, candidate_title: str,
-candidate_definition: str, *, all_fields: list[Field], gold_documents:
-list[dict], data_test_dir: Path, ner_extractor: Any, markdown_cache_fn:
-Callable) -> FieldScore` (`FieldScore` = dataclass/pydantic avec au moins
-`f1: float`, `precision: float | None`, `recall: float | None`, `tp: int`,
-`fp: int`, `fn: int`) :
+**Description (implémentée — signature légèrement simplifiée par rapport à
+la version initiale du plan) :** Dans `scripts/dspy_prompt_tuning.py`.
+
+`build_markdown_loader(*, data_test_dir, pdf_extractor, cache_dir=...) ->
+Callable[[str], str]` : ferme sur le disque/l'extracteur PDF et renvoie un
+chargeur `source_file -> markdown` (lit les bytes + appelle
+`dspy_markdown_cache.get_markdown`) — isole `score_field_candidate` de
+`data_test_dir`/la lecture disque, testable avec un simple `lambda`.
+
+`score_field_candidate(field_key, candidate_title, candidate_definition, *,
+all_fields: list[Field], gold_documents: list[dict], ner_extractor: Any,
+markdown_loader: Callable[[str], str]) -> FieldScore` (`FieldScore` =
+dataclass `f1: float`, `precision: float | None`, `recall: float | None`,
+`tp/fp/fn: int`) :
 1. Construit la liste de `Field` à passer à `ner_extractor.extract` :
    `all_fields` avec le field `field_key` remplacé par une copie
    (`model_copy`) portant `title=candidate_title`,
    `definition=candidate_definition` — **les autres champs restent
    inchangés** (valeurs CSV actuelles, voir Architecture Decisions du
    plan : field-par-field, jamais joint).
-2. Pour chaque document de `gold_documents` dont l'annotation `field_key`
-   est renseignée (même filtre que `gold_dataset_eval` / `gold_matching`) :
-   récupère le markdown via `markdown_cache_fn(source_file, ...)`, appelle
+2. Pour chaque document de `gold_documents` dont `field_key` est une clé
+   présente dans `annotations` (peu importe si sa `value` est `null` —
+   même comportement que `gold_dataset_eval.build_field_evaluator`, qui
+   laisse `classify_field` décider TN/FP/FN à partir de la présence) :
+   récupère le markdown via `markdown_loader(source_file)`, appelle
    `ner_extractor.extract(markdown, fields, ...)`, retrouve le résultat du
    `field_key` visé (par `field_title == candidate_title`, puisque
    `ExtractionResult.field_title` reflète le titre demandé), classifie via
@@ -146,19 +157,22 @@ Callable) -> FieldScore` (`FieldScore` = dataclass/pydantic avec au moins
    `gold_matching.precision_recall_f1` (Tâche 1).
 
 **Acceptance criteria :**
-- [ ] Avec un faux `ner_extractor` déterministe (map `source_file ->
+- [x] Avec un faux `ner_extractor` déterministe (map `source_file ->
       valeur extraite` fixée à la main dans le test) et 3 documents gold
       dont les valeurs attendues sont connues, `score_field_candidate`
       renvoie le TP/FP/FN et le F1 calculés à la main pour ce cas
-- [ ] Les champs autres que `field_key` reçus par `ner_extractor.extract`
+- [x] Les champs autres que `field_key` reçus par `ner_extractor.extract`
       ont bien leur `title`/`definition` d'origine (assertion sur les
       arguments reçus par le faux extracteur), pas la valeur candidate
-- [ ] Un document dont l'annotation `field_key` est `null` est exclu du
-      calcul (cohérent avec `gold_matching`/`gold_dataset_eval` existants)
+- [x] Un document dont `field_key` n'est **pas une clé** de `annotations`
+      est exclu du calcul (extracteur jamais appelé pour ce document) —
+      un document où `field_key` est présent avec `value: null` **n'est
+      pas exclu** (contribue en TN/FP selon l'extraction, cohérent avec
+      `gold_dataset_eval` existant)
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k score_field_candidate`
-      — `ner_extractor` et `markdown_cache_fn` toujours des faux injectés,
+- [x] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -q` —
+      `ner_extractor` et `markdown_loader` toujours des faux injectés,
       jamais le vrai `LangExtractNerExtractor` ni un vrai PDF
 
 **Dependencies :** Task 1, Task 2
@@ -172,7 +186,7 @@ Callable) -> FieldScore` (`FieldScore` = dataclass/pydantic avec au moins
 ---
 
 ## Checkpoint : Phase 2
-- [ ] `uv run pytest -m "not live"` passe ; `score_field_candidate` prouvé
+- [x] `uv run pytest -m "not live"` passe ; `score_field_candidate` prouvé
       correct avec un faux extracteur avant de brancher DSPy dessus
 
 ---
