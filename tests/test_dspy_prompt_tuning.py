@@ -1,16 +1,20 @@
 import pytest
 from dspy.utils import DummyLM
 
-from app.models import ExtractionResult, Field
+from app.fields_import import import_fields
+from app.models import ExtractionResult, Field, FieldExample
 from scripts.dspy_prompt_tuning import (
     FailureExample,
     FieldCandidate,
+    FieldResult,
     FieldScore,
     build_dspy_lm,
     build_markdown_loader,
     optimize_field,
     propose_candidates,
+    run,
     score_field_candidate,
+    write_results_csv,
 )
 
 
@@ -328,3 +332,122 @@ def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):
     assert load("devis.pdf") == "# markdown extrait"
     assert load("devis.pdf") == "# markdown extrait"
     assert pdf_extractor.call_count == 1
+
+
+# --- write_results_csv / run --------------------------------------------------
+
+
+def _two_fields() -> list[Field]:
+    return [
+        Field(
+            id=1,
+            key="numero_devis",
+            title="Numéro de devis",
+            definition="définition actuelle du numéro",
+            type="text",
+            section="devis_contrat",
+            examples=[FieldExample(context="DEV-1234", value=None, source="test")],
+        ),
+        Field(
+            id=2,
+            key="pourcentage_acompte",
+            title="Pourcentage d'acompte",
+            definition="définition actuelle du pourcentage",
+            type="int",
+            section="devis_contrat",
+        ),
+    ]
+
+
+def test_write_results_csv_is_reparsable_by_import_fields(tmp_path):
+    fields = _two_fields()
+    results_by_key = {
+        "numero_devis": FieldResult(
+            field_key="numero_devis",
+            baseline_title="Numéro de devis",
+            baseline_definition="définition actuelle du numéro",
+            baseline_f1=0.5,
+            best_title="Numéro du devis",
+            best_definition="nouvelle définition du numéro",
+            best_label="numero_du_devis",
+            best_f1=0.8,
+        )
+    }
+    output_path = tmp_path / "results.csv"
+
+    write_results_csv(fields, results_by_key, output_path)
+
+    result = import_fields(output_path.read_bytes(), output_path.name)
+    assert result.errors == []
+    imported_by_key = {f.key: f for f in result.fields}
+    assert imported_by_key["numero_du_devis"].title == "Numéro du devis"
+    assert imported_by_key["numero_du_devis"].definition == "nouvelle définition du numéro"
+    # champ non optimisé recopié tel quel (même clé, même title/definition)
+    assert imported_by_key["pourcentage_acompte"].title == "Pourcentage d'acompte"
+    assert imported_by_key["pourcentage_acompte"].type == "int"
+
+
+def test_run_only_optimizes_requested_field_keys(tmp_path):
+    fields = _two_fields()
+    calls = []
+
+    def fake_optimize_fn(field_key, **kwargs):
+        calls.append(field_key)
+        field = next(f for f in fields if f.key == field_key)
+        return FieldResult(
+            field_key=field_key,
+            baseline_title=field.title,
+            baseline_definition=field.definition,
+            baseline_f1=0.5,
+            best_title="Titre optimisé",
+            best_definition="définition optimisée",
+            best_label="titre_optimise",
+            best_f1=0.9,
+        )
+
+    output_path = tmp_path / "results.csv"
+    run(
+        ["numero_devis"],
+        all_fields=fields,
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        output_path=output_path,
+        optimize_fn=fake_optimize_fn,
+    )
+
+    assert calls == ["numero_devis"]
+    result = import_fields(output_path.read_bytes(), output_path.name)
+    imported_by_key = {f.key: f for f in result.fields}
+    assert imported_by_key["titre_optimise"].title == "Titre optimisé"
+    # pourcentage_acompte n'a pas été demandé -> inchangé
+    assert imported_by_key["pourcentage_acompte"].title == "Pourcentage d'acompte"
+
+
+def test_run_prints_baseline_and_best_f1(tmp_path, capsys):
+    def fake_optimize_fn(field_key, **kwargs):
+        return FieldResult(
+            field_key=field_key,
+            baseline_title="Numéro de devis",
+            baseline_definition="def",
+            baseline_f1=0.5,
+            best_title="Numéro de devis",
+            best_definition="def",
+            best_label="numero_devis",
+            best_f1=0.8,
+        )
+
+    run(
+        ["numero_devis"],
+        all_fields=_two_fields(),
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        output_path=tmp_path / "results.csv",
+        optimize_fn=fake_optimize_fn,
+    )
+
+    captured = capsys.readouterr()
+    assert "numero_devis" in captured.out
+    assert "0.500" in captured.out
+    assert "0.800" in captured.out

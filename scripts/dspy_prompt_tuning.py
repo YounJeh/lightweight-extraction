@@ -8,6 +8,9 @@ Usage :
     uv run --no-sync python scripts/dspy_prompt_tuning.py
 """
 
+import argparse
+import csv
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,11 +20,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import dspy  # noqa: E402
 
+from app.config import load_env  # noqa: E402
+from app.fields_import import _TYPE_MAP  # noqa: E402
 from app.models import Field  # noqa: E402
-from app.tools.ner_langextract import _api_key_for, _is_openai_model  # noqa: E402
+from app.tools.ner_langextract import LangExtractNerExtractor, _api_key_for, _is_openai_model  # noqa: E402
+from app.tools.pdf_pymupdf4llm import PyMuPDF4LlmTextExtractor  # noqa: E402
 from scripts import dspy_markdown_cache  # noqa: E402
+from scripts.gold_dataset_eval import DATA_TEST_DIR, load_gold_fields  # noqa: E402
+from scripts.gold_dataset_sync import GOLD_YAML_PATH, _load_gold_documents  # noqa: E402
 from scripts.gold_matching import classify_field, precision_recall_f1  # noqa: E402
 from scripts.text_slug import slugify_title  # noqa: E402
+
+DEFAULT_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "tasks" / "dspy-prompt-tuning-results.csv"
+_CSV_FIELDNAMES = ["section", "label", "Nom", "Définition", "Type", "exemple valeur", "Exemple texte", "source"]
+_TYPE_MAP_INVERSE = {v: k for k, v in _TYPE_MAP.items()}
 
 
 def build_dspy_lm(model_id: str | None) -> dspy.LM:
@@ -296,3 +308,117 @@ def optimize_field(
         best_label=slugify_title(best_title),
         best_f1=best_score.f1,
     )
+
+
+def _field_csv_row(field: Field, *, label: str, title: str, definition: str) -> dict[str, str]:
+    example = field.examples[0] if field.examples else None
+    return {
+        "section": field.section or "",
+        "label": label,
+        "Nom": title,
+        "Définition": definition,
+        "Type": _TYPE_MAP_INVERSE[field.type],
+        "exemple valeur": (example.value if example else None) or "",
+        "Exemple texte": example.context if example else "",
+        "source": (example.source if example else None) or "",
+    }
+
+
+def write_results_csv(
+    all_fields: list[Field], results_by_key: dict[str, FieldResult], output_path: Path
+) -> None:
+    """CSV complet au format `tests/data/gold_devis_fields.csv` : les champs
+    optimisés (présents dans `results_by_key`) portent leur meilleur
+    `title`/`definition`/`label` trouvé, les autres sont recopiés
+    inchangés — le fichier reste copiable-collable tel quel par-dessus le
+    CSV existant, même en n'ayant optimisé qu'un sous-ensemble de champs
+    via `--field`."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=_CSV_FIELDNAMES)
+        writer.writeheader()
+        for field in all_fields:
+            result = results_by_key.get(field.key)
+            if result is None:
+                writer.writerow(
+                    _field_csv_row(field, label=field.key, title=field.title, definition=field.definition)
+                )
+            else:
+                writer.writerow(
+                    _field_csv_row(
+                        field,
+                        label=result.best_label,
+                        title=result.best_title,
+                        definition=result.best_definition,
+                    )
+                )
+
+
+def run(
+    field_keys: list[str],
+    *,
+    all_fields: list[Field],
+    gold_documents: list[dict[str, Any]],
+    n_candidates: int,
+    n_rounds: int,
+    output_path: Path,
+    optimize_fn: Callable[..., FieldResult] = optimize_field,
+    **optimize_kwargs: Any,
+) -> dict[str, FieldResult]:
+    """Optimise chaque champ de `field_keys`, affiche `baseline_f1 ->
+    best_f1` sur stdout, puis écrit le CSV complet (Tâche 8). `optimize_fn`
+    injectable pour les tests (aucun appel LLM réel dans la suite `pytest`
+    par défaut) ; en usage réel, laissé à `optimize_field`."""
+    results_by_key: dict[str, FieldResult] = {}
+    for field_key in field_keys:
+        result = optimize_fn(
+            field_key,
+            all_fields=all_fields,
+            gold_documents=gold_documents,
+            n_candidates=n_candidates,
+            n_rounds=n_rounds,
+            **optimize_kwargs,
+        )
+        results_by_key[field_key] = result
+        print(f"{field_key} : {result.baseline_f1:.3f} -> {result.best_f1:.3f}")
+
+    write_results_csv(all_fields, results_by_key, output_path)
+    print(f"Résultats écrits dans {output_path}")
+    return results_by_key
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--field",
+        action="append",
+        dest="fields",
+        help="Clé de champ à optimiser (répétable) — défaut : tous les champs de gold_devis_fields.csv",
+    )
+    parser.add_argument("--n-candidates", type=int, default=5)
+    parser.add_argument("--n-rounds", type=int, default=2)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
+    args = parser.parse_args()
+
+    load_env()
+    all_fields = load_gold_fields()
+    gold_documents = _load_gold_documents(GOLD_YAML_PATH)
+    field_keys = args.fields or [field.key for field in all_fields]
+
+    run(
+        field_keys,
+        all_fields=all_fields,
+        gold_documents=gold_documents,
+        n_candidates=args.n_candidates,
+        n_rounds=args.n_rounds,
+        output_path=args.output,
+        ner_extractor=LangExtractNerExtractor(),
+        markdown_loader=build_markdown_loader(
+            data_test_dir=DATA_TEST_DIR, pdf_extractor=PyMuPDF4LlmTextExtractor()
+        ),
+        lm=build_dspy_lm(os.getenv("LLM_MODEL")),
+    )
+
+
+if __name__ == "__main__":
+    main()

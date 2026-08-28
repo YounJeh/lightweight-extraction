@@ -329,37 +329,41 @@ FieldResult` (`FieldResult` = `field_key`, `baseline_title/definition`,
 
 ## Task 8 : CLI `main()` — parcours des champs + export CSV
 
-**Description :** `argparse` : `--field` (répétable, filtre optionnel —
-défaut : tous les champs de `gold_devis_fields.csv`), `--n-candidates`
-(défaut raisonnable, ex. 5), `--n-rounds` (défaut, ex. 2), `--output`
-(défaut `tasks/dspy-prompt-tuning-results.csv`). Charge les champs
+**Description (implémentée) :** Séparé en trois : `write_results_csv`
+(sérialisation pure), `run` (orchestration testable, `optimize_fn`
+injectable) et `main` (argparse + wiring des vraies dépendances — jamais
+appelé par les tests). `argparse` : `--field` (répétable, filtre optionnel
+— défaut : tous les champs de `gold_devis_fields.csv`), `--n-candidates`
+(défaut 5), `--n-rounds` (défaut 2), `--output` (défaut
+`tasks/dspy-prompt-tuning-results.csv`). Charge les champs
 (`load_gold_fields`, réutilisé depuis `scripts/gold_dataset_eval.py`) et
 les documents gold (`_load_gold_documents`, réutilisé depuis
-`scripts/gold_dataset_sync.py`), appelle `optimize_field` pour chaque champ
-demandé, puis écrit un CSV **au format exact de `gold_devis_fields.csv`**
-(colonnes `section,label,Nom,Définition,Type,exemple valeur,Exemple
-texte,source`) avec les `best_*` de chaque champ (colonnes non concernées —
-`Type`, `exemple valeur`, `Exemple texte`, `source`, `section` — recopiées
-telles quelles depuis le CSV d'origine). Affiche sur stdout, par champ,
-`baseline_f1 -> best_f1`. Docstring de module avec instructions d'usage
-(`uv run --no-sync python scripts/dspy_prompt_tuning.py`), même convention
-que `scripts/validate_ocr_tuning.py`.
+`scripts/gold_dataset_sync.py`), `run` appelle `optimize_fn` pour chaque
+champ demandé puis `write_results_csv`. **Décision tranchée** : le CSV de
+sortie contient **toujours tous les champs** de `gold_devis_fields.csv` —
+les champs optimisés portent leurs `best_*`, les autres sont recopiés
+inchangés (`Type`/`exemple valeur`/`Exemple texte`/`source`/`section`
+toujours recopiés depuis l'original, jamais générés) — pour que le fichier
+reste un remplacement complet copiable-collable même après un `--field`
+partiel. Affiche sur stdout, par champ, `baseline_f1 -> best_f1`. Docstring
+de module avec instructions d'usage, même convention que
+`scripts/validate_ocr_tuning.py`.
 
 **Acceptance criteria :**
-- [ ] Avec `optimize_field` factice (pas de vrai run), le CSV de sortie
-      généré dans `tmp_path` est reparsable tel quel par
+- [x] Avec `optimize_fn` factice (pas de vrai run), le CSV de sortie généré
+      dans `tmp_path` est reparsable tel quel par
       `app.fields_import.import_fields` sans erreur
-- [ ] `--field numero_devis` ne traite que ce champ (le CSV de sortie ne
-      contient que ce champ, ou les autres champs y apparaissent inchangés
-      selon le choix retenu à l'implémentation — à trancher et documenter
-      dans le docstring de `main()`)
-- [ ] Le résumé stdout mentionne `baseline_f1` et `best_f1` pour chaque
+- [x] `run(["numero_devis"], ...)` ne traite que ce champ (`optimize_fn`
+      appelé une seule fois) ; le CSV de sortie contient bien tous les
+      champs, celui non demandé inchangé
+- [x] Le résumé stdout mentionne `baseline_f1` et `best_f1` pour chaque
       champ traité
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k main` —
-      `optimize_field` mocké/injecté, aucun appel LLM réel, CSV de sortie
-      toujours dans `tmp_path`
+- [x] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -q` —
+      `optimize_fn` injecté, aucun appel LLM réel, CSV de sortie toujours
+      dans `tmp_path` ; `uv run --no-sync python scripts/dspy_prompt_tuning.py --help`
+      vérifié manuellement (pas d'erreur d'import/wiring argparse)
 
 **Dependencies :** Task 7
 
@@ -372,7 +376,7 @@ que `scripts/validate_ocr_tuning.py`.
 ---
 
 ## Checkpoint : Phase 4
-- [ ] `uv run pytest -m "not live"` passe intégralement (tout le chantier
+- [x] `uv run pytest -m "not live"` passe intégralement (tout le chantier
       reste couvert par des doubles à ce stade)
 
 ---
