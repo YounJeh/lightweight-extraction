@@ -2,6 +2,7 @@ import re
 
 import pymupdf
 import pymupdf4llm
+from pymupdf4llm.helpers import utils as pymupdf4llm_utils
 from pymupdf4llm.helpers.document_layout import select_ocr_function
 
 from app.tools.tracer import Tracer, build_tracer
@@ -34,6 +35,14 @@ _OCR_LANGUAGE = "fra"
 # recognized *better* at 72 than at 150 — so this isn't purely a
 # speed/quality trade-off in one direction.
 _OCR_DPI = 72
+
+# Pages with an image covering less of the page than this are skipped for
+# OCR entirely (treated as a header/footer logo, not worth the pass) —
+# validated on the 13-document gold corpus (scripts/validate_ocr_tuning.py,
+# config "threshold_0.05"): ~60% faster on average, 0 regression on any
+# gold value. Chosen over 0.10 (only ~7% faster still) to stay away from
+# the edge of what's validated.
+_AREA_SKIP_THRESHOLD = 0.05
 
 
 class PyMuPDF4LlmTextExtractor:
@@ -84,7 +93,13 @@ class PyMuPDF4LlmTextExtractor:
                 # value passed above (at span-open time) is stale — send the
                 # real value now that OCR has actually run, while keeping
                 # the span's duration tied to the real work above.
-                trace.set_metadata({"pages_ocr": pages_ocr, "ocr_dpi": _OCR_DPI})
+                trace.set_metadata(
+                    {
+                        "pages_ocr": pages_ocr,
+                        "ocr_dpi": _OCR_DPI,
+                        "area_skip_threshold": _AREA_SKIP_THRESHOLD,
+                    }
+                )
                 trace.set_output(text)
                 self.last_pages_ocr = pages_ocr
                 return text
@@ -98,12 +113,21 @@ class PyMuPDF4LlmTextExtractor:
         per-page when `make_ocr_decision` (internal to PyMuPDF4LLM) decides
         that page needs it, so this is a real signal, not a guess. Returns
         None if no OCR engine is available, matching the "no OCR" behavior
-        `ocr_function=None` would have had."""
+        `ocr_function=None` would have had.
+
+        Also applies `_AREA_SKIP_THRESHOLD`: below it, the page is treated
+        as not worth OCR-ing at all (a header/footer logo, not a scan) and
+        `base_ocr_function` is never called — same `img_area` PyMuPDF4LLM's
+        own `needs_ocr` decision already computes, reused rather than
+        recomputed differently."""
         base_ocr_function = select_ocr_function()
         if not callable(base_ocr_function):
             return None
 
         def wrapped(page, **kwargs):
+            area = pymupdf4llm_utils.analyze_page(page).get("img_area", 0)
+            if area < _AREA_SKIP_THRESHOLD:
+                return None
             pages_ocr.append(page.number + 1)
             return base_ocr_function(page, **kwargs)
 
