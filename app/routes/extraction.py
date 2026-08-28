@@ -1,8 +1,10 @@
 import asyncio
+from pathlib import Path
 
-from fasthtml.common import P, RedirectResponse, UploadFile
+from fasthtml.common import P, RedirectResponse, Request, UploadFile
 
 from app.extraction_repository import ExtractionRunRepository
+from app.gold_export import GoldExportError, export_to_gold
 from app.repository import FieldRepository
 from app.tools import NerExtractor, PdfTextExtractor
 from app.tools.tracer import Tracer, build_tracer
@@ -11,8 +13,13 @@ from app.ui.components import (
     extraction_form,
     extraction_result,
     extraction_runs_list,
+    success_banner,
 )
 from app.ui.layout import page
+
+DEFAULT_GOLD_YAML_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "tests" / "data" / "dataset_gold_devis.yaml"
+)
 
 
 def register_extraction_routes(
@@ -22,6 +29,7 @@ def register_extraction_routes(
     pdf_extractor: PdfTextExtractor,
     ner_extractor: NerExtractor,
     tracer: Tracer | None = None,
+    gold_yaml_path: Path = DEFAULT_GOLD_YAML_PATH,
 ):
     tracer = tracer or build_tracer()
 
@@ -77,4 +85,44 @@ def register_extraction_routes(
         run = run_repo.get_run(id)
         if run is None:
             return page("Extraction", P("Run introuvable."))
-        return page("Résultat d'extraction", extraction_result(run))
+        title_to_key = {f.title: f.key for f in field_repo.list_all()}
+        return page("Résultat d'extraction", extraction_result(run, title_to_key))
+
+    @app.post("/extraction/runs/{id}/export-gold")
+    async def post_export_gold(id: int, req: Request):
+        run = run_repo.get_run(id)
+        if run is None:
+            return page("Extraction", P("Run introuvable."))
+
+        title_to_key = {f.title: f.key for f in field_repo.list_all()}
+        key_to_title = {key: title for title, key in title_to_key.items()}
+        results_by_title = {r.field_title: r for r in run.results}
+
+        form = await req.form()
+        checked_keys = form.getlist("export_fields")
+
+        annotations = {}
+        for key in checked_keys:
+            result = results_by_title.get(key_to_title.get(key))
+            fallback = (result.typed_value or result.value) if result else ""
+            raw_value = form.get(f"value__{key}")
+            value = (raw_value if raw_value is not None else fallback).strip() or None
+            annotations[key] = {"value": value, "evidence": {"text": None, "page": None}}
+
+        try:
+            export_result = export_to_gold(
+                gold_yaml_path, source_file=run.document_name, annotations=annotations
+            )
+        except GoldExportError as e:
+            return page(
+                "Résultat d'extraction", error_banner(str(e)), extraction_result(run, title_to_key)
+            )
+
+        status = "créée" if export_result.created else "mise à jour"
+        message = (
+            f"Entrée gold {status} (document_id={export_result.document_id}) : "
+            f"{', '.join(export_result.field_keys)}."
+        )
+        return page(
+            "Résultat d'extraction", success_banner(message), extraction_result(run, title_to_key)
+        )

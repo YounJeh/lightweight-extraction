@@ -17,16 +17,16 @@ la suite. Le mock extractor (`app/tools/mock_ner.py`) n'est pas concerné —
 il produit déjà toujours une valeur par champ.
 
 **Acceptance criteria :**
-- [ ] `extract()` avec 3 champs demandés dont 1 sans candidat dans le texte
+- [x] `extract()` avec 3 champs demandés dont 1 sans candidat dans le texte
       renvoie 3 `ExtractionResult` (pas 2) ; celui du champ non détecté a
       `value == ""` et `typed_value is None`
-- [ ] `extract()` avec tous les champs détectés a un comportement
+- [x] `extract()` avec tous les champs détectés a un comportement
       strictement inchangé (mêmes résultats qu'avant la Tâche)
-- [ ] Deux champs demandés, aucun détecté → 2 `ExtractionResult` à
+- [x] Deux champs demandés, aucun détecté → 2 `ExtractionResult` à
       `value == ""`, pas d'exception
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_ner_langextract_typed_hint.py tests/test_ner_langextract_dedupe.py`
+- [x] Tests : `uv run pytest -m "not live" tests/test_ner_langextract_typed_hint.py tests/test_ner_langextract_dedupe.py`
 
 **Dependencies :** None
 
@@ -40,7 +40,7 @@ il produit déjà toujours une valeur par champ.
 ---
 
 ## Checkpoint : Phase 1
-- [ ] `uv run pytest -m "not live"` passe
+- [x] `uv run pytest -m "not live"` passe
 
 ---
 
@@ -69,23 +69,23 @@ None}}}`, valeur `None` acceptée) :
    field_keys: list[str])` (`created` = nouveau document ou mise à jour).
 
 **Acceptance criteria :**
-- [ ] Sur un YAML de test (copié dans `tmp_path`, jamais le fichier réel) à
+- [x] Sur un YAML de test (copié dans `tmp_path`, jamais le fichier réel) à
       2 documents : exporter un `source_file` inédit ajoute un 3e document
       avec `document_id = 3` (si le max existant est 2), `human_validation:
       true`, et exactement les `annotations` fournies
-- [ ] Exporter un `source_file` déjà présent avec un sous-ensemble de champs
+- [x] Exporter un `source_file` déjà présent avec un sous-ensemble de champs
       fusionne : les champs déjà annotés et non renvoyés cette fois restent
       inchangés, ceux renvoyés sont ajoutés/écrasés, `document_id` ne change
       pas
-- [ ] `annotations={}` lève `GoldExportError`, le fichier n'est pas modifié
-- [ ] Une valeur `None` dans `annotations` est bien écrite comme `value:
+- [x] `annotations={}` lève `GoldExportError`, le fichier n'est pas modifié
+- [x] Une valeur `None` dans `annotations` est bien écrite comme `value:
       null` dans le YAML relu (pas la chaîne `"None"`)
-- [ ] Recharger le fichier après export avec `yaml.safe_load` renvoie une
+- [x] Recharger le fichier après export avec `yaml.safe_load` renvoie une
       structure valide, cohérente avec `scripts/gold_dataset_sync.py:
       _load_gold_documents` (même clé racine `dataset`)
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_gold_export.py` — tous les tests
+- [x] Tests : `uv run pytest tests/test_gold_export.py` — tous les tests
       opèrent sur une copie du YAML dans `tmp_path` (fixture `pytest`,
       jamais `tests/data/dataset_gold_devis.yaml` directement)
 
@@ -100,7 +100,7 @@ None}}}`, valeur `None` acceptée) :
 ---
 
 ## Checkpoint : Phase 2
-- [ ] `uv run pytest -m "not live"` passe
+- [x] `uv run pytest -m "not live"` passe
 
 ---
 
@@ -124,16 +124,16 @@ afficher un placeholder lisible (ex. `placeholder="—"`) plutôt qu'un champ
 vide ambigu.
 
 **Acceptance criteria :**
-- [ ] La page de résultat d'un run avec un champ non détecté affiche bien
+- [x] La page de résultat d'un run avec un champ non détecté affiche bien
       une ligne pour ce champ (valeur vide, case décochée par défaut)
-- [ ] Cocher/décocher la case globale coche/décoche toutes les lignes
-- [ ] Modifier la valeur d'une ligne dans le navigateur avant de soumettre
+- [x] Cocher/décocher la case globale coche/décoche toutes les lignes
+- [x] Modifier la valeur d'une ligne dans le navigateur avant de soumettre
       le formulaire envoie la valeur modifiée (pas l'originale) au POST
-- [ ] Aucune case cochée par défaut à l'ouverture de la page (l'utilisateur
+- [x] Aucune case cochée par défaut à l'ouverture de la page (l'utilisateur
       choisit explicitement quoi exporter)
 
 **Verification :**
-- [ ] Manuel : ouvrir `/extraction/runs/{id}` dans le navigateur (run
+- [x] Manuel : ouvrir `/extraction/runs/{id}` dans le navigateur (run
       existant), vérifier l'affichage des cases, du toggle global, et de
       l'édition de valeur (couverture automatisée apportée par la Tâche 4
       au niveau route)
@@ -166,20 +166,20 @@ exportés, `document_id`, créé ou mis à jour) ou une bannière erreur
 pattern que `_extraction_page_with_error`).
 
 **Acceptance criteria :**
-- [ ] Cocher 2 champs sur 4, en corriger un, exporter : le YAML de test
+- [x] Cocher 2 champs sur 4, en corriger un, exporter : le YAML de test
       (chemin injecté, jamais le fichier réel — voir Boundaries du plan)
       reçoit une entrée avec exactement ces 2 champs, l'un avec la valeur
       corrigée
-- [ ] Exporter deux fois le même `document_name` (même run rejoué ou runs
+- [x] Exporter deux fois le même `document_name` (même run rejoué ou runs
       différents sur le même fichier source) fusionne dans la même entrée
       gold, ne duplique pas de `document_id`
-- [ ] Soumettre le formulaire sans rien cocher affiche la bannière d'erreur,
+- [x] Soumettre le formulaire sans rien cocher affiche la bannière d'erreur,
       le YAML n'est pas modifié
-- [ ] Un run introuvable (`id` invalide) ne casse pas la route (comportement
+- [x] Un run introuvable (`id` invalide) ne casse pas la route (comportement
       cohérent avec `get_run` existant)
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_extraction_routes.py` — le chemin
+- [x] Tests : `uv run pytest tests/test_extraction_routes.py` — le chemin
       YAML est un `tmp_path`/fixture dédiée injectée dans le test, jamais
       `tests/data/dataset_gold_devis.yaml`
 
@@ -194,7 +194,7 @@ pattern que `_extraction_page_with_error`).
 ---
 
 ## Checkpoint final
-- [ ] `uv run pytest -m "not live"` passe intégralement
+- [x] `uv run pytest -m "not live"` passe intégralement
 - [ ] Revue avec l'utilisateur
 - [ ] Vérification manuelle réelle (vrai PDF, vrai
       `tests/data/dataset_gold_devis.yaml`) **laissée à l'utilisateur** —
