@@ -20,6 +20,16 @@ dependencies = [
 
 [tool.uv]
 package = false
+# rapidocr dépend en dur de opencv-python (variante GUI, a besoin de
+# libGL/libxcb absents d'un environnement serveur) ; on veut
+# opencv-python-headless (déclarée ci-dessus). Faire coexister les deux et
+# parier sur l'ordre d'installation pour que headless gagne s'est avéré peu
+# fiable (cassé sur le buildpack Cloud Run, et sur `uv run` en local à
+# chaque resynchronisation — voir choix_techniques.md, section OCR).
+# override-dependencies avec un marqueur toujours faux fait que
+# opencv-python n'est jamais résolu du tout, quel que soit ce que rapidocr
+# demande — plus de pari sur un ordre d'installation.
+override-dependencies = ["opencv-python; python_version<'0'"]
 
 [dependency-groups]
 dev = [
