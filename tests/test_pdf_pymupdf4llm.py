@@ -58,6 +58,41 @@ def _build_page_with_small_logo(native_text: str) -> bytes:
     return pdf_bytes
 
 
+def _build_page_with_small_logo_and_vectorized_shapes(native_text: str) -> bytes:
+    """Page avec du texte natif + un petit logo (comme
+    `_build_page_with_small_logo`, img_area sous _AREA_SKIP_THRESHOLD) +
+    un grand nombre de petites formes vectorielles non rectangulaires
+    (cercles remplis, via page.new_shape()) pour simuler le profil d'une
+    page à texte vectorisé (glyphes convertis en contours à l'export CAO) :
+    vec_norects élevé (vérifié empiriquement, ~160 à cette taille) malgré
+    une aire d'image minime. Reproduit la situation réelle des pages 2-4 de
+    "Devis n°63505 - ENTECH..." (voir tasks/plan-vector-text-ocr-fallback.md)
+    où de telles pages étaient ignorées par _AREA_SKIP_THRESHOLD alors que
+    PyMuPDF4LLM avait correctement détecté needs_ocr=True dessus."""
+    logo_source = pymupdf.open()
+    logo_page = logo_source.new_page(width=150, height=60)
+    logo_page.insert_text((5, 30), "ACME CORP", fontsize=14)
+    logo_pixmap = logo_page.get_pixmap(dpi=150)
+    logo_source.close()
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 200), native_text)
+    page.insert_image(pymupdf.Rect(20, 20, 110, 56), pixmap=logo_pixmap)
+
+    shape = page.new_shape()
+    for i in range(80):
+        x0 = 100 + (i % 10) * 40
+        y0 = 300 + (i // 10) * 15
+        shape.draw_circle((x0, y0), 5)
+        shape.finish(fill=(0, 0, 0), color=(0, 0, 0))
+    shape.commit()
+
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    return pdf_bytes
+
+
 def test_extract_text_returns_real_content_for_each_page():
     pdf_bytes = _build_pdf("Titre: Contrat de bail", "Date de signature: 12 janvier 2024")
 
@@ -111,6 +146,17 @@ def test_extract_text_skips_ocr_on_small_logo_pages():
 
     assert extractor.last_pages_ocr == []
     assert "Beaucoup de texte natif" in text
+
+
+def test_extract_text_ocrs_pages_with_vectorized_text_despite_small_logo():
+    pdf_bytes = _build_page_with_small_logo_and_vectorized_shapes(
+        "Beaucoup de texte natif sur cette page pour imiter un vrai devis."
+    )
+    extractor = PyMuPDF4LlmTextExtractor()
+
+    extractor.extract_text(pdf_bytes)
+
+    assert extractor.last_pages_ocr == [1]
 
 
 def test_extract_text_resets_last_pages_ocr_between_calls():

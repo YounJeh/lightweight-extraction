@@ -218,5 +218,17 @@ l'autre pris seul, mais `img_area` réutilise directement le signal déjà
 calculé par PyMuPDF4LLM) · relancer le pipeline NER complet dans la
 validation (coût réel, variance du LLM comme facteur confondant).
 
+**Correctif (texte vectorisé) :** un document réel avec du texte converti en
+contours vectoriels à l'export CAO (glyphes = formes non rectangulaires, pas
+de couche texte) a `img_area` quasi nul mais un `vec_norects` élevé — le
+seuil `img_area < 0.05` seul l'écrasait à tort alors que PyMuPDF4LLM avait
+déjà correctement détecté `needs_ocr=True` dessus (`vec_norects` élevé).
+Condition de saut désormais `img_area < 0.05 ET vec_norects == 0` — ne
+change rien au cas logo (vec_norects reste nul), débloque le cas texte
+vectorisé. Non revalidé sur le corpus gold à ce stade (changement
+strictement plus permissif : ne peut que déclencher l'OCR dans plus de cas,
+jamais en retirer).
+
 **Réf :** [docs/ideas/validation-optimisation-ocr.md](docs/ideas/validation-optimisation-ocr.md) ·
-[scripts/validate_ocr_tuning.py](scripts/validate_ocr_tuning.py)
+[scripts/validate_ocr_tuning.py](scripts/validate_ocr_tuning.py) ·
+[tasks/plan-vector-text-ocr-fallback.md](tasks/plan-vector-text-ocr-fallback.md)
