@@ -585,3 +585,171 @@ dataset:
         evidence:
           text: null
           page: 1
+
+
+  - document_id: 15
+    source_file: Devis KM LOCATION détaillé 11-001569, ENTECH SE.pdf
+    human_validation: true
+
+    annotations:
+      numero_devis:
+        value: 11-001569
+        evidence:
+          text: null
+          page: 1
+
+      nom_societe:
+        value: Kiloutou Module
+        evidence:
+          text: null
+          page: 1
+
+      pourcentage_acompte:
+        value: null
+        evidence:
+          text: null
+          page: null
+
+      pourcentage_solde:
+        value: null
+        evidence:
+          text: null
+          page: null
+
+      delai_paiement_solde_jours:
+        value: null
+        evidence:
+          text: null
+          page: null
+
+      duree_validite_offre:
+        value: "29/03/2026"
+        evidence:
+          text: null
+          page: 1
+
+
+  - document_id: 16
+    source_file: Devis n°63505 - ENTECH - PDL - Poste D_24_1224_IMPL_1000 - Département 01_DDN.pdf
+    human_validation: true
+
+    annotations:
+      numero_devis:
+        value: "63505"
+        evidence:
+          text: null
+          page: 1
+
+      nom_societe:
+        value: "SOTRELEC"
+        evidence:
+          text: null
+          page: 1
+
+      pourcentage_acompte:
+        value: 30
+        evidence:
+          text: null
+          page: 3
+
+      pourcentage_solde:
+        value: 30
+        evidence:
+          text: null
+          page: 3
+
+      delai_paiement_solde_jours:
+        value: "45 jours"
+        evidence:
+          text: null
+          page: 4
+
+      duree_validite_offre:
+        value: "1 mois"
+        evidence:
+          text: null
+          page: 3
+
+
+  - document_id: 17
+    source_file: Q42-2508667-02-Offre Commerciale et Technique dossier A_24_1224_ENTECH.pdf
+    human_validation: true
+
+    annotations:
+      numero_devis: 
+        value: "Q42-2508667-02"
+        evidence:
+          text: null
+          page: 2
+
+      nom_societe:
+        value: "ORMAZABAL"
+        evidence:
+          text: null
+          page: 1
+
+      pourcentage_acompte:
+        value: 20
+        evidence:
+          text: null
+          page: 20
+
+      pourcentage_solde:
+        value: 80
+        evidence:
+          text: null
+          page: 20
+
+      delai_paiement_solde_jours:
+        value: "45 jours"
+        evidence:
+          text: null
+          page: 20
+
+      duree_validite_offre:
+        value: "1 mois"
+        evidence:
+          text: null
+          page: 18
+
+
+  - document_id: 18
+    source_file: 02_E2648_260527_01_VILLENEUVE - SUNROCK.pdf
+    human_validation: true
+
+    annotations:
+      numero_devis:
+        value: "E2648_260527_01"
+        evidence:
+          text: null
+          page: 1
+
+      nom_societe:
+        value: "Top Cable"
+        evidence:
+          text: null
+          page: 1
+
+      pourcentage_acompte:
+        value: null
+        evidence:
+          text: null
+          page: null
+
+      pourcentage_solde:
+        value: null
+        evidence:
+          text: null
+          page: null
+
+      delai_paiement_solde_jours:
+        value: "6 SEMAINES OUVREES"
+        evidence:
+          text: null
+          page: 1
+
+      duree_validite_offre:
+        value: "48 HEURES"
+        evidence:
+          text: null
+          page: 1
