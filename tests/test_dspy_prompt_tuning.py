@@ -2,6 +2,7 @@ import pytest
 
 from app.models import ExtractionResult, Field
 from scripts.dspy_prompt_tuning import (
+    build_dspy_lm,
     build_markdown_loader,
     score_field_candidate,
 )
@@ -152,6 +153,32 @@ def test_score_field_candidate_skips_documents_without_the_field_annotated():
 
 
 # --- build_markdown_loader ----------------------------------------------------
+
+
+# --- build_dspy_lm ------------------------------------------------------------
+
+
+def test_build_dspy_lm_routes_openai_models(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    lm = build_dspy_lm("gpt-5-mini")
+
+    assert lm.model == "openai/gpt-5-mini"
+    assert lm.kwargs.get("api_key") == "sk-test"
+
+
+def test_build_dspy_lm_routes_gemini_by_default(monkeypatch):
+    monkeypatch.setenv("GOOGLE_GENERATIVE_AI_API_KEY", "gemini-test-key")
+
+    lm = build_dspy_lm("gemini-2.5-flash")
+
+    assert lm.model == "gemini/gemini-2.5-flash"
+    assert lm.kwargs.get("api_key") == "gemini-test-key"
+
+
+def test_build_dspy_lm_requires_a_model_id():
+    with pytest.raises(ValueError):
+        build_dspy_lm(None)
 
 
 def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):

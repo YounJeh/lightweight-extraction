@@ -15,9 +15,33 @@ from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import dspy  # noqa: E402
+
 from app.models import Field  # noqa: E402
+from app.tools.ner_langextract import _api_key_for, _is_openai_model  # noqa: E402
 from scripts import dspy_markdown_cache  # noqa: E402
 from scripts.gold_matching import classify_field, precision_recall_f1  # noqa: E402
+
+
+def build_dspy_lm(model_id: str | None) -> dspy.LM:
+    """`dspy.LM` routé vers le même provider/clé que `LangExtractNerExtractor`
+    (voir `app/tools/ner_langextract.py:_is_openai_model`/`_api_key_for`) —
+    pas de deuxième logique de routing à maintenir. `model` suit la
+    convention LiteLLM `"provider/model"` attendue par `dspy.LM`.
+
+    Contrairement à LangExtract (qui tolère `model_id=None` et retombe sur
+    son propre défaut interne), DSPy a besoin d'une chaîne de modèle
+    explicite : `LLM_MODEL` doit être renseigné dans l'environnement pour
+    utiliser DSPy, cohérent avec le choix déjà fait ailleurs dans ce projet
+    de ne jamais coder un modèle Gemini par défaut en dur
+    (voir `specs/pdf-ner-real.md`)."""
+    if not model_id:
+        raise ValueError(
+            "LLM_MODEL doit être défini dans l'environnement pour utiliser DSPy "
+            "(pas de modèle par défaut codé en dur, voir specs/pdf-ner-real.md)."
+        )
+    provider = "openai" if _is_openai_model(model_id) else "gemini"
+    return dspy.LM(f"{provider}/{model_id}", api_key=_api_key_for(model_id))
 
 
 def build_markdown_loader(

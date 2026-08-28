@@ -193,27 +193,33 @@ dataclass `f1: float`, `precision: float | None`, `recall: float | None`,
 
 ## Task 5 : dépendance `dspy` + configuration du `dspy.LM`
 
-**Description :** `uv add dspy`. Avant d'écrire du code contre l'API DSPy,
-vérifier (Documentation First, même principe que
-`scripts/gold_dataset_sync.py`) la forme exacte de `dspy.LM(...)` et d'un
-LM factice utilisable en test sans réseau, contre la version installée
-(`uv pip show dspy`, doc/README du package dans `.venv`). Fonction
-`build_dspy_lm(model_id: str | None) -> dspy.LM` dans
-`scripts/dspy_prompt_tuning.py`, qui réutilise le routing existant —
-import direct de `app.tools.ner_langextract._is_openai_model` et
-`_api_key_for` (déjà utilisées pour LangExtract) plutôt que dupliquer la
-logique provider/clé.
+**Description (implémentée) :** `uv add dspy` (installé : `dspy==3.3.1`,
+downgrade transitif de `openai` 3.0.0 -> 2.54.0 — suite complète revérifiée
+verte après coup). API DSPy réelle vérifiée avant codage (Documentation
+First) : `dspy.LM(model: str, ..., **kwargs)` où `model` suit la
+convention LiteLLM `"provider/model"` (ex. `"gemini/gemini-2.5-flash"`,
+`"openai/gpt-5-mini"`) et `api_key` passe par `**kwargs` ; `dspy.Predict(...)`
+accepte un `lm=` par appel (pas besoin de `dspy.settings.configure` global) ;
+`dspy.utils.DummyLM(answers=[...])` sert de LM factice en test (utilisé
+Tâche 6). Fonction `build_dspy_lm(model_id: str | None) -> dspy.LM` dans
+`scripts/dspy_prompt_tuning.py`, qui réutilise le routing existant — import
+direct de `app.tools.ner_langextract._is_openai_model` et `_api_key_for`.
+**Contrairement à LangExtract, `model_id=None` lève une `ValueError`**
+plutôt que de retomber sur un défaut : DSPy exige une chaîne de modèle
+explicite et ce projet a déjà choisi de ne jamais coder un modèle Gemini
+par défaut en dur (voir `specs/pdf-ner-real.md`).
 
 **Acceptance criteria :**
-- [ ] `build_dspy_lm("gpt-5-mini")` construit un `dspy.LM` routé OpenAI
+- [x] `build_dspy_lm("gpt-5-mini")` construit un `dspy.LM` routé OpenAI
       (assertion sur les paramètres passés, pas d'appel réseau réel)
-- [ ] `build_dspy_lm("gemini-...")` (ou `None`) construit un `dspy.LM` routé
-      Gemini (défaut), cohérent avec `_provider_for`
+- [x] `build_dspy_lm("gemini-...")` construit un `dspy.LM` routé Gemini
+      (défaut), cohérent avec `_provider_for`
+- [x] `build_dspy_lm(None)` lève `ValueError`
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k build_dspy_lm`
+- [x] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k build_dspy_lm`
       — aucun test de ce chantier n'instancie de vrai appel LM ; un test qui
-      le ferait serait marqué `@pytest.mark.live`, jamais exécuté par moi
+      le ferait serait marqué `@pytest.mark.live`
 
 **Dependencies :** None
 
