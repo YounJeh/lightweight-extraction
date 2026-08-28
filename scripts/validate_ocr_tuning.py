@@ -105,6 +105,21 @@ B_CONFIGS = [
     {"name": "threshold_0.10", "ocr_dpi": 150, "area_skip_threshold": 0.10},
 ]
 
+
+def combined_configs(threshold: float) -> list[dict]:
+    """Paliers dpi (mêmes valeurs que A_CONFIGS) combinés à un seuil B
+    fixé -- à appeler une fois le seuil B choisi sur la base du rapport de
+    la matrice B seule (report(), config B sans nouvelle régression et le
+    meilleur temps)."""
+    return [
+        {
+            "name": f"combined_dpi{dpi}_t{threshold}",
+            "ocr_dpi": dpi,
+            "area_skip_threshold": threshold,
+        }
+        for dpi in (150, 120, 100, 90, 72)
+    ]
+
 CACHE_DIR = Path(__file__).resolve().parent / "_ocr_tuning_cache"
 RESULTS_PATH = CACHE_DIR / "results.jsonl"
 
