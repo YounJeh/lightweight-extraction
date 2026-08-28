@@ -115,6 +115,7 @@ class LangExtractNerExtractor:
                 examples=[example] if example else None,
                 api_key=api_key,
                 show_progress=False,
+                max_char_buffer=5000,
                 **kwargs,
             )
             generation.set_output(
