@@ -26,7 +26,11 @@ def _ungrounded(field_title: str, text_value: str = "") -> "data.Extraction":
     )
 
 
-def test_extract_drops_fields_with_zero_grounded_candidates(monkeypatch):
+def _result_for(results, field_title: str):
+    return next(r for r in results if r.field_title == field_title)
+
+
+def test_extract_emits_empty_placeholder_for_fields_with_zero_grounded_candidates(monkeypatch):
     text = "Aucune information pertinente ici."
     annotated = data.AnnotatedDocument(
         extractions=[
@@ -44,7 +48,11 @@ def test_extract_drops_fields_with_zero_grounded_candidates(monkeypatch):
 
     results = LangExtractNerExtractor().extract(text, _fields())
 
-    assert results == []
+    # Les deux champs demandés n'ont aucun candidat groundé -> une ligne
+    # placeholder chacun (value vide), pas d'absence silencieuse (voir
+    # tasks/plan-gold-export-from-extraction.md).
+    assert {r.field_title for r in results} == {"Condition de règlement", "Avance forfaitaire"}
+    assert all(r.value == "" and r.typed_value is None for r in results)
     assert len(calls) == 1  # pas d'arbitrage déclenché
 
 
@@ -61,9 +69,10 @@ def test_extract_accepts_single_grounded_candidate_without_arbitration(monkeypat
 
     results = LangExtractNerExtractor().extract(text, _fields())
 
-    assert len(results) == 1
-    assert results[0].field_title == "Avance forfaitaire"
-    assert results[0].value == "30 jours"
+    # "Condition de règlement" n'a aucun candidat -> placeholder à côté du
+    # résultat trouvé (voir test dédié plus haut).
+    assert len(results) == 2
+    assert _result_for(results, "Avance forfaitaire").value == "30 jours"
     assert len(calls) == 1  # pas d'arbitrage déclenché
 
 
@@ -81,8 +90,8 @@ def test_extract_merges_same_normalized_value_without_arbitration(monkeypatch):
 
     results = LangExtractNerExtractor().extract(text, _fields())
 
-    assert len(results) == 1
-    assert results[0].value == "30 JOURS"  # première occurrence
+    assert len(results) == 2
+    assert _result_for(results, "Avance forfaitaire").value == "30 JOURS"  # première occurrence
     assert len(calls) == 1  # même valeur normalisée -> pas d'arbitrage
 
 
@@ -124,8 +133,11 @@ def test_extract_arbitrates_genuine_conflict_via_second_llm_call(monkeypatch):
 
     results = LangExtractNerExtractor().extract(text, _fields())
 
-    assert len(results) == 1
-    assert results[0].value == "15% à l'avancement sur situations mensuelles."
+    assert len(results) == 2
+    assert (
+        _result_for(results, "Condition de règlement").value
+        == "15% à l'avancement sur situations mensuelles."
+    )
     assert len(calls) == 2  # extraction principale + arbitrage
     assert "Condition de règlement" in calls[1]["prompt_description"]
 
@@ -235,8 +247,8 @@ def test_extract_arbitration_prompt_includes_context_snippet_per_candidate(monke
 
     results = LangExtractNerExtractor().extract(text, _fields())
 
-    assert len(results) == 1
-    assert results[0].value == "15 jours"
+    assert len(results) == 2
+    assert _result_for(results, "Avance forfaitaire").value == "15 jours"
     arbitration_input = calls[1]["text_or_documents"]
     assert "Préavis de résiliation" in arbitration_input  # contexte du candidat écarté
     assert "Durée de validité du contrat" in arbitration_input  # contexte du candidat retenu
@@ -266,5 +278,5 @@ def test_extract_falls_back_to_first_occurrence_when_arbitration_is_unparseable(
 
     results = LangExtractNerExtractor().extract(text, _fields())
 
-    assert len(results) == 1
-    assert results[0].value == "Valeur A"  # repli sur la première occurrence
+    assert len(results) == 2
+    assert _result_for(results, "Avance forfaitaire").value == "Valeur A"  # repli sur la première occurrence
