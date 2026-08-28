@@ -179,6 +179,40 @@ def _load_results(results_path: Path = RESULTS_PATH) -> list[dict]:
     return [json.loads(line) for line in results_path.read_text().splitlines() if line.strip()]
 
 
+def rescore_cache(cache_dir: Path = CACHE_DIR, results_path: Path = RESULTS_PATH) -> None:
+    """Recalcule `gold_values_missing` pour chaque résultat déjà en cache,
+    contre le yaml gold *actuel* -- sans ré-extraire (le texte mis en cache
+    ne dépend pas des valeurs gold, seul le scoring en dépend). À relancer
+    après toute correction de `tests/data/dataset_gold_devis.yaml`, sinon
+    `report()` reste basé sur un scoring périmé."""
+    rows = _load_results(results_path)
+    gold_by_file: dict[str, list[tuple[str, str]]] = {}
+    for source_file, key, value in load_gold_values():
+        gold_by_file.setdefault(source_file, []).append((key, value))
+
+    updated = []
+    for row in rows:
+        text_path = cache_dir / f"{row['source_file']}__{row['config']}.md"
+        if not text_path.exists():
+            updated.append(row)
+            continue
+        text = text_path.read_text()
+        gold_for_file = gold_by_file.get(row["source_file"], [])
+        missing = [key for key, value in gold_for_file if not value_present(text, value)]
+        updated.append(
+            {
+                **row,
+                "gold_values_total": len(gold_for_file),
+                "gold_values_missing": missing,
+            }
+        )
+
+    with results_path.open("w") as out:
+        for row in updated:
+            out.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"{len(updated)} résultats re-scorés contre le yaml gold actuel.")
+
+
 def report(
     results_path: Path = RESULTS_PATH, baseline_config: str = "dpi150_baseline"
 ) -> None:
@@ -232,11 +266,15 @@ def _cli() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=["list", "matrix-a", "matrix-b", "report"],
+        choices=["list", "matrix-a", "matrix-b", "report", "rescore"],
         default="list",
         nargs="?",
     )
     args = parser.parse_args()
+
+    if args.command == "rescore":
+        rescore_cache()
+        return
 
     if args.command == "report":
         report()
