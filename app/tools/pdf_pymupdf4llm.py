@@ -27,6 +27,14 @@ PAGE_SEPARATOR_RE = re.compile(r"\n\n--- end of page\.page_number=(\d+) ---\n\n"
 # documents show up.
 _OCR_LANGUAGE = "fra"
 
+# Lower than PyMuPDF4LLM's default (150) — validated on the 13-document
+# gold corpus (scripts/validate_ocr_tuning.py, config "dpi72"): ~56% faster
+# on average, 0 regression on any gold value. OCR quality doesn't degrade
+# monotonically with dpi in practice on this corpus — some content was
+# recognized *better* at 72 than at 150 — so this isn't purely a
+# speed/quality trade-off in one direction.
+_OCR_DPI = 72
+
 
 class PyMuPDF4LlmTextExtractor:
     """PdfTextExtractor backed by PyMuPDF4LLM. Page boundaries are preserved
@@ -69,13 +77,14 @@ class PyMuPDF4LlmTextExtractor:
                     doc,
                     page_separators=True,
                     ocr_language=_OCR_LANGUAGE,
+                    ocr_dpi=_OCR_DPI,
                     ocr_function=self._tracking_ocr_function(pages_ocr),
                 )
                 # pages_ocr is only populated *during* to_markdown, so the
                 # value passed above (at span-open time) is stale — send the
                 # real value now that OCR has actually run, while keeping
                 # the span's duration tied to the real work above.
-                trace.set_metadata({"pages_ocr": pages_ocr})
+                trace.set_metadata({"pages_ocr": pages_ocr, "ocr_dpi": _OCR_DPI})
                 trace.set_output(text)
                 self.last_pages_ocr = pages_ocr
                 return text
