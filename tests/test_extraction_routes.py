@@ -374,6 +374,56 @@ def test_run_page_shows_export_checkbox_and_placeholder_for_undetected_field(
     assert f'action="/extraction/runs/{run.id}/export-gold"' in response.text
 
 
+def test_run_page_value_cell_uses_wrapping_textarea_not_single_line_input(
+    client, field_repo, run_repo
+):
+    # Régression : un <input type="text"> ne fait jamais de saut de ligne
+    # (le texte long défile hors du champ visible au lieu de s'afficher) —
+    # la valeur éditable doit être un <textarea>, qui wrap réellement.
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert "<textarea" in response.text
+    assert 'name="value__numero_devis"' in response.text
+    assert 'type="text" name="value__numero_devis"' not in response.text
+
+
+def test_run_page_header_columns_carry_same_classes_as_body_columns(
+    client, field_repo, run_repo
+):
+    # Régression : les largeurs de colonne du tableau sont définies en CSS
+    # par classe sémantique (result-export/result-field/result-value/
+    # result-type/result-source/result-location), pas par position
+    # (nth-child) — si un <th> et son <td> divergent de classe, la colonne
+    # correspondante perd sa largeur (symptôme observé : "Localisation"
+    # réduite à ~0, un saut de ligne par caractère).
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [
+            ExtractionResult(
+                field_title="Numéro de devis",
+                value="DEV-1",
+                source="langextract",
+                page_number=1,
+                text_position="contexte",
+            )
+        ],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    for cls in ("result-export", "result-field", "result-value", "result-type", "result-source", "result-location"):
+        assert response.text.count(f'class="{cls}"') == 2, cls  # 1 th + 1 td
+
+
 def test_export_gold_ignores_unknown_field_key(gold_client, field_repo, run_repo, gold_yaml_path):
     field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
     run_repo.create_run(

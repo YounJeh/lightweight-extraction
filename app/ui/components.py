@@ -379,11 +379,16 @@ def _result_row(result: ExtractionResult, field_key: str | None):
             cls="result-export",
         )
         value_cell = Td(
-            Input(
-                type="text",
+            # Textarea plutôt qu'un input texte : un <input> ne fait jamais
+            # de saut de ligne (le texte long défile hors champ visible au
+            # lieu de s'afficher) — un textarea fait vraiment un saut de
+            # ligne quand la valeur dépasse la largeur de la colonne, tout
+            # en restant éditable.
+            Textarea(
+                displayed_value or "",
                 name=f"value__{field_key}",
-                value=displayed_value or "",
                 placeholder="—",
+                rows="2",
                 cls="result-value-input",
             ),
             **value_attrs,
@@ -444,15 +449,16 @@ def extraction_result(run: ExtractionRun, title_to_key: dict[str, str] | None = 
                         type="checkbox",
                         id="gold-export-select-all",
                         title="Tout cocher/décocher",
-                    )
+                    ),
+                    cls="result-export",
                 )
                 if exportable
-                else Th(),
-                Th("Champ"),
-                Th("Valeur"),
-                Th("Type"),
-                Th("Source"),
-                Th("Localisation"),
+                else Th(cls="result-export"),
+                Th("Champ", cls="result-field"),
+                Th("Valeur", cls="result-value"),
+                Th("Type", cls="result-type"),
+                Th("Source", cls="result-source"),
+                Th("Localisation", cls="result-location"),
             )
         ),
         Tbody(
