@@ -21,6 +21,7 @@ from app.models import Field  # noqa: E402
 from app.tools.ner_langextract import _api_key_for, _is_openai_model  # noqa: E402
 from scripts import dspy_markdown_cache  # noqa: E402
 from scripts.gold_matching import classify_field, precision_recall_f1  # noqa: E402
+from scripts.text_slug import slugify_title  # noqa: E402
 
 
 def build_dspy_lm(model_id: str | None) -> dspy.LM:
@@ -64,6 +65,16 @@ def build_markdown_loader(
 
 
 @dataclass(frozen=True)
+class FailureExample:
+    """Un document où le candidat courant n'a pas matché le gold — donné en
+    contexte au proposeur DSPy pour orienter la prochaine variante."""
+
+    source_file: str
+    gold_value: str
+    extracted_value: str | None
+
+
+@dataclass(frozen=True)
 class FieldScore:
     f1: float
     precision: float | None
@@ -71,6 +82,7 @@ class FieldScore:
     tp: int
     fp: int
     fn: int
+    failures: list[FailureExample]
 
 
 def score_field_candidate(
@@ -97,6 +109,7 @@ def score_field_candidate(
     ]
 
     tp = fp = fn = 0
+    failures: list[FailureExample] = []
     for doc in gold_documents:
         annotation = doc["annotations"].get(field_key)
         if annotation is None:
@@ -105,22 +118,34 @@ def score_field_candidate(
         markdown = markdown_loader(doc["source_file"])
         results = ner_extractor.extract(markdown, fields, source_filename=doc["source_file"])
         extracted = next((r for r in results if r.field_title == candidate_title), None)
+        extracted_value = (extracted.typed_value or extracted.value) if extracted else None
 
         outcomes = classify_field(
             field_key=field_key,
             field_type=target_field.type,
             gold_value=annotation.get("value"),
             gold_page=(annotation.get("evidence") or {}).get("page"),
-            extracted_value=(extracted.typed_value or extracted.value) if extracted else None,
+            extracted_value=extracted_value,
             extracted_page=extracted.page_number if extracted else None,
         )
+        doc_kinds = set()
         for outcome in outcomes:
+            doc_kinds.add(outcome.kind)
             if outcome.kind == "tp":
                 tp += 1
             elif outcome.kind == "fp":
                 fp += 1
             elif outcome.kind == "fn":
                 fn += 1
+
+        if doc_kinds & {"fp", "fn"}:
+            failures.append(
+                FailureExample(
+                    source_file=doc["source_file"],
+                    gold_value=str(annotation.get("value")),
+                    extracted_value=str(extracted_value) if extracted_value else None,
+                )
+            )
 
     precision, recall, f1 = precision_recall_f1(tp, fp, fn)
     return FieldScore(
@@ -130,17 +155,8 @@ def score_field_candidate(
         tp=tp,
         fp=fp,
         fn=fn,
+        failures=failures,
     )
-
-
-@dataclass(frozen=True)
-class FailureExample:
-    """Un document où le candidat courant n'a pas matché le gold — donné en
-    contexte au proposeur DSPy pour orienter la prochaine variante."""
-
-    source_file: str
-    gold_value: str
-    extracted_value: str | None
 
 
 @dataclass(frozen=True)
@@ -203,3 +219,80 @@ def propose_candidates(
         )
         candidates.append(FieldCandidate(title=result.new_title, definition=result.new_definition))
     return candidates
+
+
+@dataclass(frozen=True)
+class FieldResult:
+    field_key: str
+    baseline_title: str
+    baseline_definition: str
+    baseline_f1: float
+    best_title: str
+    best_definition: str
+    best_label: str
+    best_f1: float
+
+
+def optimize_field(
+    field_key: str,
+    *,
+    all_fields: list[Field],
+    gold_documents: list[dict[str, Any]],
+    n_candidates: int,
+    n_rounds: int,
+    ner_extractor: Any,
+    markdown_loader: Callable[[str], str],
+    lm: dspy.LM,
+    score_fn: Callable[..., FieldScore] = score_field_candidate,
+    propose_fn: Callable[..., list[FieldCandidate]] = propose_candidates,
+) -> FieldResult:
+    """Baseline (valeurs CSV actuelles) -> `n_rounds` rounds de
+    `n_candidates` propositions chacun, en repartant à chaque round du
+    meilleur candidat connu (et de ses échecs, pour orienter la
+    proposition suivante). Ne renvoie jamais un résultat pire que la
+    baseline : un candidat ne remplace le meilleur connu que s'il le bat
+    strictement en F1."""
+    target_field = next(f for f in all_fields if f.key == field_key)
+
+    def score(title: str, definition: str) -> FieldScore:
+        return score_fn(
+            field_key,
+            title,
+            definition,
+            all_fields=all_fields,
+            gold_documents=gold_documents,
+            ner_extractor=ner_extractor,
+            markdown_loader=markdown_loader,
+        )
+
+    baseline_score = score(target_field.title, target_field.definition)
+    best_title, best_definition, best_score = (
+        target_field.title,
+        target_field.definition,
+        baseline_score,
+    )
+
+    for _ in range(n_rounds):
+        current_field = target_field.model_copy(
+            update={"title": best_title, "definition": best_definition}
+        )
+        candidates = propose_fn(current_field, failures=best_score.failures, n=n_candidates, lm=lm)
+        for candidate in candidates:
+            candidate_score = score(candidate.title, candidate.definition)
+            if candidate_score.f1 > best_score.f1:
+                best_title, best_definition, best_score = (
+                    candidate.title,
+                    candidate.definition,
+                    candidate_score,
+                )
+
+    return FieldResult(
+        field_key=field_key,
+        baseline_title=target_field.title,
+        baseline_definition=target_field.definition,
+        baseline_f1=baseline_score.f1,
+        best_title=best_title,
+        best_definition=best_definition,
+        best_label=slugify_title(best_title),
+        best_f1=best_score.f1,
+    )

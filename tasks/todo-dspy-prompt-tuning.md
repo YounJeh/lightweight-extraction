@@ -169,6 +169,10 @@ dataclass `f1: float`, `precision: float | None`, `recall: float | None`,
       un document où `field_key` est présent avec `value: null` **n'est
       pas exclu** (contribue en TN/FP selon l'extraction, cohérent avec
       `gold_dataset_eval` existant)
+- [x] **Ajout rétroactif (utile à la Tâche 7)** : `FieldScore` porte aussi
+      `failures: list[FailureExample]`, un par document ayant produit un
+      outcome `fp`/`fn` — testé (`test_score_field_candidate_computes_tp_fp_fn`
+      vérifie le contenu exact de `failures`)
 
 **Verification :**
 - [x] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -q` —
@@ -279,31 +283,38 @@ vérifié suffisant avec `dspy.utils.DummyLM` en test).
 
 ## Task 7 : `optimize_field` — boucle d'optimisation
 
-**Description :** Dans `scripts/dspy_prompt_tuning.py`. Fonction
+**Description (implémentée) :** Dans `scripts/dspy_prompt_tuning.py`.
+`FieldScore` (Tâche 4) porte désormais aussi `failures: list[FailureExample]`
+— peuplé dans `score_field_candidate` (un `FailureExample` par document
+ayant produit un outcome `fp`/`fn`), pour que `optimize_field` ait de quoi
+nourrir `propose_fn` sans repasser sur les documents. Fonction
 `optimize_field(field_key: str, *, all_fields: list[Field], gold_documents:
-list[dict], n_candidates: int, n_rounds: int, score_fn=score_field_candidate,
-propose_fn=propose_candidates, **deps) -> FieldResult` (`FieldResult` =
-`field_key`, `baseline_title/definition`, `best_title/definition`,
-`best_label` (via `slugify_title`, Tâche 3), `baseline_f1`, `best_f1`) :
+list[dict], n_candidates: int, n_rounds: int, ner_extractor: Any,
+markdown_loader: Callable[[str], str], lm: dspy.LM,
+score_fn=score_field_candidate, propose_fn=propose_candidates) ->
+FieldResult` (`FieldResult` = `field_key`, `baseline_title/definition`,
+`best_title/definition`, `best_label` (via `slugify_title`, Tâche 3),
+`baseline_f1`, `best_f1`) :
 1. Score le candidat baseline (`title`/`definition` actuels du CSV) via
    `score_fn`.
 2. Pour `n_rounds` rounds : `propose_fn` génère `n_candidates` variantes à
-   partir du meilleur connu + des échecs du round précédent ; chaque
-   variante est scorée via `score_fn` ; le meilleur (baseline inclus) est
-   conservé comme point de départ du round suivant.
+   partir du meilleur connu + de ses `failures` ; chaque variante est
+   scorée via `score_fn` ; le meilleur (baseline inclus) est conservé comme
+   point de départ du round suivant — un candidat ne remplace le meilleur
+   connu que s'il le bat **strictement** en F1 (`>`, pas `>=`).
 3. Renvoie le meilleur trouvé sur l'ensemble des rounds (jamais pire que la
-   baseline, puisque la baseline reste candidate à chaque comparaison).
+   baseline, puisque la baseline reste le point de comparaison initial).
 
 **Acceptance criteria :**
-- [ ] Avec `score_fn`/`propose_fn` factices déterministes (un candidat
+- [x] Avec `score_fn`/`propose_fn` factices déterministes (un candidat
       "meilleur" connu à l'avance), `optimize_field` renvoie bien ce
       candidat comme `best_*`, avec `best_f1` >= `baseline_f1`
-- [ ] Si aucune variante proposée ne bat la baseline, `best_title ==
+- [x] Si aucune variante proposée ne bat la baseline, `best_title ==
       baseline_title` (jamais de régression silencieuse)
-- [ ] `best_label == slugify_title(best_title)`
+- [x] `best_label == slugify_title(best_title)`
 
 **Verification :**
-- [ ] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k optimize_field`
+- [x] Tests : `uv run pytest tests/test_dspy_prompt_tuning.py -k optimize_field`
       — `score_fn`/`propose_fn` toujours des faux injectés
 
 **Dependencies :** Task 3, Task 4, Task 6

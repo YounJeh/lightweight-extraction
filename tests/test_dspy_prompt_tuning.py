@@ -4,8 +4,11 @@ from dspy.utils import DummyLM
 from app.models import ExtractionResult, Field
 from scripts.dspy_prompt_tuning import (
     FailureExample,
+    FieldCandidate,
+    FieldScore,
     build_dspy_lm,
     build_markdown_loader,
+    optimize_field,
     propose_candidates,
     score_field_candidate,
 )
@@ -99,6 +102,9 @@ def test_score_field_candidate_computes_tp_fp_fn():
     assert score.precision == 0.5
     assert score.recall == 0.5
     assert score.f1 == pytest.approx(0.5)
+    assert score.failures == [
+        FailureExample(source_file="b.pdf", gold_value="DEV-2", extracted_value="WRONG")
+    ]
 
 
 def test_score_field_candidate_leaves_other_fields_unchanged():
@@ -236,6 +242,76 @@ def test_propose_candidates_prompt_includes_failure_summary():
     assert "a.pdf" in prompt_content
     assert "DEV-1" in prompt_content
     assert "WRONG" in prompt_content
+
+
+# --- optimize_field -------------------------------------------------------
+
+
+def _score(f1: float, failures: list[FailureExample] | None = None) -> FieldScore:
+    return FieldScore(f1=f1, precision=None, recall=None, tp=0, fp=0, fn=0, failures=failures or [])
+
+
+def test_optimize_field_adopts_a_strictly_better_candidate():
+    scores_by_key = {
+        ("Numéro de devis", "définition actuelle du numéro"): _score(0.5),
+        ("Meilleur titre", "meilleure définition"): _score(0.8),
+    }
+
+    def fake_score_fn(field_key, title, definition, **kwargs):
+        return scores_by_key[(title, definition)]
+
+    def fake_propose_fn(field, *, failures, n, lm):
+        return [FieldCandidate(title="Meilleur titre", definition="meilleure définition")]
+
+    result = optimize_field(
+        "numero_devis",
+        all_fields=[_numero_devis_field()],
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        ner_extractor=None,
+        markdown_loader=lambda source_file: "",
+        lm=None,
+        score_fn=fake_score_fn,
+        propose_fn=fake_propose_fn,
+    )
+
+    assert result.best_title == "Meilleur titre"
+    assert result.best_definition == "meilleure définition"
+    assert result.best_f1 == 0.8
+    assert result.baseline_f1 == 0.5
+    assert result.best_label == "meilleur_titre"
+
+
+def test_optimize_field_keeps_baseline_when_no_candidate_is_better():
+    scores_by_key = {
+        ("Numéro de devis", "définition actuelle du numéro"): _score(0.5),
+        ("Pire titre", "pire définition"): _score(0.2),
+    }
+
+    def fake_score_fn(field_key, title, definition, **kwargs):
+        return scores_by_key[(title, definition)]
+
+    def fake_propose_fn(field, *, failures, n, lm):
+        return [FieldCandidate(title="Pire titre", definition="pire définition")]
+
+    result = optimize_field(
+        "numero_devis",
+        all_fields=[_numero_devis_field()],
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        ner_extractor=None,
+        markdown_loader=lambda source_file: "",
+        lm=None,
+        score_fn=fake_score_fn,
+        propose_fn=fake_propose_fn,
+    )
+
+    assert result.best_title == "Numéro de devis"
+    assert result.best_definition == "définition actuelle du numéro"
+    assert result.best_f1 == 0.5
+    assert result.best_label == "numero_devis"
 
 
 def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):
