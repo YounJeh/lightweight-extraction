@@ -16,6 +16,21 @@ from app.tools.pdf_pymupdf4llm import PyMuPDF4LlmTextExtractor
 
 load_env()
 
+_STYLE_CSS_PATH = Path(__file__).resolve().parent.parent / "static" / "style.css"
+
+
+def _static_asset_version() -> str:
+    """Horodatage de `static/style.css`, en query string sur le lien
+    stylesheet — sans lui, un navigateur qui a déjà chargé la page garde le
+    CSS en cache après une modification et ne le recharge qu'au hard-refresh
+    (source de confusion : "j'ai corrigé le CSS mais rien ne change à
+    l'écran"). Recalculé une fois par démarrage du process, suffisant pour
+    un serveur mono-utilisateur redémarré à chaque déploiement/reload."""
+    try:
+        return str(int(_STYLE_CSS_PATH.stat().st_mtime))
+    except OSError:
+        return "0"
+
 
 def create_app(
     conn: sqlite3.Connection,
@@ -29,7 +44,7 @@ def create_app(
         before=basic_auth_beforeware(),
         hdrs=(
             Meta(name="viewport", content="width=device-width, initial-scale=1"),
-            Link(rel="stylesheet", href="/static/style.css"),
+            Link(rel="stylesheet", href=f"/static/style.css?v={_static_asset_version()}"),
         ),
     )
 
