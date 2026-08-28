@@ -11,7 +11,7 @@ dataset:
           page: 1
 
       nom_societe:
-        value: "ADALTRA SAS"
+        value: "ADALTRA"
         evidence:
           text: null
           page: 1
@@ -53,7 +53,7 @@ dataset:
           page: 1
 
       nom_societe:
-        value: "SAS ADIWATT"
+        value: "ADIWATT"
         evidence:
           text: null
           page: 6
@@ -305,7 +305,7 @@ dataset:
           page: 11
 
       nom_societe:
-        value: "GIRARD HERVOUET / SAS"
+        value: "GIRARD HERVOUET"
         evidence:
           text: null
           page: 1
@@ -347,7 +347,7 @@ dataset:
           page: null
 
       nom_societe:
-        value: "SAS PRISER"
+        value: "PRISER"
         evidence:
           text: null
           page: null
@@ -515,7 +515,7 @@ dataset:
           page: 1
 
       nom_societe:
-        value: "S.A.S. GUINDE"
+        value: "GUINDE"
         evidence:
           text: null
           page: 3
@@ -557,7 +557,7 @@ dataset:
           page: 1
 
       nom_societe:
-        value: "mobasolar capital énergie"
+        value: "mobasolar"
         evidence:
           text: null
           page: 1
