@@ -434,6 +434,15 @@ def _gold_export_selection_script():
     )
 
 
+def _export_header_cell(exportable: bool):
+    if not exportable:
+        return Th(cls="result-export")
+    return Th(
+        Input(type="checkbox", id="gold-export-select-all", title="Tout cocher/décocher"),
+        cls="result-export",
+    )
+
+
 def extraction_result(run: ExtractionRun, title_to_key: dict[str, str] | None = None):
     title_to_key = title_to_key or {}
     if not run.results:
@@ -444,16 +453,7 @@ def extraction_result(run: ExtractionRun, title_to_key: dict[str, str] | None = 
     table = Table(
         Thead(
             Tr(
-                Th(
-                    Input(
-                        type="checkbox",
-                        id="gold-export-select-all",
-                        title="Tout cocher/décocher",
-                    ),
-                    cls="result-export",
-                )
-                if exportable
-                else Th(cls="result-export"),
+                _export_header_cell(exportable),
                 Th("Champ", cls="result-field"),
                 Th("Valeur", cls="result-value"),
                 Th("Type", cls="result-type"),

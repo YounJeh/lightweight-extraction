@@ -41,6 +41,9 @@ def register_extraction_routes(
             extraction_runs_list(run_repo.list_runs()),
         )
 
+    def _title_to_key() -> dict[str, str]:
+        return {f.title: f.key for f in field_repo.list_all()}
+
     # Route handlers are nested closures, so `.get`/`.post` are used
     # explicitly (see app/main.py for why bare `@rt(path)` name inference
     # doesn't apply here).
@@ -85,8 +88,7 @@ def register_extraction_routes(
         run = run_repo.get_run(id)
         if run is None:
             return page("Extraction", P("Run introuvable."))
-        title_to_key = {f.title: f.key for f in field_repo.list_all()}
-        return page("Résultat d'extraction", extraction_result(run, title_to_key))
+        return page("Résultat d'extraction", extraction_result(run, _title_to_key()))
 
     @app.post("/extraction/runs/{id}/export-gold")
     async def post_export_gold(id: int, req: Request):
@@ -94,9 +96,12 @@ def register_extraction_routes(
         if run is None:
             return page("Extraction", P("Run introuvable."))
 
-        title_to_key = {f.title: f.key for f in field_repo.list_all()}
+        title_to_key = _title_to_key()
         key_to_title = {key: title for title, key in title_to_key.items()}
         results_by_title = {r.field_title: r for r in run.results}
+
+        def _result_page(banner):
+            return page("Résultat d'extraction", banner, extraction_result(run, title_to_key))
 
         form = await req.form()
         checked_keys = form.getlist("export_fields")
@@ -121,15 +126,11 @@ def register_extraction_routes(
                 gold_yaml_path, source_file=run.document_name, annotations=annotations
             )
         except GoldExportError as e:
-            return page(
-                "Résultat d'extraction", error_banner(str(e)), extraction_result(run, title_to_key)
-            )
+            return _result_page(error_banner(str(e)))
 
         status = "créée" if export_result.created else "mise à jour"
         message = (
             f"Entrée gold {status} (document_id={export_result.document_id}) : "
             f"{', '.join(export_result.field_keys)}."
         )
-        return page(
-            "Résultat d'extraction", success_banner(message), extraction_result(run, title_to_key)
-        )
+        return _result_page(success_banner(message))
