@@ -21,7 +21,7 @@ from app.repository import FieldRepository  # noqa: E402
 from app.tools.ner_langextract import LangExtractNerExtractor  # noqa: E402
 from app.tools.pdf_pymupdf4llm import PyMuPDF4LlmTextExtractor  # noqa: E402
 from scripts.gold_dataset_sync import DATASET_NAME  # noqa: E402
-from scripts.gold_matching import classify_field  # noqa: E402
+from scripts.gold_matching import classify_field, precision_recall_f1  # noqa: E402
 
 GOLD_FIELDS_CSV = (
     Path(__file__).resolve().parent.parent / "tests" / "data" / "gold_devis_fields.csv"
@@ -176,19 +176,6 @@ def _match_evaluations(item_result: Any) -> list[Any]:
     return [ev for ev in item_result.evaluations if ev.name.startswith("match:")]
 
 
-def _precision_recall_f1(
-    tp: int, fp: int, fn: int
-) -> tuple[float | None, float | None, float | None]:
-    precision = tp / (tp + fp) if (tp + fp) else None
-    recall = tp / (tp + fn) if (tp + fn) else None
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if precision is not None and recall is not None and (precision + recall) > 0
-        else None
-    )
-    return precision, recall, f1
-
-
 def _field_metrics_evaluations(item_results: list[Any]) -> list[Any]:
     """P/R/F1 par champ (pool TP/FP/FN sur tous les documents validés) +
     macro (moyenne des F1 par champ) et micro (TP/FP/FN totaux, tous champs
@@ -206,7 +193,7 @@ def _field_metrics_evaluations(item_results: list[Any]) -> list[Any]:
     field_f1s = []
     total_tp = total_fp = total_fn = 0
     for field_key, c in counts.items():
-        precision, recall, f1 = _precision_recall_f1(c["tp"], c["fp"], c["fn"])
+        precision, recall, f1 = precision_recall_f1(c["tp"], c["fp"], c["fn"])
         evaluations.append(
             Evaluation(
                 name=f"precision:{field_key}",
@@ -227,7 +214,7 @@ def _field_metrics_evaluations(item_results: list[Any]) -> list[Any]:
         total_fn += c["fn"]
 
     macro_f1 = sum(field_f1s) / len(field_f1s) if field_f1s else 0.0
-    micro_precision, micro_recall, micro_f1 = _precision_recall_f1(total_tp, total_fp, total_fn)
+    micro_precision, micro_recall, micro_f1 = precision_recall_f1(total_tp, total_fp, total_fn)
 
     evaluations.append(Evaluation(name="f1_macro", value=macro_f1))
     evaluations.append(Evaluation(name="precision_micro", value=micro_precision or 0.0))

@@ -118,3 +118,20 @@ def classify_field(
     if gold_present:
         outcomes.append(FieldOutcome(field_key, "fn"))
     return outcomes
+
+
+def precision_recall_f1(
+    tp: int, fp: int, fn: int
+) -> tuple[float | None, float | None, float | None]:
+    """Precision/recall/F1 à partir de compteurs TP/FP/FN poolés (un ou
+    plusieurs documents). `None` quand le dénominateur est nul (pas de
+    positif prédit pour precision, pas de positif gold pour recall) —
+    laissé au consommateur de retomber sur 0.0 pour l'affichage."""
+    precision = tp / (tp + fp) if (tp + fp) else None
+    recall = tp / (tp + fn) if (tp + fn) else None
+    f1 = (
+        2 * precision * recall / (precision + recall)
+        if precision is not None and recall is not None and (precision + recall) > 0
+        else None
+    )
+    return precision, recall, f1

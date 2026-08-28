@@ -1,4 +1,6 @@
-from scripts.gold_matching import classify_field, values_match
+import pytest
+
+from scripts.gold_matching import classify_field, precision_recall_f1, values_match
 
 # --- values_match : cas nominaux par type ---------------------------------
 
@@ -130,3 +132,28 @@ def test_classify_field_wrong_value_counts_as_both_fp_and_fn():
     )
     assert {o.kind for o in outcomes} == {"fp", "fn"}
     assert len(outcomes) == 2
+
+
+# --- precision_recall_f1 ---------------------------------------------------
+
+
+def test_precision_recall_f1_all_zero_counts_is_none():
+    assert precision_recall_f1(0, 0, 0) == (None, None, None)
+
+
+def test_precision_recall_f1_perfect_score():
+    assert precision_recall_f1(5, 0, 0) == (1.0, 1.0, 1.0)
+
+
+def test_precision_recall_f1_computes_expected_values():
+    precision, recall, f1 = precision_recall_f1(tp=3, fp=1, fn=2)
+    assert precision == 0.75
+    assert recall == 0.6
+    assert f1 == pytest.approx(0.6667, abs=1e-4)
+
+
+def test_precision_recall_f1_no_predicted_positives_precision_is_none():
+    precision, recall, f1 = precision_recall_f1(tp=0, fp=0, fn=3)
+    assert precision is None
+    assert recall == 0.0
+    assert f1 is None
