@@ -184,3 +184,29 @@ contexte. Le pipeline ne plante pas silencieusement : l'échec remonte
 
 **Réf :** [specs/ci-eval-gold-dataset.md](specs/ci-eval-gold-dataset.md) ·
 [tasks/todo-ci-eval-gold-dataset.md](tasks/todo-ci-eval-gold-dataset.md)
+
+---
+
+## Latence OCR : dpi réduit + seuil de saut sur img_area
+
+**Contexte :** l'OCR se déclenchait sur quasi toutes les pages de documents
+réels à cause de logos d'en-tête/pied de page (section OCR ci-dessus),
+rendant l'extraction lente (jusqu'à ~2 min/document) sans gain réel — le
+logo n'apporte rien à l'extraction NER.
+
+**Décision** (`app/tools/pdf_pymupdf4llm.py`) : `ocr_dpi=72` (au lieu du
+défaut 150) et saut d'OCR pour toute page dont `img_area < 0.05` (logo,
+pas un scan). Les deux validés ensemble sur les 13 documents du dataset
+gold (`scripts/validate_ocr_tuning.py`, script autonome sans appel LLM —
+présence des valeurs gold dans le texte OCR brut) : **~77% de temps en
+moins, 0 régression** sur les 53 valeurs gold testées.
+
+**Écarté :** seuils `img_area` plus agressifs (0.10, 0.20 — gain marginal
+au-delà de 0.05) · seuil basé sur la longueur du texte natif plutôt que
+`img_area` (la distribution ne sépare proprement ni sur l'un ni sur
+l'autre pris seul, mais `img_area` réutilise directement le signal déjà
+calculé par PyMuPDF4LLM) · relancer le pipeline NER complet dans la
+validation (coût réel, variance du LLM comme facteur confondant).
+
+**Réf :** [docs/ideas/validation-optimisation-ocr.md](docs/ideas/validation-optimisation-ocr.md) ·
+[scripts/validate_ocr_tuning.py](scripts/validate_ocr_tuning.py)

@@ -35,6 +35,29 @@ def _build_mixed_pdf(native_text: str, scanned_text: str) -> bytes:
     return pdf_bytes
 
 
+def _build_page_with_small_logo(native_text: str) -> bytes:
+    """Page avec du texte natif + un petit logo (image contenant du texte,
+    comme un en-tête) dans un coin -- couvre une fraction de la page sous
+    _AREA_SKIP_THRESHOLD (0.05) tout en déclenchant quand même needs_ocr=True
+    côté PyMuPDF4LLM (vérifié empiriquement, img_area=0.0488 à cette taille),
+    contrairement à _build_mixed_pdf dont la page scannée est une image
+    pleine page. Reproduit la situation réelle des logos Tournan/Super-U
+    (voir choix_techniques.md, section "Latence OCR")."""
+    logo_source = pymupdf.open()
+    logo_page = logo_source.new_page(width=150, height=60)
+    logo_page.insert_text((5, 30), "ACME CORP", fontsize=14)
+    logo_pixmap = logo_page.get_pixmap(dpi=150)
+    logo_source.close()
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 200), native_text)
+    page.insert_image(pymupdf.Rect(20, 20, 110, 56), pixmap=logo_pixmap)
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    return pdf_bytes
+
+
 def test_extract_text_returns_real_content_for_each_page():
     pdf_bytes = _build_pdf("Titre: Contrat de bail", "Date de signature: 12 janvier 2024")
 
@@ -76,6 +99,18 @@ def test_extract_text_records_only_the_scanned_page_as_ocred():
 
     assert extractor.last_pages_ocr == [2]
     assert "Titre: Contrat de bail" in text
+
+
+def test_extract_text_skips_ocr_on_small_logo_pages():
+    pdf_bytes = _build_page_with_small_logo(
+        "Beaucoup de texte natif sur cette page pour imiter un vrai devis."
+    )
+    extractor = PyMuPDF4LlmTextExtractor()
+
+    text = extractor.extract_text(pdf_bytes)
+
+    assert extractor.last_pages_ocr == []
+    assert "Beaucoup de texte natif" in text
 
 
 def test_extract_text_resets_last_pages_ocr_between_calls():
