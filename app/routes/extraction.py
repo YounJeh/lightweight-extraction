@@ -1,8 +1,10 @@
 import asyncio
+from pathlib import Path
 
-from fasthtml.common import P, RedirectResponse, UploadFile
+from fasthtml.common import P, RedirectResponse, Request, UploadFile
 
 from app.extraction_repository import ExtractionRunRepository
+from app.gold_export import GoldExportError, export_to_gold
 from app.repository import FieldRepository
 from app.tools import NerExtractor, PdfTextExtractor
 from app.tools.tracer import Tracer, build_tracer
@@ -11,8 +13,13 @@ from app.ui.components import (
     extraction_form,
     extraction_result,
     extraction_runs_list,
+    success_banner,
 )
 from app.ui.layout import page
+
+DEFAULT_GOLD_YAML_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "tests" / "data" / "dataset_gold_devis.yaml"
+)
 
 
 def register_extraction_routes(
@@ -22,6 +29,7 @@ def register_extraction_routes(
     pdf_extractor: PdfTextExtractor,
     ner_extractor: NerExtractor,
     tracer: Tracer | None = None,
+    gold_yaml_path: Path = DEFAULT_GOLD_YAML_PATH,
 ):
     tracer = tracer or build_tracer()
 
@@ -32,6 +40,9 @@ def register_extraction_routes(
             extraction_form(field_repo.list_all()),
             extraction_runs_list(run_repo.list_runs()),
         )
+
+    def _title_to_key() -> dict[str, str]:
+        return {f.title: f.key for f in field_repo.list_all()}
 
     # Route handlers are nested closures, so `.get`/`.post` are used
     # explicitly (see app/main.py for why bare `@rt(path)` name inference
@@ -77,4 +88,49 @@ def register_extraction_routes(
         run = run_repo.get_run(id)
         if run is None:
             return page("Extraction", P("Run introuvable."))
-        return page("Résultat d'extraction", extraction_result(run))
+        return page("Résultat d'extraction", extraction_result(run, _title_to_key()))
+
+    @app.post("/extraction/runs/{id}/export-gold")
+    async def post_export_gold(id: int, req: Request):
+        run = run_repo.get_run(id)
+        if run is None:
+            return page("Extraction", P("Run introuvable."))
+
+        title_to_key = _title_to_key()
+        key_to_title = {key: title for title, key in title_to_key.items()}
+        results_by_title = {r.field_title: r for r in run.results}
+
+        def _result_page(banner):
+            return page("Résultat d'extraction", banner, extraction_result(run, title_to_key))
+
+        form = await req.form()
+        checked_keys = form.getlist("export_fields")
+
+        annotations = {}
+        for key in checked_keys:
+            title = key_to_title.get(key)
+            if title is None:
+                # Clé cochée qui ne correspond plus à aucun champ connu
+                # (ex. champ renommé/supprimé entre le rendu de la page et
+                # la soumission) — jamais écrite dans le gold, plutôt qu'une
+                # clé orpheline silencieuse dans un fichier versionné.
+                continue
+            result = results_by_title.get(title)
+            fallback = (result.typed_value or result.value) if result else ""
+            raw_value = form.get(f"value__{key}")
+            value = (raw_value if raw_value is not None else fallback).strip() or None
+            annotations[key] = {"value": value, "evidence": {"text": None, "page": None}}
+
+        try:
+            export_result = export_to_gold(
+                gold_yaml_path, source_file=run.document_name, annotations=annotations
+            )
+        except GoldExportError as e:
+            return _result_page(error_banner(str(e)))
+
+        status = "créée" if export_result.created else "mise à jour"
+        message = (
+            f"Entrée gold {status} (document_id={export_result.document_id}) : "
+            f"{', '.join(export_result.field_keys)}."
+        )
+        return _result_page(success_banner(message))

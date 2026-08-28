@@ -1,4 +1,5 @@
 import pytest
+import yaml
 from starlette.testclient import TestClient
 
 from app.extraction_repository import ExtractionRunRepository
@@ -13,6 +14,22 @@ from app.tools.mock_pdf import MockPdfTextExtractor
 def client(db_conn):
     return TestClient(
         create_app(db_conn, MockPdfTextExtractor(), MockNerExtractor())
+    )
+
+
+@pytest.fixture
+def gold_yaml_path(tmp_path):
+    path = tmp_path / "gold.yaml"
+    path.write_text("dataset: []\n", encoding="utf-8")
+    return path
+
+
+@pytest.fixture
+def gold_client(db_conn, gold_yaml_path):
+    return TestClient(
+        create_app(
+            db_conn, MockPdfTextExtractor(), MockNerExtractor(), gold_yaml_path=gold_yaml_path
+        )
     )
 
 
@@ -236,3 +253,230 @@ def test_extraction_page_links_to_fields_page(client):
     response = client.get("/extraction")
 
     assert 'href="/fields"' in response.text
+
+
+def test_export_gold_creates_new_document_with_only_checked_fields(
+    gold_client, field_repo, run_repo, gold_yaml_path
+):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    field_repo.create(FieldCreate(key="nom_societe", title="Nom société", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [
+            ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract"),
+            ExtractionResult(field_title="Nom société", value="ACME", source="langextract"),
+        ],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = gold_client.post(
+        f"/extraction/runs/{run.id}/export-gold",
+        data={"export_fields": ["numero_devis"], "value__numero_devis": "DEV-1-corrige"},
+    )
+
+    assert response.status_code == 200
+    data = yaml.safe_load(gold_yaml_path.read_text(encoding="utf-8"))
+    doc = data["dataset"][0]
+    assert doc["source_file"] == "doc.pdf"
+    assert doc["document_id"] == 1
+    assert doc["human_validation"] is True
+    assert doc["annotations"] == {
+        "numero_devis": {"value": "DEV-1-corrige", "evidence": {"text": None, "page": None}}
+    }
+    assert "nom_societe" not in doc["annotations"]  # non coché
+
+
+def test_export_gold_reexport_same_document_merges_by_source_file(
+    gold_client, field_repo, run_repo, gold_yaml_path
+):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    field_repo.create(FieldCreate(key="nom_societe", title="Nom société", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract")],
+    )
+    run1 = run_repo.list_runs()[0]
+    gold_client.post(
+        f"/extraction/runs/{run1.id}/export-gold",
+        data={"export_fields": ["numero_devis"]},
+    )
+
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Nom société", value="ACME", source="langextract")],
+    )
+    run2 = [r for r in run_repo.list_runs() if r.id != run1.id][0]
+    gold_client.post(
+        f"/extraction/runs/{run2.id}/export-gold",
+        data={"export_fields": ["nom_societe"]},
+    )
+
+    data = yaml.safe_load(gold_yaml_path.read_text(encoding="utf-8"))
+    assert len(data["dataset"]) == 1  # pas de doublon, même document_id
+    annotations = data["dataset"][0]["annotations"]
+    assert annotations["numero_devis"]["value"] == "DEV-1"
+    assert annotations["nom_societe"]["value"] == "ACME"
+
+
+def test_export_gold_with_nothing_checked_shows_error_and_does_not_write(
+    gold_client, field_repo, run_repo, gold_yaml_path
+):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+    original = gold_yaml_path.read_text(encoding="utf-8")
+
+    response = gold_client.post(f"/extraction/runs/{run.id}/export-gold", data={})
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert gold_yaml_path.read_text(encoding="utf-8") == original
+
+
+def test_export_gold_unchecked_undetected_field_exports_as_null(
+    gold_client, field_repo, run_repo, gold_yaml_path
+):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    gold_client.post(
+        f"/extraction/runs/{run.id}/export-gold",
+        data={"export_fields": ["numero_devis"]},
+    )
+
+    data = yaml.safe_load(gold_yaml_path.read_text(encoding="utf-8"))
+    assert data["dataset"][0]["annotations"]["numero_devis"]["value"] is None
+
+
+def test_run_page_shows_export_checkbox_and_placeholder_for_undetected_field(
+    client, field_repo, run_repo
+):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert 'id="gold-export-select-all"' in response.text
+    assert 'name="export_fields" value="numero_devis"' in response.text
+    assert 'name="value__numero_devis"' in response.text
+    assert 'placeholder="—"' in response.text
+    assert f'action="/extraction/runs/{run.id}/export-gold"' in response.text
+
+
+def test_run_page_value_cell_uses_wrapping_textarea_not_single_line_input(
+    client, field_repo, run_repo
+):
+    # Régression : un <input type="text"> ne fait jamais de saut de ligne
+    # (le texte long défile hors du champ visible au lieu de s'afficher) —
+    # la valeur éditable doit être un <textarea>, qui wrap réellement.
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert "<textarea" in response.text
+    assert 'name="value__numero_devis"' in response.text
+    assert 'type="text" name="value__numero_devis"' not in response.text
+
+
+def test_run_page_header_columns_carry_same_classes_as_body_columns(
+    client, field_repo, run_repo
+):
+    # Régression : les largeurs de colonne du tableau sont définies en CSS
+    # par classe sémantique (result-export/result-field/result-value/
+    # result-type/result-source/result-location), pas par position
+    # (nth-child) — si un <th> et son <td> divergent de classe, la colonne
+    # correspondante perd sa largeur (symptôme observé : "Localisation"
+    # réduite à ~0, un saut de ligne par caractère).
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [
+            ExtractionResult(
+                field_title="Numéro de devis",
+                value="DEV-1",
+                source="langextract",
+                page_number=1,
+                text_position="contexte",
+            )
+        ],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    for cls in ("result-export", "result-field", "result-value", "result-type", "result-source", "result-location"):
+        assert response.text.count(f'class="{cls}"') == 2, cls  # 1 th + 1 td
+
+
+def test_export_gold_ignores_unknown_field_key(gold_client, field_repo, run_repo, gold_yaml_path):
+    field_repo.create(FieldCreate(key="numero_devis", title="Numéro de devis", definition="d", examples=[]))
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Numéro de devis", value="DEV-1", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    # "cle_obsolete" ne correspond à aucun champ connu (ex. champ renommé
+    # entre le rendu de la page et la soumission du formulaire) — doit être
+    # ignorée plutôt qu'écrite telle quelle dans le gold.
+    response = gold_client.post(
+        f"/extraction/runs/{run.id}/export-gold",
+        data={"export_fields": ["numero_devis", "cle_obsolete"], "value__cle_obsolete": "n'importe quoi"},
+    )
+
+    assert response.status_code == 200
+    data = yaml.safe_load(gold_yaml_path.read_text(encoding="utf-8"))
+    annotations = data["dataset"][0]["annotations"]
+    assert "cle_obsolete" not in annotations
+    assert annotations["numero_devis"]["value"] == "DEV-1"
+
+
+def test_export_gold_all_checked_keys_unknown_shows_error(gold_client, run_repo, gold_yaml_path):
+    run_repo.create_run("doc.pdf", [])
+    run = run_repo.list_runs()[0]
+    original = gold_yaml_path.read_text(encoding="utf-8")
+
+    response = gold_client.post(
+        f"/extraction/runs/{run.id}/export-gold",
+        data={"export_fields": ["cle_obsolete"]},
+    )
+
+    assert response.status_code == 200
+    assert "Erreur" in response.text
+    assert gold_yaml_path.read_text(encoding="utf-8") == original
+
+
+def test_export_gold_unknown_run_does_not_crash(gold_client):
+    response = gold_client.post("/extraction/runs/999/export-gold", data={})
+
+    assert response.status_code == 200
+    assert "Run introuvable" in response.text
+
+
+def test_run_page_no_export_column_when_no_field_matches_repo(client, run_repo):
+    run_repo.create_run(
+        "doc.pdf",
+        [ExtractionResult(field_title="Inconnu", value="x", source="langextract")],
+    )
+    run = run_repo.list_runs()[0]
+
+    response = client.get(f"/extraction/runs/{run.id}")
+
+    assert "export_fields" not in response.text
+    assert "gold-export-select-all" not in response.text

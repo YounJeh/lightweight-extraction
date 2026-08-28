@@ -153,6 +153,22 @@ class LangExtractNerExtractor:
                     type_error=type_error,
                 )
             )
+
+        for field_title, field in fields_by_title.items():
+            if field_title in candidates_by_field:
+                continue
+            # Champ demandé mais sans candidat groundé : une ligne à valeur
+            # vide plutôt qu'une absence silencieuse, pour que l'utilisateur
+            # puisse confirmer "non détecté" comme un résultat valide côté
+            # export gold (voir tasks/plan-gold-export-from-extraction.md).
+            results.append(
+                ExtractionResult(
+                    field_title=field_title,
+                    value="",
+                    source="langextract",
+                    value_type=field.type,
+                )
+            )
         return results
 
 

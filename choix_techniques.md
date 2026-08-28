@@ -232,3 +232,32 @@ jamais en retirer).
 **Réf :** [docs/ideas/validation-optimisation-ocr.md](docs/ideas/validation-optimisation-ocr.md) ·
 [scripts/validate_ocr_tuning.py](scripts/validate_ocr_tuning.py) ·
 [tasks/plan-vector-text-ocr-fallback.md](tasks/plan-vector-text-ocr-fallback.md)
+
+---
+
+## Export vers le gold dataset : réutilisation du mapping title→key existant
+
+**Contexte :** exporter une extraction validée vers
+`tests/data/dataset_gold_devis.yaml` exige `Field.key` (slug machine), mais
+`ExtractionResult` ne porte que `field_title` (libellé humain, pas garanti
+unique en base).
+
+**Décision :** résolution via `{field.title: field.key for field in
+field_repo.list_all()}`, calculée à la volée côté route
+(`app/routes/extraction.py`) — même pattern déjà en place dans
+`scripts/gold_dataset_eval.py` pour le même besoin. Pas de nouvelle colonne
+`field_key` sur `extraction_results` : la collision de `title` reste un
+risque déjà accepté ailleurs dans le code, pas aggravé ici.
+
+Un champ sans candidat groundé (`ner_langextract.py`) produit désormais une
+ligne à `value=""` plutôt qu'une absence silencieuse — nécessaire pour
+pouvoir valider "non détecté" comme correct. `value` reste `TEXT NOT NULL`
+en base (`gold_matching._is_present` traite déjà `""` comme absent), donc
+aucune migration de schéma.
+
+**Écarté :** colonne `field_key` dédiée sur `extraction_results` (migration
+évitable) · valeur `NULL` en base pour "non détecté" (aurait nécessité une
+migration de contrainte, SQLite ne le permet pas via `ALTER TABLE`).
+
+**Réf :** [tasks/plan-gold-export-from-extraction.md](tasks/plan-gold-export-from-extraction.md) ·
+[app/gold_export.py](app/gold_export.py)
