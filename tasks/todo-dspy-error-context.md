@@ -265,34 +265,64 @@ sur de vraies données, pas seulement des doubles — en particulier que
 texte réel (pas juste sur les exemples synthétiques des tests) et que
 `reasoning` (Tâche 5) n'est jamais vide.
 
+**Exécutée** — run réel sur `delai_paiement_solde_jours` (le champ de
+l'exemple délai/durée donné en idea-refine), 3 documents gold
+(`DEV-1NT2605-0384_1ENTECH29 1.pdf`, `26-0727 Super U Exincourt V1
+2026-03-19.pdf`, `Devis - S01736.pdf`), `n_candidates=2`, `n_rounds=1`.
+
+**Résultat** : baseline F1 = 0.400 (2 échecs sur 3 documents). Les deux
+échecs ont bien produit un `gold_evidence` réel non `None` — ex. pour
+`Devis - S01736.pdf`, gold `"45 jours"` localisé dans *"...celui-ci ne
+pourra dépasser 45 jours fin de mois..."*, à côté de l'`extracted_evidence`
+(le même passage, l'extraction avait pris `"45 jours fin de mois"` au lieu
+de `"45 jours"`). Les 2 candidats proposés par `ChainOfThought` ont un
+`reasoning` non vide et lisible (ex. *"La définition actuelle du 'Délai de
+paiement du solde' est trop vague et peut prêter à confusion..."*), mais
+ont tous les deux un F1 plus bas que la baseline (0.333) — **la garantie
+"jamais pire que la baseline" a été vérifiée en conditions réelles** :
+`best_f1` est resté à 0.400, le CSV de sortie garde la définition
+d'origine pour ce champ. Écrit dans `tasks/dspy-error-context-results.csv`
+(gitignoré). **Ce résultat ne valide pas que les candidats DSPy sont
+meilleurs sur ce jeu réduit** — seulement que le pipeline (evidence, F1,
+non-régression, export) fonctionne correctement de bout en bout ; un run
+plus large (plus de candidats/rounds, plus de documents) reste à la
+discrétion de l'utilisateur.
+
+**Constat en plus, hors scope de ce chantier (noté, pas corrigé)** :
+sur `DEV-1NT2605-0384_1ENTECH29 1.pdf`, la baseline n'a **rien extrait du
+tout** pour `delai_paiement_solde_jours` alors que le gold (`"30 jours"`)
+est bien présent littéralement dans le texte (*"VIR 30 Jours Fin de mois"*)
+— un vrai raté d'extraction, pas un problème de ce chantier (contexte
+enrichi/Définition seule). Reste dans `choix_techniques.md`/le pipeline
+LangExtract existant, hors périmètre ici.
+
 **Acceptance criteria :**
-- [ ] Le run se termine sans exception
-- [ ] Au moins un `FailureExample` réel (sur les documents choisis) a un
-      `gold_evidence` non `None` — sinon la Tâche 3 n'apporte rien en
-      pratique sur ce jeu de test, à documenter comme risque avéré plutôt
-      que supposé
-- [ ] Le `reasoning` affiché par la Tâche 6 est non vide et lisible
-      (pas un texte tronqué à 0 caractère ni un artefact de formatage)
-- [ ] Le CSV de sortie a `Nom`/`label` identiques à `gold_devis_fields.csv`
-      pour tous les champs, seule `Définition` diffère pour le(s) champ(s)
-      demandé(s)
+- [x] Le run se termine sans exception
+- [x] Au moins un `FailureExample` réel a un `gold_evidence` non `None`
+      (2 sur 2 dans ce run)
+- [x] Le `reasoning` affiché par la Tâche 6 est non vide et lisible
+- [x] Le CSV de sortie a `Nom`/`label` identiques à `gold_devis_fields.csv`
+      pour tous les champs (vérifié : les 6 champs, y compris celui
+      demandé, ont leur `Nom`/`label` d'origine)
 
 **Verification :**
-- [ ] Exécution manuelle du script (pas un test `pytest` — run réel,
+- [x] Exécution manuelle du script (pas un test `pytest` — run réel,
       volontairement hors suite automatisée)
 
 **Dependencies :** Task 6
 
 **Files likely touched :**
-- Aucun fichier de code (run de validation)
+- Aucun fichier de code (run de validation) — génère
+  `tasks/dspy-error-context-results.csv` (gitignoré) et peuple
+  `scripts/_dspy_markdown_cache/` (gitignoré)
 
 **Estimated scope :** XS (pas de code, exécution + lecture des résultats)
 
 ---
 
 ## Checkpoint final
-- [ ] `uv run pytest -m "not live"` passe intégralement
-- [ ] Tâche 7 exécutée avec succès
+- [x] `uv run pytest -m "not live"` passe intégralement
+- [x] Tâche 7 exécutée avec succès
 - [ ] Revue avec l'utilisateur
 - [ ] Proposer `/code-review-and-quality` puis une PR une fois la branche
       complète (convention CLAUDE.md)

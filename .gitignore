@@ -57,3 +57,4 @@ scripts/_ocr_tuning_cache/
 # run, jamais une source de vérité versionnée.
 scripts/_dspy_markdown_cache/
 tasks/dspy-prompt-tuning-results.csv
+tasks/dspy-error-context-results.csv

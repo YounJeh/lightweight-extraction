@@ -102,36 +102,36 @@ suivi de progression (consomme le `reasoning` de la tâche précédente),
 puis la validation réelle bornée.
 
 ### Phase 1 : Définition seule (mécanique)
-- [ ] Tâche 1 : retirer `Nom`/`label` de la cible d'optimisation +
+- [x] Tâche 1 : retirer `Nom`/`label` de la cible d'optimisation +
       supprimer `scripts/text_slug.py`
 
 ### Checkpoint 1
-- [ ] `uv run pytest -m "not live"` passe
+- [x] `uv run pytest -m "not live"` passe
 
 ### Phase 2 : Contexte d'erreur enrichi
-- [ ] Tâche 2 : `FailureExample.extracted_evidence` (déjà calculé, simple
+- [x] Tâche 2 : `FailureExample.extracted_evidence` (déjà calculé, simple
       plomberie)
-- [ ] Tâche 3 : `FailureExample.gold_evidence` (recherche dans le markdown,
+- [x] Tâche 3 : `FailureExample.gold_evidence` (recherche dans le markdown,
       nouvelle logique)
-- [ ] Tâche 4 : `_format_failure_summary` — bloc structuré Gold/Evidence
+- [x] Tâche 4 : `_format_failure_summary` — bloc structuré Gold/Evidence
       gold/Extraction incorrecte/Evidence extraction
-- [ ] Tâche 5 : `ProposeFieldPrompt`/`propose_candidates` →
+- [x] Tâche 5 : `ProposeFieldPrompt`/`propose_candidates` →
       `dspy.ChainOfThought`, `FieldCandidate.reasoning`
 
 ### Checkpoint 2
-- [ ] `uv run pytest -m "not live"` passe ; testé avec `dspy.utils.DummyLM`
+- [x] `uv run pytest -m "not live"` passe ; testé avec `dspy.utils.DummyLM`
       (réponses incluant `reasoning`), aucun appel réseau
 
 ### Phase 3 : Suivi de progression + validation réelle
-- [ ] Tâche 6 : `print()` par round/candidat (F1 + `reasoning`) dans
+- [x] Tâche 6 : `print()` par round/candidat (F1 + `reasoning`) dans
       `optimize_field`
-- [ ] Tâche 7 : run réel de validation borné (1 champ, budget réduit) —
+- [x] Tâche 7 : run réel de validation borné (1 champ, budget réduit) —
       vérifie qu'au moins une `gold_evidence` réelle est trouvée et qu'un
       `reasoning` non vide est produit
 
 ### Checkpoint final
-- [ ] `uv run pytest -m "not live"` passe intégralement
-- [ ] Tâche 7 exécutée avec succès
+- [x] `uv run pytest -m "not live"` passe intégralement
+- [x] Tâche 7 exécutée avec succès
 - [ ] Revue avec l'utilisateur
 - [ ] Proposer `/code-review-and-quality` puis une PR une fois la branche
       complète (convention CLAUDE.md)
