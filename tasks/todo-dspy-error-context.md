@@ -112,17 +112,17 @@ Appelée dans `score_field_candidate` au moment de construire chaque
 rechargement).
 
 **Acceptance criteria :**
-- [ ] `_find_gold_evidence("...sous 30 jours après réception...", "30
+- [x] `_find_gold_evidence("...sous 30 jours après réception...", "30
       jours")` renvoie un snippet contenant `"30 jours"` et son contexte
-- [ ] `_find_gold_evidence("...un texte sans le rapport...", "30 jours")`
+- [x] `_find_gold_evidence("...un texte sans le rapport...", "30 jours")`
       renvoie `None`
-- [ ] `_find_gold_evidence("...page 1030...", "30")` **ne matche pas**
+- [x] `_find_gold_evidence("...page 1030...", "30")` **ne matche pas**
       `"30"` à l'intérieur de `"1030"` (frontière de mot respectée)
-- [ ] Un `FailureExample` généré via `score_field_candidate` porte le
+- [x] Un `FailureExample` généré via `score_field_candidate` porte le
       `gold_evidence` correspondant quand trouvé
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k gold_evidence`
+- [x] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k gold_evidence`
 
 **Dependencies :** Task 2
 

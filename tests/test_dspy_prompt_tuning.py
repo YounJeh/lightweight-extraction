@@ -8,6 +8,7 @@ from scripts.dspy_prompt_tuning import (
     FieldCandidate,
     FieldResult,
     FieldScore,
+    _find_gold_evidence,
     build_dspy_lm,
     build_markdown_loader,
     optimize_field,
@@ -115,6 +116,7 @@ def test_score_field_candidate_computes_tp_fp_fn():
             gold_value="DEV-2",
             extracted_value="WRONG",
             extracted_evidence="...la durée est de WRONG jours...",
+            gold_evidence=None,
         )
     ]
 
@@ -194,6 +196,70 @@ def test_score_field_candidate_skips_documents_without_the_field_annotated():
     assert score.f1 == 0.0
 
 
+def test_score_field_candidate_failure_includes_gold_evidence_when_found():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "30 jours", "evidence": {"page": 1}}},
+        },
+    ]
+    extractor = _FakeNerExtractor(
+        {"a.pdf": [ExtractionResult(field_title="Numéro de devis", value="45 jours")]}
+    )
+    markdown = "Le solde de 70 % sera réglé sous 30 jours après réception de la facture."
+
+    score = score_field_candidate(
+        "numero_devis",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: markdown,
+    )
+
+    assert len(score.failures) == 1
+    assert score.failures[0].gold_evidence is not None
+    assert "30 jours" in score.failures[0].gold_evidence
+
+
+# --- _find_gold_evidence -------------------------------------------------------
+
+
+def test_find_gold_evidence_returns_a_snippet_around_the_match():
+    text = "Le solde de 70 % sera réglé sous 30 jours après réception de la facture."
+
+    snippet = _find_gold_evidence(text, "30 jours")
+
+    assert snippet is not None
+    assert "30 jours" in snippet
+
+
+def test_find_gold_evidence_returns_none_when_value_not_present():
+    text = "Un texte qui ne contient pas la valeur cherchée."
+
+    assert _find_gold_evidence(text, "30 jours") is None
+
+
+def test_find_gold_evidence_respects_word_boundaries_for_short_numbers():
+    text = "Voir la clause en page 1030 du contrat."
+
+    assert _find_gold_evidence(text, "30") is None
+
+
+def test_find_gold_evidence_matches_case_insensitively():
+    text = "Montant TTC : Trente Mille Euros."
+
+    snippet = _find_gold_evidence(text, "trente mille euros")
+
+    assert snippet is not None
+    assert "Trente Mille Euros" in snippet
+
+
+def test_find_gold_evidence_returns_none_for_empty_value():
+    assert _find_gold_evidence("un texte quelconque", "") is None
+    assert _find_gold_evidence("un texte quelconque", None) is None
+
+
 # --- build_markdown_loader ----------------------------------------------------
 
 
@@ -270,6 +336,7 @@ def test_propose_candidates_prompt_includes_failure_summary():
             gold_value="DEV-1",
             extracted_value="WRONG",
             extracted_evidence=None,
+            gold_evidence=None,
         ),
     ]
 

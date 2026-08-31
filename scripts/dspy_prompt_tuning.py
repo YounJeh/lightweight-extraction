@@ -1,8 +1,8 @@
 """Optimisation, champ par champ, de la `Définition` de
 `tests/data/gold_devis_fields.csv` via DSPy — jamais intégré à l'app en
 production (LangExtract reste le moteur réel). Voir
-`tasks/plan-dspy-prompt-tuning.md` pour le contexte et les décisions
-d'architecture complètes.
+`tasks/plan-dspy-prompt-tuning.md` et `tasks/plan-dspy-error-context.md`
+pour le contexte et les décisions d'architecture complètes.
 
 Usage :
     uv run --no-sync python scripts/dspy_prompt_tuning.py
@@ -11,6 +11,7 @@ Usage :
 import argparse
 import csv
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,7 @@ from app.config import load_env  # noqa: E402
 from app.fields_import import _TYPE_MAP  # noqa: E402
 from app.models import Field  # noqa: E402
 from app.tools.ner_langextract import LangExtractNerExtractor, _api_key_for, _is_openai_model  # noqa: E402
-from app.tools.pdf_pymupdf4llm import PyMuPDF4LlmTextExtractor  # noqa: E402
+from app.tools.pdf_pymupdf4llm import PAGE_SEPARATOR_RE, PyMuPDF4LlmTextExtractor  # noqa: E402
 from scripts import dspy_markdown_cache  # noqa: E402
 from scripts.gold_dataset_eval import DATA_TEST_DIR, load_gold_fields  # noqa: E402
 from scripts.gold_dataset_sync import GOLD_YAML_PATH, _load_gold_documents  # noqa: E402
@@ -33,6 +34,39 @@ from scripts.gold_matching import classify_field, precision_recall_f1  # noqa: E
 DEFAULT_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "tasks" / "dspy-prompt-tuning-results.csv"
 _CSV_FIELDNAMES = ["section", "label", "Nom", "Définition", "Type", "exemple valeur", "Exemple texte", "source"]
 _TYPE_MAP_INVERSE = {v: k for k, v in _TYPE_MAP.items()}
+_GOLD_EVIDENCE_CONTEXT_CHARS = 80
+_ALPHANUMERIC_RE = re.compile(r"^\w+$", re.UNICODE)
+
+
+def _find_gold_evidence(
+    markdown: str, gold_value: object, *, context_chars: int = _GOLD_EVIDENCE_CONTEXT_CHARS
+) -> str | None:
+    """Cherche `gold_value` (converti en texte) comme sous-chaîne de
+    `markdown`, insensible à la casse, et renvoie un snippet de contexte
+    `±context_chars` (même convention que `_locate` côté extraction,
+    `app/tools/ner_langextract.py`). `\\b...\\b` autour du motif quand
+    `gold_value` est purement alphanumérique, pour éviter qu'une valeur
+    courte (ex. `"30"`) ne matche à l'intérieur d'une autre (`"1030"`) —
+    pas un vrai grounding, une simple recherche texte. `None` si non
+    trouvée (valeur paraphrasée/reformatée dans le texte) — cas attendu,
+    pas une erreur. `gold_value=None` (gold absent, ex. un `fp` sans `fn`
+    associé) renvoie aussi `None` — jamais une recherche littérale de la
+    chaîne `"None"`."""
+    if gold_value is None:
+        return None
+    value_str = str(gold_value).strip()
+    if not value_str:
+        return None
+    pattern = re.escape(value_str)
+    if _ALPHANUMERIC_RE.match(value_str):
+        pattern = rf"\b{pattern}\b"
+    match = re.search(pattern, markdown, re.IGNORECASE)
+    if match is None:
+        return None
+    start, end = match.span()
+    snippet = markdown[max(0, start - context_chars) : end + context_chars]
+    snippet = PAGE_SEPARATOR_RE.sub(" ", snippet)
+    return " ".join(snippet.split())
 
 
 def build_dspy_lm(model_id: str | None) -> dspy.LM:
@@ -81,13 +115,17 @@ class FailureExample:
     contexte au proposeur DSPy pour orienter la prochaine variante.
     `extracted_evidence` : contexte source autour de la valeur extraite,
     déjà calculé par `LangExtractNerExtractor._locate`
-    (`ExtractionResult.text_position`) — `None` si rien n'a été extrait, cas
-    attendu, pas une erreur."""
+    (`ExtractionResult.text_position`). `gold_evidence` : contexte source
+    autour de la valeur gold, dérivé à la volée (`_find_gold_evidence`) —
+    jamais lu depuis `evidence.text` du YAML gold (toujours `null`
+    aujourd'hui). Les deux sont `None` si non disponibles — cas attendu,
+    pas une erreur."""
 
     source_file: str
     gold_value: str
     extracted_value: str | None
     extracted_evidence: str | None
+    gold_evidence: str | None
 
 
 @dataclass(frozen=True)
@@ -161,6 +199,7 @@ def score_field_candidate(
                     gold_value=str(annotation.get("value")),
                     extracted_value=str(extracted_value) if extracted_value else None,
                     extracted_evidence=extracted.text_position if extracted else None,
+                    gold_evidence=_find_gold_evidence(markdown, annotation.get("value")),
                 )
             )
 
