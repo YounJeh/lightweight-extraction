@@ -32,22 +32,22 @@ Plan : [tasks/plan-dspy-error-context.md](plan-dspy-error-context.md)
    plan).
 
 **Acceptance criteria :**
-- [ ] `score_field_candidate("numero_devis", "nouvelle def", all_fields=...,
+- [x] `score_field_candidate("numero_devis", "nouvelle def", all_fields=...,
       ...)` (signature à 2 positionnels, plus 3) fonctionne et le `title`
       envoyé à `ner_extractor.extract` pour ce champ est **inchangé**
       (celui du CSV d'origine)
-- [ ] `optimize_field(...)` renvoie un `FieldResult` sans `title`/`label`,
+- [x] `optimize_field(...)` renvoie un `FieldResult` sans `title`/`label`,
       avec `best_definition` différent de `baseline_definition` quand un
       candidat gagne
-- [ ] `write_results_csv(...)` produit un CSV où **toutes** les lignes ont
+- [x] `write_results_csv(...)` produit un CSV où **toutes** les lignes ont
       `Nom`/`label` identiques à l'entrée (`all_fields`), y compris les
       champs optimisés — seule `Définition` diffère pour ceux-là
-- [ ] `scripts/text_slug.py` et `tests/test_text_slug.py` n'existent plus ;
+- [x] `scripts/text_slug.py` et `tests/test_text_slug.py` n'existent plus ;
       `uv run pytest --collect-only` ne référence plus aucun test de ce
       module
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -q`
+- [x] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -q`
       (tests existants adaptés aux nouvelles signatures — plus de
       `title`/`label` dans les assertions/fixtures)
 
@@ -65,7 +65,7 @@ une dimension, aucune nouvelle logique)
 ---
 
 ## Checkpoint : Phase 1
-- [ ] `uv run pytest -m "not live"` passe
+- [x] `uv run pytest -m "not live"` passe
 
 ---
 

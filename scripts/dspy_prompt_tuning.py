@@ -1,4 +1,4 @@
-"""Optimisation, champ par champ, des valeurs `Nom`/`Définition` de
+"""Optimisation, champ par champ, de la `Définition` de
 `tests/data/gold_devis_fields.csv` via DSPy — jamais intégré à l'app en
 production (LangExtract reste le moteur réel). Voir
 `tasks/plan-dspy-prompt-tuning.md` pour le contexte et les décisions
@@ -29,7 +29,6 @@ from scripts import dspy_markdown_cache  # noqa: E402
 from scripts.gold_dataset_eval import DATA_TEST_DIR, load_gold_fields  # noqa: E402
 from scripts.gold_dataset_sync import GOLD_YAML_PATH, _load_gold_documents  # noqa: E402
 from scripts.gold_matching import classify_field, precision_recall_f1  # noqa: E402
-from scripts.text_slug import slugify_title  # noqa: E402
 
 DEFAULT_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "tasks" / "dspy-prompt-tuning-results.csv"
 _CSV_FIELDNAMES = ["section", "label", "Nom", "Définition", "Type", "exemple valeur", "Exemple texte", "source"]
@@ -99,7 +98,6 @@ class FieldScore:
 
 def score_field_candidate(
     field_key: str,
-    candidate_title: str,
     candidate_definition: str,
     *,
     all_fields: list[Field],
@@ -108,13 +106,14 @@ def score_field_candidate(
     markdown_loader: Callable[[str], str],
 ) -> FieldScore:
     """F1 (et TP/FP/FN poolés sur tous les documents) d'un candidat
-    `title`/`definition` pour `field_key`, contre `gold_documents`. Les
-    champs de `all_fields` autres que `field_key` sont passés tels quels à
-    `ner_extractor` — optimisation field-par-field, jamais jointe (voir
-    Architecture Decisions du plan)."""
+    `definition` pour `field_key`, contre `gold_documents`. `title` n'est
+    jamais modifié (optimisation Définition seule, voir Architecture
+    Decisions du plan) ; les champs de `all_fields` autres que `field_key`
+    sont passés tels quels à `ner_extractor` — optimisation field-par-field,
+    jamais jointe."""
     target_field = next(f for f in all_fields if f.key == field_key)
     fields = [
-        f.model_copy(update={"title": candidate_title, "definition": candidate_definition})
+        f.model_copy(update={"definition": candidate_definition})
         if f.key == field_key
         else f
         for f in all_fields
@@ -129,7 +128,7 @@ def score_field_candidate(
 
         markdown = markdown_loader(doc["source_file"])
         results = ner_extractor.extract(markdown, fields, source_filename=doc["source_file"])
-        extracted = next((r for r in results if r.field_title == candidate_title), None)
+        extracted = next((r for r in results if r.field_title == target_field.title), None)
         extracted_value = (extracted.typed_value or extracted.value) if extracted else None
 
         outcomes = classify_field(
@@ -173,26 +172,25 @@ def score_field_candidate(
 
 @dataclass(frozen=True)
 class FieldCandidate:
-    title: str
     definition: str
 
 
 class ProposeFieldPrompt(dspy.Signature):
-    """Tu améliores un champ d'extraction NER pour un pipeline français
-    d'extraction de devis/contrats. Propose un nouveau titre (`new_title`)
-    et une nouvelle définition (`new_definition`), en français, plus clairs
-    et sans ambiguïté pour un LLM d'extraction — même sens métier que
-    l'original, mais reformulés pour réduire les erreurs listées dans
-    `failure_summary` (si vide, propose simplement une formulation
-    alternative à tester)."""
+    """Tu améliores la définition d'un champ d'extraction NER pour un
+    pipeline français d'extraction de devis/contrats. `current_title` est
+    donné comme contexte (le concept que la définition doit décrire), il
+    n'est pas à modifier. Propose une nouvelle définition
+    (`new_definition`), en français, plus claire et sans ambiguïté pour un
+    LLM d'extraction — même sens métier que l'original, mais reformulée
+    pour réduire les erreurs listées dans `failure_summary` (si vide,
+    propose simplement une formulation alternative à tester)."""
 
     field_type: str = dspy.InputField()
-    current_title: str = dspy.InputField()
+    current_title: str = dspy.InputField(desc="Contexte uniquement, ne pas modifier")
     current_definition: str = dspy.InputField()
     failure_summary: str = dspy.InputField(
         desc="Échecs observés avec la formulation actuelle, un par ligne, vide si aucun"
     )
-    new_title: str = dspy.OutputField()
     new_definition: str = dspy.OutputField()
 
 
@@ -229,19 +227,16 @@ def propose_candidates(
             failure_summary=failure_summary,
             lm=lm,
         )
-        candidates.append(FieldCandidate(title=result.new_title, definition=result.new_definition))
+        candidates.append(FieldCandidate(definition=result.new_definition))
     return candidates
 
 
 @dataclass(frozen=True)
 class FieldResult:
     field_key: str
-    baseline_title: str
     baseline_definition: str
     baseline_f1: float
-    best_title: str
     best_definition: str
-    best_label: str
     best_f1: float
 
 
@@ -258,18 +253,17 @@ def optimize_field(
     score_fn: Callable[..., FieldScore] = score_field_candidate,
     propose_fn: Callable[..., list[FieldCandidate]] = propose_candidates,
 ) -> FieldResult:
-    """Baseline (valeurs CSV actuelles) -> `n_rounds` rounds de
-    `n_candidates` propositions chacun, en repartant à chaque round du
-    meilleur candidat connu (et de ses échecs, pour orienter la
-    proposition suivante). Ne renvoie jamais un résultat pire que la
-    baseline : un candidat ne remplace le meilleur connu que s'il le bat
-    strictement en F1."""
+    """Baseline (`definition` CSV actuelle) -> `n_rounds` rounds de
+    `n_candidates` propositions chacun, en repartant à chaque round de la
+    meilleure définition connue (et de ses échecs, pour orienter la
+    proposition suivante). `title` n'est jamais modifié. Ne renvoie jamais
+    un résultat pire que la baseline : un candidat ne remplace la meilleure
+    définition connue que s'il la bat strictement en F1."""
     target_field = next(f for f in all_fields if f.key == field_key)
 
-    def score(title: str, definition: str) -> FieldScore:
+    def score(definition: str) -> FieldScore:
         return score_fn(
             field_key,
-            title,
             definition,
             all_fields=all_fields,
             gold_documents=gold_documents,
@@ -277,45 +271,32 @@ def optimize_field(
             markdown_loader=markdown_loader,
         )
 
-    baseline_score = score(target_field.title, target_field.definition)
-    best_title, best_definition, best_score = (
-        target_field.title,
-        target_field.definition,
-        baseline_score,
-    )
+    baseline_score = score(target_field.definition)
+    best_definition, best_score = target_field.definition, baseline_score
 
     for _ in range(n_rounds):
-        current_field = target_field.model_copy(
-            update={"title": best_title, "definition": best_definition}
-        )
+        current_field = target_field.model_copy(update={"definition": best_definition})
         candidates = propose_fn(current_field, failures=best_score.failures, n=n_candidates, lm=lm)
         for candidate in candidates:
-            candidate_score = score(candidate.title, candidate.definition)
+            candidate_score = score(candidate.definition)
             if candidate_score.f1 > best_score.f1:
-                best_title, best_definition, best_score = (
-                    candidate.title,
-                    candidate.definition,
-                    candidate_score,
-                )
+                best_definition, best_score = candidate.definition, candidate_score
 
     return FieldResult(
         field_key=field_key,
-        baseline_title=target_field.title,
         baseline_definition=target_field.definition,
         baseline_f1=baseline_score.f1,
-        best_title=best_title,
         best_definition=best_definition,
-        best_label=slugify_title(best_title),
         best_f1=best_score.f1,
     )
 
 
-def _field_csv_row(field: Field, *, label: str, title: str, definition: str) -> dict[str, str]:
+def _field_csv_row(field: Field, *, definition: str) -> dict[str, str]:
     example = field.examples[0] if field.examples else None
     return {
         "section": field.section or "",
-        "label": label,
-        "Nom": title,
+        "label": field.key,
+        "Nom": field.title,
         "Définition": definition,
         "Type": _TYPE_MAP_INVERSE[field.type],
         "exemple valeur": (example.value if example else None) or "",
@@ -327,31 +308,20 @@ def _field_csv_row(field: Field, *, label: str, title: str, definition: str) -> 
 def write_results_csv(
     all_fields: list[Field], results_by_key: dict[str, FieldResult], output_path: Path
 ) -> None:
-    """CSV complet au format `tests/data/gold_devis_fields.csv` : les champs
-    optimisés (présents dans `results_by_key`) portent leur meilleur
-    `title`/`definition`/`label` trouvé, les autres sont recopiés
-    inchangés — le fichier reste copiable-collable tel quel par-dessus le
-    CSV existant, même en n'ayant optimisé qu'un sous-ensemble de champs
-    via `--field`."""
+    """CSV complet au format `tests/data/gold_devis_fields.csv` : `Nom`/
+    `label` sont toujours ceux de `all_fields` (jamais optimisés — voir
+    Architecture Decisions du plan) ; seule `Définition` varie, pour les
+    champs présents dans `results_by_key` — le fichier reste
+    copiable-collable tel quel par-dessus le CSV existant, même en n'ayant
+    optimisé qu'un sous-ensemble de champs via `--field`."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=_CSV_FIELDNAMES)
         writer.writeheader()
         for field in all_fields:
             result = results_by_key.get(field.key)
-            if result is None:
-                writer.writerow(
-                    _field_csv_row(field, label=field.key, title=field.title, definition=field.definition)
-                )
-            else:
-                writer.writerow(
-                    _field_csv_row(
-                        field,
-                        label=result.best_label,
-                        title=result.best_title,
-                        definition=result.best_definition,
-                    )
-                )
+            definition = result.best_definition if result is not None else field.definition
+            writer.writerow(_field_csv_row(field, definition=definition))
 
 
 def run(

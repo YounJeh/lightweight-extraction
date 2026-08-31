@@ -78,12 +78,12 @@ def test_score_field_candidate_computes_tp_fp_fn():
     results_by_source = {
         "a.pdf": [
             ExtractionResult(
-                field_title="Numéro candidat", value="DEV-1", typed_value="DEV-1", page_number=1
+                field_title="Numéro de devis", value="DEV-1", typed_value="DEV-1", page_number=1
             )
         ],
         "b.pdf": [
             ExtractionResult(
-                field_title="Numéro candidat", value="WRONG", typed_value="WRONG", page_number=1
+                field_title="Numéro de devis", value="WRONG", typed_value="WRONG", page_number=1
             )
         ],
         "c.pdf": [],
@@ -92,7 +92,6 @@ def test_score_field_candidate_computes_tp_fp_fn():
 
     score = score_field_candidate(
         "numero_devis",
-        "Numéro candidat",
         "nouvelle définition",
         all_fields=_fields(),
         gold_documents=gold_documents,
@@ -111,7 +110,7 @@ def test_score_field_candidate_computes_tp_fp_fn():
     ]
 
 
-def test_score_field_candidate_leaves_other_fields_unchanged():
+def test_score_field_candidate_never_changes_title():
     gold_documents = [
         {
             "source_file": "a.pdf",
@@ -121,14 +120,13 @@ def test_score_field_candidate_leaves_other_fields_unchanged():
     extractor = _FakeNerExtractor(
         {
             "a.pdf": [
-                ExtractionResult(field_title="Titre candidat", value="DEV-1", typed_value="DEV-1")
+                ExtractionResult(field_title="Numéro de devis", value="DEV-1", typed_value="DEV-1")
             ]
         }
     )
 
     score_field_candidate(
         "numero_devis",
-        "Titre candidat",
         "définition candidate",
         all_fields=_fields(),
         gold_documents=gold_documents,
@@ -138,7 +136,7 @@ def test_score_field_candidate_leaves_other_fields_unchanged():
 
     assert len(extractor.calls) == 1
     fields_sent = {f.key: f for f in extractor.calls[0]["fields"]}
-    assert fields_sent["numero_devis"].title == "Titre candidat"
+    assert fields_sent["numero_devis"].title == "Numéro de devis"
     assert fields_sent["numero_devis"].definition == "définition candidate"
     assert fields_sent["nom_societe"].title == "Nom de la société"
     assert fields_sent["nom_societe"].definition == "définition actuelle de la société"
@@ -152,7 +150,6 @@ def test_score_field_candidate_skips_documents_without_the_field_annotated():
 
     score = score_field_candidate(
         "numero_devis",
-        "Titre candidat",
         "définition candidate",
         all_fields=_fields(),
         gold_documents=gold_documents,
@@ -210,21 +207,20 @@ def _numero_devis_field() -> Field:
 def test_propose_candidates_returns_n_candidates_from_a_dummy_lm():
     lm = DummyLM(
         [
-            {"new_title": "Titre A", "new_definition": "Def A"},
-            {"new_title": "Titre B", "new_definition": "Def B"},
-            {"new_title": "Titre C", "new_definition": "Def C"},
+            {"new_definition": "Def A"},
+            {"new_definition": "Def B"},
+            {"new_definition": "Def C"},
         ]
     )
 
     candidates = propose_candidates(_numero_devis_field(), failures=[], n=3, lm=lm)
 
     assert len(candidates) == 3
-    assert [c.title for c in candidates] == ["Titre A", "Titre B", "Titre C"]
-    assert all(c.definition for c in candidates)
+    assert [c.definition for c in candidates] == ["Def A", "Def B", "Def C"]
 
 
 def test_propose_candidates_prompt_includes_current_field_state():
-    lm = DummyLM([{"new_title": "Titre A", "new_definition": "Def A"}])
+    lm = DummyLM([{"new_definition": "Def A"}])
 
     propose_candidates(_numero_devis_field(), failures=[], n=1, lm=lm)
 
@@ -235,7 +231,7 @@ def test_propose_candidates_prompt_includes_current_field_state():
 
 
 def test_propose_candidates_prompt_includes_failure_summary():
-    lm = DummyLM([{"new_title": "Titre A", "new_definition": "Def A"}])
+    lm = DummyLM([{"new_definition": "Def A"}])
     failures = [
         FailureExample(source_file="a.pdf", gold_value="DEV-1", extracted_value="WRONG"),
     ]
@@ -256,16 +252,16 @@ def _score(f1: float, failures: list[FailureExample] | None = None) -> FieldScor
 
 
 def test_optimize_field_adopts_a_strictly_better_candidate():
-    scores_by_key = {
-        ("Numéro de devis", "définition actuelle du numéro"): _score(0.5),
-        ("Meilleur titre", "meilleure définition"): _score(0.8),
+    scores_by_definition = {
+        "définition actuelle du numéro": _score(0.5),
+        "meilleure définition": _score(0.8),
     }
 
-    def fake_score_fn(field_key, title, definition, **kwargs):
-        return scores_by_key[(title, definition)]
+    def fake_score_fn(field_key, definition, **kwargs):
+        return scores_by_definition[definition]
 
     def fake_propose_fn(field, *, failures, n, lm):
-        return [FieldCandidate(title="Meilleur titre", definition="meilleure définition")]
+        return [FieldCandidate(definition="meilleure définition")]
 
     result = optimize_field(
         "numero_devis",
@@ -280,24 +276,22 @@ def test_optimize_field_adopts_a_strictly_better_candidate():
         propose_fn=fake_propose_fn,
     )
 
-    assert result.best_title == "Meilleur titre"
     assert result.best_definition == "meilleure définition"
     assert result.best_f1 == 0.8
     assert result.baseline_f1 == 0.5
-    assert result.best_label == "meilleur_titre"
 
 
 def test_optimize_field_keeps_baseline_when_no_candidate_is_better():
-    scores_by_key = {
-        ("Numéro de devis", "définition actuelle du numéro"): _score(0.5),
-        ("Pire titre", "pire définition"): _score(0.2),
+    scores_by_definition = {
+        "définition actuelle du numéro": _score(0.5),
+        "pire définition": _score(0.2),
     }
 
-    def fake_score_fn(field_key, title, definition, **kwargs):
-        return scores_by_key[(title, definition)]
+    def fake_score_fn(field_key, definition, **kwargs):
+        return scores_by_definition[definition]
 
     def fake_propose_fn(field, *, failures, n, lm):
-        return [FieldCandidate(title="Pire titre", definition="pire définition")]
+        return [FieldCandidate(definition="pire définition")]
 
     result = optimize_field(
         "numero_devis",
@@ -312,10 +306,8 @@ def test_optimize_field_keeps_baseline_when_no_candidate_is_better():
         propose_fn=fake_propose_fn,
     )
 
-    assert result.best_title == "Numéro de devis"
     assert result.best_definition == "définition actuelle du numéro"
     assert result.best_f1 == 0.5
-    assert result.best_label == "numero_devis"
 
 
 def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):
@@ -364,12 +356,9 @@ def test_write_results_csv_is_reparsable_by_import_fields(tmp_path):
     results_by_key = {
         "numero_devis": FieldResult(
             field_key="numero_devis",
-            baseline_title="Numéro de devis",
             baseline_definition="définition actuelle du numéro",
             baseline_f1=0.5,
-            best_title="Numéro du devis",
             best_definition="nouvelle définition du numéro",
-            best_label="numero_du_devis",
             best_f1=0.8,
         )
     }
@@ -380,10 +369,13 @@ def test_write_results_csv_is_reparsable_by_import_fields(tmp_path):
     result = import_fields(output_path.read_bytes(), output_path.name)
     assert result.errors == []
     imported_by_key = {f.key: f for f in result.fields}
-    assert imported_by_key["numero_du_devis"].title == "Numéro du devis"
-    assert imported_by_key["numero_du_devis"].definition == "nouvelle définition du numéro"
+    # Nom/label jamais modifiés, même pour un champ optimisé — seule la
+    # définition change
+    assert imported_by_key["numero_devis"].title == "Numéro de devis"
+    assert imported_by_key["numero_devis"].definition == "nouvelle définition du numéro"
     # champ non optimisé recopié tel quel (même clé, même title/definition)
     assert imported_by_key["pourcentage_acompte"].title == "Pourcentage d'acompte"
+    assert imported_by_key["pourcentage_acompte"].definition == "définition actuelle du pourcentage"
     assert imported_by_key["pourcentage_acompte"].type == "int"
 
 
@@ -396,12 +388,9 @@ def test_run_only_optimizes_requested_field_keys(tmp_path):
         field = next(f for f in fields if f.key == field_key)
         return FieldResult(
             field_key=field_key,
-            baseline_title=field.title,
             baseline_definition=field.definition,
             baseline_f1=0.5,
-            best_title="Titre optimisé",
             best_definition="définition optimisée",
-            best_label="titre_optimise",
             best_f1=0.9,
         )
 
@@ -419,7 +408,8 @@ def test_run_only_optimizes_requested_field_keys(tmp_path):
     assert calls == ["numero_devis"]
     result = import_fields(output_path.read_bytes(), output_path.name)
     imported_by_key = {f.key: f for f in result.fields}
-    assert imported_by_key["titre_optimise"].title == "Titre optimisé"
+    assert imported_by_key["numero_devis"].title == "Numéro de devis"
+    assert imported_by_key["numero_devis"].definition == "définition optimisée"
     # pourcentage_acompte n'a pas été demandé -> inchangé
     assert imported_by_key["pourcentage_acompte"].title == "Pourcentage d'acompte"
 
@@ -428,12 +418,9 @@ def test_run_prints_baseline_and_best_f1(tmp_path, capsys):
     def fake_optimize_fn(field_key, **kwargs):
         return FieldResult(
             field_key=field_key,
-            baseline_title="Numéro de devis",
             baseline_definition="def",
             baseline_f1=0.5,
-            best_title="Numéro de devis",
             best_definition="def",
-            best_label="numero_devis",
             best_f1=0.8,
         )
 
