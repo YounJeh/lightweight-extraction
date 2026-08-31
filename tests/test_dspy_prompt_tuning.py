@@ -488,6 +488,44 @@ def test_optimize_field_keeps_baseline_when_no_candidate_is_better():
     assert result.best_f1 == 0.5
 
 
+def test_optimize_field_prints_progress_per_round_and_candidate(capsys):
+    scores_by_definition = {
+        "définition actuelle du numéro": _score(0.5),
+        "meilleure définition": _score(0.8),
+    }
+
+    def fake_score_fn(field_key, definition, **kwargs):
+        return scores_by_definition[definition]
+
+    def fake_propose_fn(field, *, failures, n, lm):
+        return [FieldCandidate(definition="meilleure définition", reasoning="confusion X/Y")]
+
+    result = optimize_field(
+        "numero_devis",
+        all_fields=[_numero_devis_field()],
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        ner_extractor=None,
+        markdown_loader=lambda source_file: "",
+        lm=None,
+        score_fn=fake_score_fn,
+        propose_fn=fake_propose_fn,
+    )
+
+    captured = capsys.readouterr()
+    assert "numero_devis" in captured.out
+    assert "baseline F1=0.500" in captured.out
+    assert "round 1/1" in captured.out
+    assert "candidat 1/1" in captured.out
+    assert "F1=0.800" in captured.out
+    assert "nouveau meilleur" in captured.out
+    assert "confusion X/Y" in captured.out
+    # comportement inchangé
+    assert result.best_definition == "meilleure définition"
+    assert result.best_f1 == 0.8
+
+
 def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):
     data_test_dir = tmp_path / "data_test"
     data_test_dir.mkdir()

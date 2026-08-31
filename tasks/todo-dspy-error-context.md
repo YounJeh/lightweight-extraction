@@ -229,19 +229,19 @@ Aucun changement de signature/valeur de retour — uniquement des `print()`
 ajoutés dans le corps existant.
 
 **Acceptance criteria :**
-- [ ] Avec `score_fn`/`propose_fn` factices (mêmes patterns que les tests
+- [x] Avec `score_fn`/`propose_fn` factices (mêmes patterns que les tests
       `optimize_field` existants) et `capsys`, la sortie stdout contient le
       `field_key`, au moins une ligne "round X/Y", et au moins une ligne
       "candidat i/n" avec un F1 affiché
-- [ ] Quand un candidat devient le nouveau meilleur, la ligne
+- [x] Quand un candidat devient le nouveau meilleur, la ligne
       correspondante le signale ("nouveau meilleur" ou équivalent)
-- [ ] Le comportement de retour (`FieldResult`) est strictement inchangé
+- [x] Le comportement de retour (`FieldResult`) est strictement inchangé
       par rapport à avant cette tâche (tests `optimize_field` existants
       toujours verts sans modification de leurs assertions sur la valeur
       de retour)
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k optimize_field`
+- [x] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k optimize_field`
 
 **Dependencies :** Task 1, Task 5
 

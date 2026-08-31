@@ -337,14 +337,26 @@ def optimize_field(
 
     baseline_score = score(target_field.definition)
     best_definition, best_score = target_field.definition, baseline_score
+    print(
+        f"[{field_key}] baseline F1={baseline_score.f1:.3f} "
+        f"({len(baseline_score.failures)} échec(s))"
+    )
 
-    for _ in range(n_rounds):
+    for round_idx in range(1, n_rounds + 1):
         current_field = target_field.model_copy(update={"definition": best_definition})
         candidates = propose_fn(current_field, failures=best_score.failures, n=n_candidates, lm=lm)
-        for candidate in candidates:
+        print(f"[{field_key}] round {round_idx}/{n_rounds} : {len(candidates)} candidat(s) proposé(s)")
+        for i, candidate in enumerate(candidates, start=1):
             candidate_score = score(candidate.definition)
-            if candidate_score.f1 > best_score.f1:
+            improved = candidate_score.f1 > best_score.f1
+            if improved:
                 best_definition, best_score = candidate.definition, candidate_score
+            marker = " (nouveau meilleur)" if improved else ""
+            reasoning = candidate.reasoning[:120]
+            print(
+                f"[{field_key}]   candidat {i}/{len(candidates)} : "
+                f"F1={candidate_score.f1:.3f}{marker} — {reasoning}"
+            )
 
     return FieldResult(
         field_key=field_key,
