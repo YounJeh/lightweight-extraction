@@ -9,6 +9,7 @@ from scripts.dspy_prompt_tuning import (
     FieldResult,
     FieldScore,
     _find_gold_evidence,
+    _format_failure_summary,
     build_dspy_lm,
     build_markdown_loader,
     optimize_field,
@@ -287,6 +288,67 @@ def test_build_dspy_lm_routes_gemini_by_default(monkeypatch):
 def test_build_dspy_lm_requires_a_model_id():
     with pytest.raises(ValueError):
         build_dspy_lm(None)
+
+
+# --- _format_failure_summary ---------------------------------------------------
+
+
+def test_format_failure_summary_empty_list_returns_empty_string():
+    assert _format_failure_summary([]) == ""
+
+
+def test_format_failure_summary_includes_both_evidences_when_present():
+    failures = [
+        FailureExample(
+            source_file="26-0743.pdf",
+            gold_value="30 jours",
+            extracted_value="45 jours",
+            extracted_evidence="La durée prévisionnelle du chantier est de 45 jours.",
+            gold_evidence="Le solde de 70 % sera réglé sous 30 jours après réception de la facture.",
+        )
+    ]
+
+    summary = _format_failure_summary(failures)
+
+    assert "26-0743.pdf" in summary
+    assert "Gold : 30 jours" in summary
+    assert 'Evidence gold : "Le solde de 70 % sera réglé sous 30 jours' in summary
+    assert "Extraction incorrecte : 45 jours" in summary
+    assert 'Evidence extraction : "La durée prévisionnelle du chantier est de 45 jours."' in summary
+
+
+def test_format_failure_summary_omits_missing_evidence_lines():
+    failures = [
+        FailureExample(
+            source_file="a.pdf",
+            gold_value="DEV-1",
+            extracted_value="WRONG",
+            extracted_evidence=None,
+            gold_evidence=None,
+        )
+    ]
+
+    summary = _format_failure_summary(failures)
+
+    assert "Evidence gold" not in summary
+    assert "Evidence extraction" not in summary
+    assert "None" not in summary
+
+
+def test_format_failure_summary_shows_placeholder_when_nothing_extracted():
+    failures = [
+        FailureExample(
+            source_file="a.pdf",
+            gold_value="DEV-1",
+            extracted_value=None,
+            extracted_evidence=None,
+            gold_evidence=None,
+        )
+    ]
+
+    summary = _format_failure_summary(failures)
+
+    assert "Extraction incorrecte : (rien)" in summary
 
 
 # --- propose_candidates -------------------------------------------------------

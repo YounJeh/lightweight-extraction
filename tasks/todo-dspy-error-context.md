@@ -150,15 +150,15 @@ document en échec, un bloc proche de l'exemple donné par l'utilisateur :
 Chaîne vide (`""`) si `failures` est vide, comme aujourd'hui.
 
 **Acceptance criteria :**
-- [ ] Un `FailureExample` avec les deux evidences produit un bloc avec les
+- [x] Un `FailureExample` avec les deux evidences produit un bloc avec les
       4 lignes (Gold/Evidence gold/Extraction incorrecte/Evidence
       extraction)
-- [ ] Un `FailureExample` avec `gold_evidence=None` omet la ligne
+- [x] Un `FailureExample` avec `gold_evidence=None` omet la ligne
       "Evidence gold" sans laisser de ligne vide/`None` littéral
-- [ ] `failures=[]` renvoie toujours `""`
+- [x] `failures=[]` renvoie toujours `""`
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k format_failure_summary`
+- [x] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k format_failure_summary`
 
 **Dependencies :** Task 2, Task 3
 

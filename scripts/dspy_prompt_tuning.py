@@ -240,12 +240,23 @@ class ProposeFieldPrompt(dspy.Signature):
 
 
 def _format_failure_summary(failures: list[FailureExample]) -> str:
+    """Un bloc par document en échec — Gold/Evidence gold/Extraction
+    incorrecte/Evidence extraction, une ligne "Evidence ..." omise quand
+    l'evidence correspondante est `None` (non trouvée, voir
+    `_find_gold_evidence`/`FailureExample.extracted_evidence`)."""
     if not failures:
         return ""
-    return "\n".join(
-        f"- {f.source_file} : attendu {f.gold_value!r}, extrait {f.extracted_value!r}"
-        for f in failures
-    )
+    blocks = []
+    for f in failures:
+        lines = [f"- {f.source_file} :", f"  Gold : {f.gold_value}"]
+        if f.gold_evidence:
+            lines.append(f'  Evidence gold : "{f.gold_evidence}"')
+        extracted_display = f.extracted_value if f.extracted_value is not None else "(rien)"
+        lines.append(f"  Extraction incorrecte : {extracted_display}")
+        if f.extracted_evidence:
+            lines.append(f'  Evidence extraction : "{f.extracted_evidence}"')
+        blocks.append("\n".join(lines))
+    return "\n".join(blocks)
 
 
 def propose_candidates(
