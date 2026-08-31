@@ -78,11 +78,16 @@ def build_markdown_loader(
 @dataclass(frozen=True)
 class FailureExample:
     """Un document où le candidat courant n'a pas matché le gold — donné en
-    contexte au proposeur DSPy pour orienter la prochaine variante."""
+    contexte au proposeur DSPy pour orienter la prochaine variante.
+    `extracted_evidence` : contexte source autour de la valeur extraite,
+    déjà calculé par `LangExtractNerExtractor._locate`
+    (`ExtractionResult.text_position`) — `None` si rien n'a été extrait, cas
+    attendu, pas une erreur."""
 
     source_file: str
     gold_value: str
     extracted_value: str | None
+    extracted_evidence: str | None
 
 
 @dataclass(frozen=True)
@@ -155,6 +160,7 @@ def score_field_candidate(
                     source_file=doc["source_file"],
                     gold_value=str(annotation.get("value")),
                     extracted_value=str(extracted_value) if extracted_value else None,
+                    extracted_evidence=extracted.text_position if extracted else None,
                 )
             )
 

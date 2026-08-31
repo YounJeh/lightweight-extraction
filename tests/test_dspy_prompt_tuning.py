@@ -83,7 +83,11 @@ def test_score_field_candidate_computes_tp_fp_fn():
         ],
         "b.pdf": [
             ExtractionResult(
-                field_title="Numéro de devis", value="WRONG", typed_value="WRONG", page_number=1
+                field_title="Numéro de devis",
+                value="WRONG",
+                typed_value="WRONG",
+                page_number=1,
+                text_position="...la durée est de WRONG jours...",
             )
         ],
         "c.pdf": [],
@@ -106,8 +110,36 @@ def test_score_field_candidate_computes_tp_fp_fn():
     assert score.recall == 0.5
     assert score.f1 == pytest.approx(0.5)
     assert score.failures == [
-        FailureExample(source_file="b.pdf", gold_value="DEV-2", extracted_value="WRONG")
+        FailureExample(
+            source_file="b.pdf",
+            gold_value="DEV-2",
+            extracted_value="WRONG",
+            extracted_evidence="...la durée est de WRONG jours...",
+        )
     ]
+
+
+def test_score_field_candidate_failure_has_no_extracted_evidence_when_nothing_extracted():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-1", "evidence": {"page": 1}}},
+        },
+    ]
+    extractor = _FakeNerExtractor({"a.pdf": []})
+
+    score = score_field_candidate(
+        "numero_devis",
+        "nouvelle définition",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "markdown",
+    )
+
+    assert len(score.failures) == 1
+    assert score.failures[0].extracted_value is None
+    assert score.failures[0].extracted_evidence is None
 
 
 def test_score_field_candidate_never_changes_title():
@@ -233,7 +265,12 @@ def test_propose_candidates_prompt_includes_current_field_state():
 def test_propose_candidates_prompt_includes_failure_summary():
     lm = DummyLM([{"new_definition": "Def A"}])
     failures = [
-        FailureExample(source_file="a.pdf", gold_value="DEV-1", extracted_value="WRONG"),
+        FailureExample(
+            source_file="a.pdf",
+            gold_value="DEV-1",
+            extracted_value="WRONG",
+            extracted_evidence=None,
+        ),
     ]
 
     propose_candidates(_numero_devis_field(), failures=failures, n=1, lm=lm)

@@ -78,13 +78,13 @@ devient `FailureExample.extracted_evidence: str | None` — `None` quand
 `extracted.text_position` est lui-même `None`.
 
 **Acceptance criteria :**
-- [ ] Un `FailureExample` généré pour un document où `extracted` a un
+- [x] Un `FailureExample` généré pour un document où `extracted` a un
       `text_position` non vide porte ce texte dans `extracted_evidence`
-- [ ] Un document sans extraction (`extracted is None`) produit
+- [x] Un document sans extraction (`extracted is None`) produit
       `extracted_evidence=None`, pas d'exception
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k extracted_evidence`
+- [x] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k extracted_evidence`
 
 **Dependencies :** Task 1
 
