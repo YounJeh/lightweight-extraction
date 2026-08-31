@@ -182,20 +182,20 @@ d'abord la confusion probable à partir des deux evidences avant de
 proposer une nouvelle définition qui la rend impossible").
 
 **Acceptance criteria :**
-- [ ] Avec un `dspy.utils.DummyLM(answers=[{"reasoning": "...", "new_definition": "..."}])`
+- [x] Avec un `dspy.utils.DummyLM(answers=[{"reasoning": "...", "new_definition": "..."}])`
       (la clé `reasoning` est **obligatoire** dans chaque réponse factice —
       vérifié en amont, voir Architecture Decisions), `propose_candidates`
       renvoie des `FieldCandidate` avec `reasoning` et `definition` non
       vides
-- [ ] Le prompt envoyé au LM factice (`lm.history[0]["messages"]`) contient
+- [x] Le prompt envoyé au LM factice (`lm.history[0]["messages"]`) contient
       toujours `current_title` (contexte) même si `title` n'est plus
       optimisé
-- [ ] Un test avec une réponse `DummyLM` **sans** clé `reasoning` échoue
+- [x] Un test avec une réponse `DummyLM` **sans** clé `reasoning` échoue
       explicitement (documente la contrainte, évite qu'un futur test
       l'oublie silencieusement)
 
 **Verification :**
-- [ ] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k propose_candidates`
+- [x] Tests : `uv run pytest -m "not live" tests/test_dspy_prompt_tuning.py -k propose_candidates`
       — LM factice uniquement, aucun appel réseau
 
 **Dependencies :** Task 4
@@ -209,7 +209,7 @@ proposer une nouvelle définition qui la rend impossible").
 ---
 
 ## Checkpoint : Phase 2
-- [ ] `uv run pytest -m "not live"` passe ; `ProposeFieldPrompt` testé avec
+- [x] `uv run pytest -m "not live"` passe ; `ProposeFieldPrompt` testé avec
       `dspy.utils.DummyLM` (réponses avec `reasoning`), aucun appel réseau
 
 ---

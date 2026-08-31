@@ -367,9 +367,9 @@ def _numero_devis_field() -> Field:
 def test_propose_candidates_returns_n_candidates_from_a_dummy_lm():
     lm = DummyLM(
         [
-            {"new_definition": "Def A"},
-            {"new_definition": "Def B"},
-            {"new_definition": "Def C"},
+            {"reasoning": "Raison A", "new_definition": "Def A"},
+            {"reasoning": "Raison B", "new_definition": "Def B"},
+            {"reasoning": "Raison C", "new_definition": "Def C"},
         ]
     )
 
@@ -377,10 +377,22 @@ def test_propose_candidates_returns_n_candidates_from_a_dummy_lm():
 
     assert len(candidates) == 3
     assert [c.definition for c in candidates] == ["Def A", "Def B", "Def C"]
+    assert [c.reasoning for c in candidates] == ["Raison A", "Raison B", "Raison C"]
+
+
+def test_propose_candidates_requires_reasoning_in_dummy_lm_answers():
+    """`dspy.ChainOfThought` attend un champ `reasoning` en plus des sorties
+    déclarées dans la Signature — une réponse `DummyLM` qui l'omet doit
+    échouer explicitement (documente la contrainte, voir Architecture
+    Decisions du plan)."""
+    lm = DummyLM([{"new_definition": "Def A"}])
+
+    with pytest.raises(Exception):
+        propose_candidates(_numero_devis_field(), failures=[], n=1, lm=lm)
 
 
 def test_propose_candidates_prompt_includes_current_field_state():
-    lm = DummyLM([{"new_definition": "Def A"}])
+    lm = DummyLM([{"reasoning": "Raison", "new_definition": "Def A"}])
 
     propose_candidates(_numero_devis_field(), failures=[], n=1, lm=lm)
 
@@ -391,7 +403,7 @@ def test_propose_candidates_prompt_includes_current_field_state():
 
 
 def test_propose_candidates_prompt_includes_failure_summary():
-    lm = DummyLM([{"new_definition": "Def A"}])
+    lm = DummyLM([{"reasoning": "Raison", "new_definition": "Def A"}])
     failures = [
         FailureExample(
             source_file="a.pdf",
@@ -427,7 +439,7 @@ def test_optimize_field_adopts_a_strictly_better_candidate():
         return scores_by_definition[definition]
 
     def fake_propose_fn(field, *, failures, n, lm):
-        return [FieldCandidate(definition="meilleure définition")]
+        return [FieldCandidate(definition="meilleure définition", reasoning="raison")]
 
     result = optimize_field(
         "numero_devis",
@@ -457,7 +469,7 @@ def test_optimize_field_keeps_baseline_when_no_candidate_is_better():
         return scores_by_definition[definition]
 
     def fake_propose_fn(field, *, failures, n, lm):
-        return [FieldCandidate(definition="pire définition")]
+        return [FieldCandidate(definition="pire définition", reasoning="raison")]
 
     result = optimize_field(
         "numero_devis",

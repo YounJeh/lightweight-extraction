@@ -218,17 +218,23 @@ def score_field_candidate(
 @dataclass(frozen=True)
 class FieldCandidate:
     definition: str
+    reasoning: str
 
 
 class ProposeFieldPrompt(dspy.Signature):
     """Tu améliores la définition d'un champ d'extraction NER pour un
     pipeline français d'extraction de devis/contrats. `current_title` est
     donné comme contexte (le concept que la définition doit décrire), il
-    n'est pas à modifier. Propose une nouvelle définition
-    (`new_definition`), en français, plus claire et sans ambiguïté pour un
-    LLM d'extraction — même sens métier que l'original, mais reformulée
-    pour réduire les erreurs listées dans `failure_summary` (si vide,
-    propose simplement une formulation alternative à tester)."""
+    n'est pas à modifier. `failure_summary` (si non vide) montre, pour
+    chaque document en échec, la valeur gold et son contexte source à côté
+    de la valeur extraite à tort et son contexte source : identifie
+    d'abord la confusion probable qui explique l'erreur (ex. deux concepts
+    voisins dans le texte, une valeur au mauvais format...) avant de
+    proposer une nouvelle définition (`new_definition`), en français,
+    claire et sans ambiguïté pour un LLM d'extraction, qui rend cette
+    confusion impossible — même sens métier que l'original. Si
+    `failure_summary` est vide, propose simplement une formulation
+    alternative à tester."""
 
     field_type: str = dspy.InputField()
     current_title: str = dspy.InputField(desc="Contexte uniquement, ne pas modifier")
@@ -266,12 +272,14 @@ def propose_candidates(
     n: int,
     lm: dspy.LM,
 ) -> list[FieldCandidate]:
-    """Propose `n` variantes de `title`/`definition` pour `field`, en tenant
-    compte de `failures` (documents où la formulation courante a échoué).
-    Un appel LM par variante (température de `lm` régit la diversité entre
-    les appels — pas d'API de complétions multiples DSPy dédiée utilisée
-    ici, un `dspy.Predict` par candidat suffit et reste simple à tester)."""
-    predict = dspy.Predict(ProposeFieldPrompt)
+    """Propose `n` variantes de `definition` pour `field`, en tenant compte
+    de `failures` (documents où la formulation courante a échoué).
+    `dspy.ChainOfThought` (pas `dspy.Predict`) pour que le modèle produise
+    son propre diagnostic (`reasoning`) du type d'erreur à partir des
+    evidences avant de reformuler — pas de classifieur d'erreur codé en
+    dur (voir Architecture Decisions du plan). Un appel LM par variante
+    (température de `lm` régit la diversité entre les appels)."""
+    predict = dspy.ChainOfThought(ProposeFieldPrompt)
     failure_summary = _format_failure_summary(failures)
 
     candidates = []
@@ -283,7 +291,7 @@ def propose_candidates(
             failure_summary=failure_summary,
             lm=lm,
         )
-        candidates.append(FieldCandidate(definition=result.new_definition))
+        candidates.append(FieldCandidate(definition=result.new_definition, reasoning=result.reasoning))
     return candidates
 
 
