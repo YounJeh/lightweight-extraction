@@ -29,6 +29,12 @@ image = (
         "vllm",
         "huggingface_hub",
     )
+    # Le sampler FlashInfer de vLLM compile un kernel JIT au premier appel,
+    # qui a besoin de nvcc — absent des wheels PyTorch/de cette image (pas
+    # de toolkit CUDA complet). Plutôt que d'installer nvcc, on désactive ce
+    # sampler : vLLM retombe sur l'implémentation PyTorch-native, sans JIT.
+    # Root cause + fix : https://github.com/vllm-project/vllm/issues/44305
+    .env({"VLLM_USE_FLASHINFER_SAMPLER": "0"})
 )
 
 
@@ -85,7 +91,7 @@ class NuExtractServer:
             "16384",
 
             "--limit-mm-per-prompt",
-            '{"image": 6, "video": 0}',
+            '{"image": 15, "video": 0}',
         ]
 
         subprocess.Popen(cmd)
