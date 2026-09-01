@@ -113,16 +113,18 @@ def build_markdown_loader(
 class FailureExample:
     """Un document où le candidat courant n'a pas matché le gold — donné en
     contexte au proposeur DSPy pour orienter la prochaine variante.
+    `gold_value=None` : gold absent (faux positif — rien n'était attendu
+    mais une valeur a été extraite), pas la chaîne littérale `"None"`.
     `extracted_evidence` : contexte source autour de la valeur extraite,
     déjà calculé par `LangExtractNerExtractor._locate`
     (`ExtractionResult.text_position`). `gold_evidence` : contexte source
     autour de la valeur gold, dérivé à la volée (`_find_gold_evidence`) —
     jamais lu depuis `evidence.text` du YAML gold (toujours `null`
-    aujourd'hui). Les deux sont `None` si non disponibles — cas attendu,
-    pas une erreur."""
+    aujourd'hui). Les evidences sont `None` si non disponibles — cas
+    attendu, pas une erreur."""
 
     source_file: str
-    gold_value: str
+    gold_value: str | None
     extracted_value: str | None
     extracted_evidence: str | None
     gold_evidence: str | None
@@ -193,13 +195,14 @@ def score_field_candidate(
                 fn += 1
 
         if doc_kinds & {"fp", "fn"}:
+            gold_value = annotation.get("value")
             failures.append(
                 FailureExample(
                     source_file=doc["source_file"],
-                    gold_value=str(annotation.get("value")),
+                    gold_value=str(gold_value) if gold_value is not None else None,
                     extracted_value=str(extracted_value) if extracted_value else None,
                     extracted_evidence=extracted.text_position if extracted else None,
-                    gold_evidence=_find_gold_evidence(markdown, annotation.get("value")),
+                    gold_evidence=_find_gold_evidence(markdown, gold_value),
                 )
             )
 
@@ -254,7 +257,8 @@ def _format_failure_summary(failures: list[FailureExample]) -> str:
         return ""
     blocks = []
     for f in failures:
-        lines = [f"- {f.source_file} :", f"  Gold : {f.gold_value}"]
+        gold_display = f.gold_value if f.gold_value is not None else "(absent)"
+        lines = [f"- {f.source_file} :", f"  Gold : {gold_display}"]
         if f.gold_evidence:
             lines.append(f'  Evidence gold : "{f.gold_evidence}"')
         extracted_display = f.extracted_value if f.extracted_value is not None else "(rien)"

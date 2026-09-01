@@ -223,6 +223,38 @@ def test_score_field_candidate_failure_includes_gold_evidence_when_found():
     assert "30 jours" in score.failures[0].gold_evidence
 
 
+def test_score_field_candidate_failure_has_no_literal_none_when_gold_absent():
+    """Faux positif : gold absent (None) mais une valeur est extraite quand
+    même — gold_value doit rester None, jamais la chaîne littérale
+    "None" (voir _format_failure_summary)."""
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": None, "evidence": {"page": None}}},
+        },
+    ]
+    extractor = _FakeNerExtractor(
+        {"a.pdf": [ExtractionResult(field_title="Numéro de devis", value="DEV-1", typed_value="DEV-1")]}
+    )
+
+    score = score_field_candidate(
+        "numero_devis",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "un texte sans rapport",
+    )
+
+    assert len(score.failures) == 1
+    assert score.failures[0].gold_value is None
+    assert score.failures[0].gold_evidence is None
+
+    summary = _format_failure_summary(score.failures)
+    assert "Gold : (absent)" in summary
+    assert "Gold : None" not in summary
+
+
 # --- _find_gold_evidence -------------------------------------------------------
 
 
