@@ -52,3 +52,9 @@ data_test/ITM Vitr* - March* de travaux - ENTECH - lot PV.pdf
 data_test/SKM_C300i26022410480.pdf
 # Cache local du script de validation OCR (scripts/validate_ocr_tuning.py)
 scripts/_ocr_tuning_cache/
+# Cache local markdown + résultats générés par le script d'optimisation de
+# prompts DSPy (scripts/dspy_prompt_tuning.py) — sortie régénérée à chaque
+# run, jamais une source de vérité versionnée.
+scripts/_dspy_markdown_cache/
+tasks/dspy-prompt-tuning-results.csv
+tasks/dspy-error-context-results.csv

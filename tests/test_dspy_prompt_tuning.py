@@ -1,0 +1,688 @@
+import pytest
+from dspy.utils import DummyLM
+
+from app.fields_import import import_fields
+from app.models import ExtractionResult, Field, FieldExample
+from scripts.dspy_prompt_tuning import (
+    FailureExample,
+    FieldCandidate,
+    FieldResult,
+    FieldScore,
+    _find_gold_evidence,
+    _format_failure_summary,
+    build_dspy_lm,
+    build_markdown_loader,
+    optimize_field,
+    propose_candidates,
+    run,
+    score_field_candidate,
+    write_results_csv,
+)
+
+
+class _FakeNerExtractor:
+    def __init__(self, results_by_source: dict[str, list[ExtractionResult]]):
+        self.results_by_source = results_by_source
+        self.calls: list[dict] = []
+
+    def extract(self, text, fields, *, source_filename=None):
+        self.calls.append({"text": text, "fields": fields, "source_filename": source_filename})
+        return self.results_by_source.get(source_filename, [])
+
+
+class _FakePdfExtractor:
+    def __init__(self, text: str):
+        self.text = text
+        self.call_count = 0
+
+    def extract_text(self, pdf_bytes: bytes) -> str:
+        self.call_count += 1
+        return self.text
+
+
+def _fields() -> list[Field]:
+    return [
+        Field(
+            id=1,
+            key="numero_devis",
+            title="Numéro de devis",
+            definition="définition actuelle du numéro",
+            type="text",
+        ),
+        Field(
+            id=2,
+            key="nom_societe",
+            title="Nom de la société",
+            definition="définition actuelle de la société",
+            type="text",
+        ),
+    ]
+
+
+# --- score_field_candidate ---------------------------------------------------
+
+
+def test_score_field_candidate_computes_tp_fp_fn():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-1", "evidence": {"page": 1}}},
+        },
+        {
+            "source_file": "b.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-2", "evidence": {"page": 1}}},
+        },
+        {
+            "source_file": "c.pdf",
+            "annotations": {"numero_devis": {"value": None, "evidence": {"page": None}}},
+        },
+    ]
+    results_by_source = {
+        "a.pdf": [
+            ExtractionResult(
+                field_title="Numéro de devis", value="DEV-1", typed_value="DEV-1", page_number=1
+            )
+        ],
+        "b.pdf": [
+            ExtractionResult(
+                field_title="Numéro de devis",
+                value="WRONG",
+                typed_value="WRONG",
+                page_number=1,
+                text_position="...la durée est de WRONG jours...",
+            )
+        ],
+        "c.pdf": [],
+    }
+    extractor = _FakeNerExtractor(results_by_source)
+
+    score = score_field_candidate(
+        "numero_devis",
+        "nouvelle définition",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: f"markdown::{source_file}",
+    )
+
+    # a : match -> TP ; b : mauvaise valeur -> FP + FN ; c : gold vide, rien
+    # extrait -> TN (exclu du calcul precision/recall)
+    assert (score.tp, score.fp, score.fn) == (1, 1, 1)
+    assert score.precision == 0.5
+    assert score.recall == 0.5
+    assert score.f1 == pytest.approx(0.5)
+    assert score.failures == [
+        FailureExample(
+            source_file="b.pdf",
+            gold_value="DEV-2",
+            extracted_value="WRONG",
+            extracted_evidence="...la durée est de WRONG jours...",
+            gold_evidence=None,
+        )
+    ]
+
+
+def test_score_field_candidate_failure_has_no_extracted_evidence_when_nothing_extracted():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-1", "evidence": {"page": 1}}},
+        },
+    ]
+    extractor = _FakeNerExtractor({"a.pdf": []})
+
+    score = score_field_candidate(
+        "numero_devis",
+        "nouvelle définition",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "markdown",
+    )
+
+    assert len(score.failures) == 1
+    assert score.failures[0].extracted_value is None
+    assert score.failures[0].extracted_evidence is None
+
+
+def test_score_field_candidate_never_changes_title():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "DEV-1", "evidence": {"page": 1}}},
+        },
+    ]
+    extractor = _FakeNerExtractor(
+        {
+            "a.pdf": [
+                ExtractionResult(field_title="Numéro de devis", value="DEV-1", typed_value="DEV-1")
+            ]
+        }
+    )
+
+    score_field_candidate(
+        "numero_devis",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "markdown",
+    )
+
+    assert len(extractor.calls) == 1
+    fields_sent = {f.key: f for f in extractor.calls[0]["fields"]}
+    assert fields_sent["numero_devis"].title == "Numéro de devis"
+    assert fields_sent["numero_devis"].definition == "définition candidate"
+    assert fields_sent["nom_societe"].title == "Nom de la société"
+    assert fields_sent["nom_societe"].definition == "définition actuelle de la société"
+
+
+def test_score_field_candidate_skips_documents_without_the_field_annotated():
+    gold_documents = [
+        {"source_file": "a.pdf", "annotations": {"nom_societe": {"value": "ADALTRA"}}},
+    ]
+    extractor = _FakeNerExtractor({})
+
+    score = score_field_candidate(
+        "numero_devis",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "markdown",
+    )
+
+    assert extractor.calls == []
+    assert (score.tp, score.fp, score.fn) == (0, 0, 0)
+    assert score.f1 == 0.0
+
+
+def test_score_field_candidate_failure_includes_gold_evidence_when_found():
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": "30 jours", "evidence": {"page": 1}}},
+        },
+    ]
+    extractor = _FakeNerExtractor(
+        {"a.pdf": [ExtractionResult(field_title="Numéro de devis", value="45 jours")]}
+    )
+    markdown = "Le solde de 70 % sera réglé sous 30 jours après réception de la facture."
+
+    score = score_field_candidate(
+        "numero_devis",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: markdown,
+    )
+
+    assert len(score.failures) == 1
+    assert score.failures[0].gold_evidence is not None
+    assert "30 jours" in score.failures[0].gold_evidence
+
+
+def test_score_field_candidate_failure_has_no_literal_none_when_gold_absent():
+    """Faux positif : gold absent (None) mais une valeur est extraite quand
+    même — gold_value doit rester None, jamais la chaîne littérale
+    "None" (voir _format_failure_summary)."""
+    gold_documents = [
+        {
+            "source_file": "a.pdf",
+            "annotations": {"numero_devis": {"value": None, "evidence": {"page": None}}},
+        },
+    ]
+    extractor = _FakeNerExtractor(
+        {"a.pdf": [ExtractionResult(field_title="Numéro de devis", value="DEV-1", typed_value="DEV-1")]}
+    )
+
+    score = score_field_candidate(
+        "numero_devis",
+        "définition candidate",
+        all_fields=_fields(),
+        gold_documents=gold_documents,
+        ner_extractor=extractor,
+        markdown_loader=lambda source_file: "un texte sans rapport",
+    )
+
+    assert len(score.failures) == 1
+    assert score.failures[0].gold_value is None
+    assert score.failures[0].gold_evidence is None
+
+    summary = _format_failure_summary(score.failures)
+    assert "Gold : (absent)" in summary
+    assert "Gold : None" not in summary
+
+
+# --- _find_gold_evidence -------------------------------------------------------
+
+
+def test_find_gold_evidence_returns_a_snippet_around_the_match():
+    text = "Le solde de 70 % sera réglé sous 30 jours après réception de la facture."
+
+    snippet = _find_gold_evidence(text, "30 jours")
+
+    assert snippet is not None
+    assert "30 jours" in snippet
+
+
+def test_find_gold_evidence_returns_none_when_value_not_present():
+    text = "Un texte qui ne contient pas la valeur cherchée."
+
+    assert _find_gold_evidence(text, "30 jours") is None
+
+
+def test_find_gold_evidence_respects_word_boundaries_for_short_numbers():
+    text = "Voir la clause en page 1030 du contrat."
+
+    assert _find_gold_evidence(text, "30") is None
+
+
+def test_find_gold_evidence_matches_case_insensitively():
+    text = "Montant TTC : Trente Mille Euros."
+
+    snippet = _find_gold_evidence(text, "trente mille euros")
+
+    assert snippet is not None
+    assert "Trente Mille Euros" in snippet
+
+
+def test_find_gold_evidence_returns_none_for_empty_value():
+    assert _find_gold_evidence("un texte quelconque", "") is None
+    assert _find_gold_evidence("un texte quelconque", None) is None
+
+
+# --- build_markdown_loader ----------------------------------------------------
+
+
+# --- build_dspy_lm ------------------------------------------------------------
+
+
+def test_build_dspy_lm_routes_openai_models(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    lm = build_dspy_lm("gpt-5-mini")
+
+    assert lm.model == "openai/gpt-5-mini"
+    assert lm.kwargs.get("api_key") == "sk-test"
+
+
+def test_build_dspy_lm_routes_gemini_by_default(monkeypatch):
+    monkeypatch.setenv("GOOGLE_GENERATIVE_AI_API_KEY", "gemini-test-key")
+
+    lm = build_dspy_lm("gemini-2.5-flash")
+
+    assert lm.model == "gemini/gemini-2.5-flash"
+    assert lm.kwargs.get("api_key") == "gemini-test-key"
+
+
+def test_build_dspy_lm_requires_a_model_id():
+    with pytest.raises(ValueError):
+        build_dspy_lm(None)
+
+
+# --- _format_failure_summary ---------------------------------------------------
+
+
+def test_format_failure_summary_empty_list_returns_empty_string():
+    assert _format_failure_summary([]) == ""
+
+
+def test_format_failure_summary_includes_both_evidences_when_present():
+    failures = [
+        FailureExample(
+            source_file="26-0743.pdf",
+            gold_value="30 jours",
+            extracted_value="45 jours",
+            extracted_evidence="La durée prévisionnelle du chantier est de 45 jours.",
+            gold_evidence="Le solde de 70 % sera réglé sous 30 jours après réception de la facture.",
+        )
+    ]
+
+    summary = _format_failure_summary(failures)
+
+    assert "26-0743.pdf" in summary
+    assert "Gold : 30 jours" in summary
+    assert 'Evidence gold : "Le solde de 70 % sera réglé sous 30 jours' in summary
+    assert "Extraction incorrecte : 45 jours" in summary
+    assert 'Evidence extraction : "La durée prévisionnelle du chantier est de 45 jours."' in summary
+
+
+def test_format_failure_summary_omits_missing_evidence_lines():
+    failures = [
+        FailureExample(
+            source_file="a.pdf",
+            gold_value="DEV-1",
+            extracted_value="WRONG",
+            extracted_evidence=None,
+            gold_evidence=None,
+        )
+    ]
+
+    summary = _format_failure_summary(failures)
+
+    assert "Evidence gold" not in summary
+    assert "Evidence extraction" not in summary
+    assert "None" not in summary
+
+
+def test_format_failure_summary_shows_placeholder_when_nothing_extracted():
+    failures = [
+        FailureExample(
+            source_file="a.pdf",
+            gold_value="DEV-1",
+            extracted_value=None,
+            extracted_evidence=None,
+            gold_evidence=None,
+        )
+    ]
+
+    summary = _format_failure_summary(failures)
+
+    assert "Extraction incorrecte : (rien)" in summary
+
+
+# --- propose_candidates -------------------------------------------------------
+
+
+def _numero_devis_field() -> Field:
+    return Field(
+        id=1,
+        key="numero_devis",
+        title="Numéro de devis",
+        definition="définition actuelle du numéro",
+        type="text",
+    )
+
+
+def test_propose_candidates_returns_n_candidates_from_a_dummy_lm():
+    lm = DummyLM(
+        [
+            {"reasoning": "Raison A", "new_definition": "Def A"},
+            {"reasoning": "Raison B", "new_definition": "Def B"},
+            {"reasoning": "Raison C", "new_definition": "Def C"},
+        ]
+    )
+
+    candidates = propose_candidates(_numero_devis_field(), failures=[], n=3, lm=lm)
+
+    assert len(candidates) == 3
+    assert [c.definition for c in candidates] == ["Def A", "Def B", "Def C"]
+    assert [c.reasoning for c in candidates] == ["Raison A", "Raison B", "Raison C"]
+
+
+def test_propose_candidates_requires_reasoning_in_dummy_lm_answers():
+    """`dspy.ChainOfThought` attend un champ `reasoning` en plus des sorties
+    déclarées dans la Signature — une réponse `DummyLM` qui l'omet doit
+    échouer explicitement (documente la contrainte, voir Architecture
+    Decisions du plan)."""
+    lm = DummyLM([{"new_definition": "Def A"}])
+
+    with pytest.raises(Exception):
+        propose_candidates(_numero_devis_field(), failures=[], n=1, lm=lm)
+
+
+def test_propose_candidates_prompt_includes_current_field_state():
+    lm = DummyLM([{"reasoning": "Raison", "new_definition": "Def A"}])
+
+    propose_candidates(_numero_devis_field(), failures=[], n=1, lm=lm)
+
+    prompt_content = lm.history[0]["messages"][1]["content"]
+    assert "Numéro de devis" in prompt_content
+    assert "définition actuelle du numéro" in prompt_content
+    assert "text" in prompt_content
+
+
+def test_propose_candidates_prompt_includes_failure_summary():
+    lm = DummyLM([{"reasoning": "Raison", "new_definition": "Def A"}])
+    failures = [
+        FailureExample(
+            source_file="a.pdf",
+            gold_value="DEV-1",
+            extracted_value="WRONG",
+            extracted_evidence=None,
+            gold_evidence=None,
+        ),
+    ]
+
+    propose_candidates(_numero_devis_field(), failures=failures, n=1, lm=lm)
+
+    prompt_content = lm.history[0]["messages"][1]["content"]
+    assert "a.pdf" in prompt_content
+    assert "DEV-1" in prompt_content
+    assert "WRONG" in prompt_content
+
+
+# --- optimize_field -------------------------------------------------------
+
+
+def _score(f1: float, failures: list[FailureExample] | None = None) -> FieldScore:
+    return FieldScore(f1=f1, precision=None, recall=None, tp=0, fp=0, fn=0, failures=failures or [])
+
+
+def test_optimize_field_adopts_a_strictly_better_candidate():
+    scores_by_definition = {
+        "définition actuelle du numéro": _score(0.5),
+        "meilleure définition": _score(0.8),
+    }
+
+    def fake_score_fn(field_key, definition, **kwargs):
+        return scores_by_definition[definition]
+
+    def fake_propose_fn(field, *, failures, n, lm):
+        return [FieldCandidate(definition="meilleure définition", reasoning="raison")]
+
+    result = optimize_field(
+        "numero_devis",
+        all_fields=[_numero_devis_field()],
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        ner_extractor=None,
+        markdown_loader=lambda source_file: "",
+        lm=None,
+        score_fn=fake_score_fn,
+        propose_fn=fake_propose_fn,
+    )
+
+    assert result.best_definition == "meilleure définition"
+    assert result.best_f1 == 0.8
+    assert result.baseline_f1 == 0.5
+
+
+def test_optimize_field_keeps_baseline_when_no_candidate_is_better():
+    scores_by_definition = {
+        "définition actuelle du numéro": _score(0.5),
+        "pire définition": _score(0.2),
+    }
+
+    def fake_score_fn(field_key, definition, **kwargs):
+        return scores_by_definition[definition]
+
+    def fake_propose_fn(field, *, failures, n, lm):
+        return [FieldCandidate(definition="pire définition", reasoning="raison")]
+
+    result = optimize_field(
+        "numero_devis",
+        all_fields=[_numero_devis_field()],
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        ner_extractor=None,
+        markdown_loader=lambda source_file: "",
+        lm=None,
+        score_fn=fake_score_fn,
+        propose_fn=fake_propose_fn,
+    )
+
+    assert result.best_definition == "définition actuelle du numéro"
+    assert result.best_f1 == 0.5
+
+
+def test_optimize_field_prints_progress_per_round_and_candidate(capsys):
+    scores_by_definition = {
+        "définition actuelle du numéro": _score(0.5),
+        "meilleure définition": _score(0.8),
+    }
+
+    def fake_score_fn(field_key, definition, **kwargs):
+        return scores_by_definition[definition]
+
+    def fake_propose_fn(field, *, failures, n, lm):
+        return [FieldCandidate(definition="meilleure définition", reasoning="confusion X/Y")]
+
+    result = optimize_field(
+        "numero_devis",
+        all_fields=[_numero_devis_field()],
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        ner_extractor=None,
+        markdown_loader=lambda source_file: "",
+        lm=None,
+        score_fn=fake_score_fn,
+        propose_fn=fake_propose_fn,
+    )
+
+    captured = capsys.readouterr()
+    assert "numero_devis" in captured.out
+    assert "baseline F1=0.500" in captured.out
+    assert "round 1/1" in captured.out
+    assert "candidat 1/1" in captured.out
+    assert "F1=0.800" in captured.out
+    assert "nouveau meilleur" in captured.out
+    assert "confusion X/Y" in captured.out
+    # comportement inchangé
+    assert result.best_definition == "meilleure définition"
+    assert result.best_f1 == 0.8
+
+
+def test_build_markdown_loader_reads_pdf_and_caches(tmp_path):
+    data_test_dir = tmp_path / "data_test"
+    data_test_dir.mkdir()
+    (data_test_dir / "devis.pdf").write_bytes(b"fake-pdf-bytes")
+    cache_dir = tmp_path / "cache"
+    pdf_extractor = _FakePdfExtractor("# markdown extrait")
+
+    load = build_markdown_loader(
+        data_test_dir=data_test_dir, pdf_extractor=pdf_extractor, cache_dir=cache_dir
+    )
+
+    assert load("devis.pdf") == "# markdown extrait"
+    assert load("devis.pdf") == "# markdown extrait"
+    assert pdf_extractor.call_count == 1
+
+
+# --- write_results_csv / run --------------------------------------------------
+
+
+def _two_fields() -> list[Field]:
+    return [
+        Field(
+            id=1,
+            key="numero_devis",
+            title="Numéro de devis",
+            definition="définition actuelle du numéro",
+            type="text",
+            section="devis_contrat",
+            examples=[FieldExample(context="DEV-1234", value=None, source="test")],
+        ),
+        Field(
+            id=2,
+            key="pourcentage_acompte",
+            title="Pourcentage d'acompte",
+            definition="définition actuelle du pourcentage",
+            type="int",
+            section="devis_contrat",
+        ),
+    ]
+
+
+def test_write_results_csv_is_reparsable_by_import_fields(tmp_path):
+    fields = _two_fields()
+    results_by_key = {
+        "numero_devis": FieldResult(
+            field_key="numero_devis",
+            baseline_definition="définition actuelle du numéro",
+            baseline_f1=0.5,
+            best_definition="nouvelle définition du numéro",
+            best_f1=0.8,
+        )
+    }
+    output_path = tmp_path / "results.csv"
+
+    write_results_csv(fields, results_by_key, output_path)
+
+    result = import_fields(output_path.read_bytes(), output_path.name)
+    assert result.errors == []
+    imported_by_key = {f.key: f for f in result.fields}
+    # Nom/label jamais modifiés, même pour un champ optimisé — seule la
+    # définition change
+    assert imported_by_key["numero_devis"].title == "Numéro de devis"
+    assert imported_by_key["numero_devis"].definition == "nouvelle définition du numéro"
+    # champ non optimisé recopié tel quel (même clé, même title/definition)
+    assert imported_by_key["pourcentage_acompte"].title == "Pourcentage d'acompte"
+    assert imported_by_key["pourcentage_acompte"].definition == "définition actuelle du pourcentage"
+    assert imported_by_key["pourcentage_acompte"].type == "int"
+
+
+def test_run_only_optimizes_requested_field_keys(tmp_path):
+    fields = _two_fields()
+    calls = []
+
+    def fake_optimize_fn(field_key, **kwargs):
+        calls.append(field_key)
+        field = next(f for f in fields if f.key == field_key)
+        return FieldResult(
+            field_key=field_key,
+            baseline_definition=field.definition,
+            baseline_f1=0.5,
+            best_definition="définition optimisée",
+            best_f1=0.9,
+        )
+
+    output_path = tmp_path / "results.csv"
+    run(
+        ["numero_devis"],
+        all_fields=fields,
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        output_path=output_path,
+        optimize_fn=fake_optimize_fn,
+    )
+
+    assert calls == ["numero_devis"]
+    result = import_fields(output_path.read_bytes(), output_path.name)
+    imported_by_key = {f.key: f for f in result.fields}
+    assert imported_by_key["numero_devis"].title == "Numéro de devis"
+    assert imported_by_key["numero_devis"].definition == "définition optimisée"
+    # pourcentage_acompte n'a pas été demandé -> inchangé
+    assert imported_by_key["pourcentage_acompte"].title == "Pourcentage d'acompte"
+
+
+def test_run_prints_baseline_and_best_f1(tmp_path, capsys):
+    def fake_optimize_fn(field_key, **kwargs):
+        return FieldResult(
+            field_key=field_key,
+            baseline_definition="def",
+            baseline_f1=0.5,
+            best_definition="def",
+            best_f1=0.8,
+        )
+
+    run(
+        ["numero_devis"],
+        all_fields=_two_fields(),
+        gold_documents=[],
+        n_candidates=1,
+        n_rounds=1,
+        output_path=tmp_path / "results.csv",
+        optimize_fn=fake_optimize_fn,
+    )
+
+    captured = capsys.readouterr()
+    assert "numero_devis" in captured.out
+    assert "0.500" in captured.out
+    assert "0.800" in captured.out
