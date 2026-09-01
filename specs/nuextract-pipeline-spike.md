@@ -154,9 +154,13 @@ Mapping `ExtractionResult` (mêmes conventions que
       `specs/` — rien sous `app/`.*
 - [ ] Le run réel sur le dataset gold est déclenché et interprété par
       l'humain, pas par Claude.
-      *Bloqué sur la config `NUEXTRACT_BASE_URL` côté humain — script prêt
-      (`uv run python scripts/nuextract_pipeline_eval.py --limit 2` pour
-      un premier essai réduit).*
+      *Non bloquant : serveur déployé (Modal, `scripts/modal_nuextract_server.py`)
+      et connectivité bout-en-bout vérifiée par un test de fumée hors-gold
+      (PDF synthétique, 1 champ) — voir le fix `VLLM_USE_FLASHINFER_SAMPLER=0`
+      dans le même script (nvcc absent de l'image). Le run réel sur les 14
+      documents gold reste à faire par l'humain
+      (`uv run python scripts/nuextract_pipeline_eval.py --limit 2` pour un
+      premier essai réduit).*
 
 ## Open Questions
 
