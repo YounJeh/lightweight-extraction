@@ -4,14 +4,18 @@ OpenAI) — pipeline de comparaison, jamais utilisé par l'app en production.
 Voir specs/nuextract-pipeline-spike.md pour le contexte complet.
 """
 
+import base64
 import json
+import os
 
 import pymupdf
+from openai import OpenAI
 
 from app.models import ExtractionResult, Field
 from app.tools import type_coercion
 
 _RENDER_DPI = 150
+_DEFAULT_MODEL = "numind/NuExtract3"
 
 
 def render_pdf_pages(pdf_bytes: bytes, *, dpi: int = _RENDER_DPI) -> list[bytes]:
@@ -66,3 +70,56 @@ def parse_response(content: str, fields: list[Field]) -> list[ExtractionResult]:
             )
         )
     return results
+
+
+def _image_message_content(images: list[bytes]) -> list[dict]:
+    return [
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/png;base64,{base64.b64encode(image).decode('ascii')}"
+            },
+        }
+        for image in images
+    ]
+
+
+def build_client(*, base_url: str | None = None, api_key: str | None = None) -> OpenAI:
+    """`api_key` retombe sur `"EMPTY"` si absent — convention des serveurs
+    vLLM auto-hébergés sans authentification (voir exemple officiel,
+    specs/nuextract-pipeline-spike.md), le SDK `openai` refuse une clé
+    vide/None."""
+    return OpenAI(
+        base_url=base_url or os.environ["NUEXTRACT_BASE_URL"],
+        api_key=api_key or os.getenv("NUEXTRACT_API_KEY") or "EMPTY",
+    )
+
+
+def extract(
+    pdf_bytes: bytes,
+    fields: list[Field],
+    *,
+    client: OpenAI | None = None,
+    model: str = _DEFAULT_MODEL,
+) -> list[ExtractionResult]:
+    """Extrait `fields` depuis `pdf_bytes` en un **seul** appel
+    `chat/completions` — toutes les pages du document envoyées d'un coup,
+    sans découpage en fenêtres (voir specs/nuextract-pipeline-spike.md,
+    windowing repoussé tant que le corpus gold n'en a pas besoin).
+    `client` injectable pour les tests offline (mock) ; par défaut construit
+    depuis `NUEXTRACT_BASE_URL`/`NUEXTRACT_API_KEY`.
+
+    `temperature=0` : on veut une recopie fidèle du document
+    (`verbatim-string`), pas de variation créative — cohérent avec l'usage
+    de "evidence" par le cadrage."""
+    client = client or build_client()
+    images = render_pdf_pages(pdf_bytes)
+    template = build_template(fields)
+
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0,
+        messages=[{"role": "user", "content": _image_message_content(images)}],
+        extra_body={"chat_template_kwargs": {"template": json.dumps(template)}},
+    )
+    return parse_response(response.choices[0].message.content, fields)

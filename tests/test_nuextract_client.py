@@ -3,7 +3,7 @@ import json
 import pymupdf
 
 from app.models import Field
-from scripts.nuextract_client import build_template, parse_response, render_pdf_pages
+from scripts.nuextract_client import build_template, extract, parse_response, render_pdf_pages
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -81,3 +81,49 @@ def test_parse_response_produces_an_empty_row_for_a_missing_or_blank_field():
     assert by_title["Titre numero_devis"].value == ""
     assert by_title["Titre numero_devis"].typed_value is None
     assert by_title["Titre nom_societe"].value == ""
+
+
+class _FakeMessage:
+    def __init__(self, content: str):
+        self.content = content
+
+
+class _FakeChoice:
+    def __init__(self, content: str):
+        self.message = _FakeMessage(content)
+
+
+class _FakeResponse:
+    def __init__(self, content: str):
+        self.choices = [_FakeChoice(content)]
+
+
+class _FakeCompletions:
+    def __init__(self, content: str):
+        self._content = content
+        self.received_kwargs: dict | None = None
+
+    def create(self, **kwargs):
+        self.received_kwargs = kwargs
+        return _FakeResponse(self._content)
+
+
+class _FakeClient:
+    def __init__(self, content: str):
+        self.chat = type("_Chat", (), {})()
+        self.chat.completions = _FakeCompletions(content)
+
+
+def test_extract_sends_one_image_per_page_and_the_verbatim_string_template():
+    pdf_bytes = _build_pdf("page un", "page deux")
+    fields = [_field("numero_devis")]
+    fake_client = _FakeClient(json.dumps({"numero_devis": "n°6952"}))
+
+    results = extract(pdf_bytes, fields, client=fake_client)
+
+    kwargs = fake_client.chat.completions.received_kwargs
+    assert len(kwargs["messages"][0]["content"]) == 2  # une image par page
+    template = json.loads(kwargs["extra_body"]["chat_template_kwargs"]["template"])
+    assert template == {"numero_devis": "verbatim-string"}
+    assert results[0].value == "n°6952"
+    assert results[0].source == "nuextract"
