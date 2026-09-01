@@ -131,29 +131,38 @@ Mapping `ExtractionResult` (mêmes conventions que
 
 ## Success Criteria
 
-- [ ] `scripts/nuextract_client.py` rend un PDF en une image PNG par page
+- [x] `scripts/nuextract_client.py` rend un PDF en une image PNG par page
       (PyMuPDF), envoie **toutes** les images d'un document en un **seul**
       appel `chat/completions` (pas de découpage), et retourne
       `list[ExtractionResult]` avec `source="nuextract"`, `value`=evidence
       `verbatim-string`, `typed_value` coercée.
-- [ ] `scripts/nuextract_pipeline_eval.py` rejoue ce pipeline sur (un
+      *`render_pdf_pages`/`build_template`/`parse_response`/`extract` —
+      7 tests offline, `tests/test_nuextract_client.py`.*
+- [x] `scripts/nuextract_pipeline_eval.py` rejoue ce pipeline sur (un
       sous-ensemble du) dataset gold et produit un CSV avec précision/
       recall/F1 par champ + macro — comparable au format déjà produit par
       les runs DSPy existants (`tasks/*.csv`).
-- [ ] `uv run pytest -v -m "not live"` passe, y compris les nouveaux tests
+      *`run`/`run_document`/`aggregate_scores`/`write_results_csv` —
+      8 tests offline, `tests/test_nuextract_pipeline_eval.py`. `--limit`
+      ajouté pour valider sur un sous-ensemble avant un run complet.*
+- [x] `uv run pytest -v -m "not live"` passe, y compris les nouveaux tests
       offline, sans régression sur la suite existante.
-- [ ] Aucune modification de `app/` (`Protocol` `NerExtractor`/
+      *286 passed, 1 deselected (`-m live`).*
+- [x] Aucune modification de `app/` (`Protocol` `NerExtractor`/
       `PdfTextExtractor` inchangés, aucune route/UI touchée).
+      *Fichiers touchés : `scripts/`, `tests/`, `.env.example`, `docs/`,
+      `specs/` — rien sous `app/`.*
 - [ ] Le run réel sur le dataset gold est déclenché et interprété par
       l'humain, pas par Claude.
+      *Bloqué sur la config `NUEXTRACT_BASE_URL` côté humain — script prêt
+      (`uv run python scripts/nuextract_pipeline_eval.py --limit 2` pour
+      un premier essai réduit).*
 
 ## Open Questions
 
-- Nom exact du modèle servi par le serveur vLLM de l'utilisateur (a priori
-  `numind/NuExtract3` d'après la doc publique, à confirmer contre ce qui
-  tourne réellement — n'affecte pas le code client, juste `model=...` dans
-  la requête).
-- Scorer sur les 14 documents gold en une fois, ou d'abord sur un
-  sous-ensemble (2-3 docs, 1-2 champs) pour valider le tuyau avant un run
-  complet ? (cohérent avec la variation "un seul champ testé d'abord" du
-  one-pager) — à trancher en Plan/Tasks.
+- Nom exact du modèle servi par le serveur vLLM de l'utilisateur (défaut
+  code : `numind/NuExtract3`, overridable via l'argument `model` de
+  `nuextract_client.extract` — n'affecte pas le reste du pipeline).
+- ~~Scorer sur les 14 documents gold en une fois, ou d'abord sur un
+  sous-ensemble ?~~ Résolu : `--limit N` sur
+  `scripts/nuextract_pipeline_eval.py`.
