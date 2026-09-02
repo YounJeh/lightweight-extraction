@@ -8,6 +8,7 @@ import base64
 import json
 import os
 import time
+from typing import Callable
 
 import openai
 import pymupdf
@@ -149,7 +150,25 @@ def _merge_window_results(
     return list(merged.values())
 
 
-def _create_completion_with_retries(client: OpenAI, *, sleep=time.sleep, **kwargs):
+def _create_completion_with_retries(
+    client: OpenAI,
+    *,
+    sleep: Callable[[float], None] | None = None,
+    on_retry: Callable[[float], None] | None = None,
+    **kwargs,
+):
+    """`on_retry(delay)` est appelé après chaque `sleep(delay)` -- pas
+    avant -- pour que `delay` reflète le temps réellement attendu (voir
+    docs/ideas/nuextract-cold-start-latency.md). Permet à l'appelant
+    d'accumuler un temps d'attente cumulé (essentiellement du cold-start
+    serveur, mais pas exclusivement -- toute tentative retentée déclenche
+    ce callback) sans changer le type de retour de cette fonction.
+
+    `sleep` résolu à l'intérieur (pas `sleep=time.sleep` en défaut) pour
+    rester patchable via `monkeypatch` même à travers `extract()`, qui ne
+    l'expose pas lui-même -- un défaut lié à l'import fige la référence
+    une fois pour toutes, invisible à un monkeypatch fait après coup."""
+    sleep = sleep or time.sleep
     delay = _INITIAL_BACKOFF_SECONDS
     for attempt in range(_MAX_RETRIES):
         try:
@@ -158,6 +177,8 @@ def _create_completion_with_retries(client: OpenAI, *, sleep=time.sleep, **kwarg
             if attempt == _MAX_RETRIES - 1:
                 raise
             sleep(delay)
+            if on_retry is not None:
+                on_retry(delay)
             delay = min(delay * 2, _MAX_BACKOFF_SECONDS)
 
 
@@ -178,6 +199,7 @@ def extract(
     *,
     client: OpenAI | None = None,
     model: str = _DEFAULT_MODEL,
+    on_retry: Callable[[float], None] | None = None,
 ) -> list[ExtractionResult]:
     """Extrait `fields` depuis `pdf_bytes` via un ou plusieurs appels
     `chat/completions` selon le nombre de pages : un seul appel si le
@@ -189,7 +211,11 @@ def extract(
     gagne).
 
     `client` injectable pour les tests offline (mock) ; par défaut construit
-    depuis `NUEXTRACT_BASE_URL`/`NUEXTRACT_API_KEY`.
+    depuis `NUEXTRACT_BASE_URL`/`NUEXTRACT_API_KEY`. `on_retry`, transmis
+    tel quel à `_create_completion_with_retries` pour **chaque** fenêtre —
+    un document à plusieurs fenêtres peut donc accumuler plusieurs appels
+    du callback, un par tentative retentée, toutes fenêtres confondues
+    (voir docs/ideas/nuextract-cold-start-latency.md).
 
     `temperature=0` : on veut une recopie fidèle du document
     (`verbatim-string`), pas de variation créative — cohérent avec l'usage
@@ -203,6 +229,7 @@ def extract(
     for start, end in _page_windows(len(images)):
         response = _create_completion_with_retries(
             client,
+            on_retry=on_retry,
             model=model,
             temperature=0,
             messages=[{"role": "user", "content": _image_message_content(images[start:end])}],

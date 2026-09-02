@@ -216,6 +216,16 @@ def test_create_completion_with_retries_succeeds_after_transient_503s():
     assert sleeps == [5.0, 10.0]  # backoff exponentiel : 5s puis 10s
 
 
+def test_create_completion_with_retries_calls_on_retry_with_each_delay():
+    completions = _FlakyCompletions([_server_error_503(), _server_error_503()], "ok")
+    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+    delays: list[float] = []
+
+    _create_completion_with_retries(fake_client, sleep=lambda _: None, on_retry=delays.append)
+
+    assert delays == [5.0, 10.0]
+
+
 def test_create_completion_with_retries_raises_after_exhausting_attempts():
     completions = _FlakyCompletions([_server_error_503() for _ in range(8)], "unreachable")
     fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
@@ -281,6 +291,47 @@ def test_extract_windows_a_long_document_and_merges_across_calls():
     assert len(calls[0]["messages"][0]["content"]) == 5  # fenêtre 1 : pages 0-4
     assert len(calls[1]["messages"][0]["content"]) == 3  # fenêtre 2 : pages 4-6
     assert results[0].value == "n°6952"  # trouvé en fenêtre 2, fusionné correctement
+
+
+class _ScriptedCompletions:
+    """Consomme `outcomes` dans l'ordre : une exception est levée, une
+    chaîne est renvoyée comme contenu de réponse -- simule une séquence
+    échec/succès arbitraire à travers plusieurs fenêtres."""
+
+    def __init__(self, outcomes: list):
+        self._outcomes = list(outcomes)
+
+    def create(self, **kwargs):
+        outcome = self._outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return _FakeResponse(outcome)
+
+
+class _ScriptedClient:
+    def __init__(self, outcomes: list):
+        self.chat = type("_Chat", (), {})()
+        self.chat.completions = _ScriptedCompletions(outcomes)
+
+
+def test_extract_accumulates_on_retry_across_multiple_windows(monkeypatch):
+    monkeypatch.setattr("scripts.nuextract_client.time.sleep", lambda _: None)
+    pdf_bytes = _build_pdf(*[f"page {i}" for i in range(7)])  # -> 2 fenêtres
+    fields = [_field("numero_devis")]
+    fake_client = _ScriptedClient(
+        [
+            _server_error_503(),
+            json.dumps({"numero_devis": ""}),  # fenêtre 1 : échoue puis réussit
+            _server_error_503(),
+            json.dumps({"numero_devis": "n°6952"}),  # fenêtre 2 : échoue puis réussit
+        ]
+    )
+    delays: list[float] = []
+
+    results = extract(pdf_bytes, fields, client=fake_client, on_retry=delays.append)
+
+    assert delays == [5.0, 5.0]  # un retry par fenêtre, chacune repart de l'initial backoff
+    assert results[0].value == "n°6952"
 
 
 def test_extract_makes_a_single_call_for_a_short_document():
