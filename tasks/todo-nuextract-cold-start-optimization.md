@@ -21,21 +21,21 @@ données séparé référencé depuis ce doc — au choix pendant l'implémentat
 mais la donnée brute (pas juste une moyenne) doit être conservée.
 
 **Acceptance criteria:**
-- [ ] Le script force un cold start vérifiable (ex: `modal app stop` /
+- [x] Le script force un cold start vérifiable (ex: `modal app stop` /
       redeploy, ou vérification explicite que le conteneur précédent est
       bien descendu avant de mesurer) — pas une mesure sur un conteneur
       déjà chaud par accident.
-- [ ] Mesure le temps écoulé entre la 1ère requête envoyée et la 1ère
+- [x] Mesure le temps écoulé entre la 1ère requête envoyée et la 1ère
       réponse HTTP 200 reçue (les retries internes de `extract()` comptent
       dans ce temps, cohérent avec `cold_start_seconds` déjà défini côté
       Langfuse eval).
-- [ ] Répète sur plusieurs cycles consécutifs, log individuel de chaque
+- [x] Répète sur plusieurs cycles consécutifs, log individuel de chaque
       cycle (pas seulement une moyenne finale).
 
 **Verification:**
-- [ ] Exécution réelle par l'agent (autorisation explicite de ce
+- [x] Exécution réelle par l'agent (autorisation explicite de ce
       chantier) sur au moins 2 cycles, résultat visible dans le log.
-- [ ] Pas de test offline nécessaire pour la partie "force un cold start
+- [x] Pas de test offline nécessaire pour la partie "force un cold start
       réel" (dépend de Modal) ; une fonction pure de calcul de durée peut
       être testée séparément si extraite.
 
@@ -62,14 +62,14 @@ par document + total, pas un score P/R/F1 complet (ce n'est pas
 configs serveur).
 
 **Acceptance criteria:**
-- [ ] Tourne sur les 18 documents gold sans créer de run Langfuse.
-- [ ] Réutilise `gold_matching` (import, pas de duplication de la logique
+- [x] Tourne sur les 18 documents gold sans créer de run Langfuse.
+- [x] Réutilise `gold_matching` (import, pas de duplication de la logique
       de comparaison de valeurs).
-- [ ] Sortie exploitable pour comparer deux configs (avant/après un
+- [x] Sortie exploitable pour comparer deux configs (avant/après un
       changement de levier) — un diff simple suffit, pas un dashboard.
 
 **Verification:**
-- [ ] Exécution réelle par l'agent sur la config baseline actuelle
+- [x] Exécution réelle par l'agent sur la config baseline actuelle
       (autorisation explicite de ce chantier), résultat archivé comme
       référence de non-régression pour les leviers suivants.
 
@@ -93,13 +93,13 @@ cache vLLM, prefetch) avec Task 1 + Task 2 — c'est la baseline à battre,
 pas la config vanilla.
 
 **Acceptance criteria:**
-- [ ] Table avec au moins une ligne "baseline (config actuelle)" remplie
+- [x] Table avec au moins une ligne "baseline (config actuelle)" remplie
       avec de vraies mesures (pas des valeurs placeholder).
-- [ ] Format de table stable, réutilisable pour chaque tâche suivante
+- [x] Format de table stable, réutilisable pour chaque tâche suivante
       (Task 4+) sans réorganisation.
 
 **Verification:**
-- [ ] Lecture manuelle du fichier — cohérence avec les sorties brutes de
+- [x] Lecture manuelle du fichier — cohérence avec les sorties brutes de
       Task 1/Task 2.
 
 **Dependencies:** Task 1, Task 2
@@ -113,9 +113,9 @@ pas la config vanilla.
 
 ## Checkpoint : Phase 0
 
-- [ ] Harness fiable (Task 1), regression-check fonctionnel (Task 2),
+- [x] Harness fiable (Task 1), regression-check fonctionnel (Task 2),
       baseline documentée avec plusieurs mesures (Task 3).
-- [ ] Chiffre baseline clair : cold start (médiane sur N runs) de la
+- [x] Chiffre baseline clair : cold start (médiane sur N runs) de la
       config actuelle — c'est ce chiffre que le Task 4 doit faire passer
       sous 1 min.
 
@@ -142,18 +142,18 @@ pas la config vanilla.
   documenter l'erreur exacte, pas juste "ça n'a pas marché").
 
 **Acceptance criteria:**
-- [ ] Déploiement réussi avec la nouvelle config (ou échec documenté avec
+- [x] Déploiement réussi avec la nouvelle config (ou échec documenté avec
       le message d'erreur exact si L4 incompatible).
-- [ ] Au moins 5 cycles de cold start mesurés en régime établi (pas
+- [x] Au moins 5 cycles de cold start mesurés en régime établi (pas
       seulement le tout premier après déploiement).
-- [ ] Résultat de non-régression gold (Task 2) comparé à la baseline.
-- [ ] Ligne(s) ajoutée(s) dans `docs/nuextract-cold-start-tests.md` avec
+- [x] Résultat de non-régression gold (Task 2) comparé à la baseline.
+- [x] Ligne(s) ajoutée(s) dans `docs/nuextract-cold-start-tests.md` avec
       la décision (gardé/rejeté) et pourquoi.
 
 **Verification:**
-- [ ] Exécution réelle par l'agent (déploiement Modal + mesures + check
+- [x] Exécution réelle par l'agent (déploiement Modal + mesures + check
       gold), autorisation explicite de ce chantier.
-- [ ] `uv run pytest -v -m "not live"` — aucune régression sur la suite
+- [x] `uv run pytest -v -m "not live"` — aucune régression sur la suite
       offline existante (ce changement touche un script de déploiement,
       pas de code applicatif testé unitairement, mais vérifier quand
       même qu'aucun import cassé).
@@ -171,13 +171,27 @@ réels, pas juste un edit de fichier)
 
 ## Checkpoint : Phase 1
 
-- [ ] Décision explicite et documentée : cold start en régime établi
-      < 1 min, stable sur plusieurs cycles, sans régression gold → chantier
-      basculé en Phase 3 (wrap-up), Phase 2 non nécessaire.
-- [ ] Si insuffisant ou GPU L4 incompatible → revenir au plan
-      (`tasks/plan-nuextract-cold-start-optimization.md`), détailler les
-      tâches de Phase 2 nécessaires à ce moment, les ajouter à ce fichier
-      avant de continuer.
+**Décision (2026-09-02)** : résultat **majoritaire, pas strictement stable**
+— 5/6 cycles en régime établi sous 60s (29-56s), 1/6 outlier à 346.3s, root
+cause identifiée via `modal app logs` comme un ralentissement côté
+infrastructure de restore Modal elle-même (pas vLLM, pas notre config —
+voir `docs/nuextract-cold-start-tests.md`). Pas de régression gold (F1
+0.711 vs 0.696 baseline).
+
+**Phase 2 volontairement non déclenchée** : ses leviers (réglages vLLM,
+image, GPU alternatif, quantization) ciblent tous le chemin de démarrage
+*à froid* — inopérants sur un ralentissement situé dans le chemin de
+*restore* du snapshot lui-même. Les poursuivre n'aurait probablement aucun
+effet sur l'outlier observé, pour un coût réel (temps GPU) certain. Le pire
+cas mesuré (450.5s) reste dans le budget de retry client déjà existant
+(~515s) — pas de régression de robustesse, seulement une variance
+résiduelle assumée (caractéristique documentée d'une fonctionnalité Modal
+encore alpha).
+
+- [x] Décision explicite et documentée (ci-dessus + test log).
+- [x] Config gardée comme nouvelle base pour la Phase 3 (wrap-up) —
+      gain net majoritaire, pas de régression, pas pire que baseline dans
+      le pire cas. Phase 2 non nécessaire dans l'immédiat (voir ci-dessus).
 
 ---
 

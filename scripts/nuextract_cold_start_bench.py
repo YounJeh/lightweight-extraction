@@ -47,7 +47,11 @@ _BENCH_DOCUMENT_ID = 1
 
 # Le conteneur peut mettre un instant à disparaître de `container list`
 # après un `stop` -- attente bornée avant de considérer l'arrêt en échec.
-_STOP_CONFIRM_TIMEOUT_SECONDS = 60.0
+# 60s s'est révélé trop court en réel avec le snapshot GPU activé (cycle 4
+# du run gpu-snapshot-sleep-mode, voir docs/nuextract-cold-start-tests.md) :
+# le teardown d'un conteneur dont l'état vient d'être snapshotté semble
+# parfois plus lent qu'un teardown "normal".
+_STOP_CONFIRM_TIMEOUT_SECONDS = 180.0
 
 
 def _record(row: dict, *, results_path: Path = RESULTS_PATH) -> None:
@@ -115,7 +119,16 @@ def measure_cold_start(
     fields, pdf_bytes = _bench_document()
     rows = []
     for cycle in range(cycles):
-        force_cold_start(app_id)
+        try:
+            force_cold_start(app_id)
+            forced = True
+        except TimeoutError as exc:
+            # Ne casse pas tout le run : le conteneur finira par tomber (ou
+            # la requête suivante en verra un nouveau de toute façon) --
+            # mieux vaut un cycle marqué "non garanti froid" que perdre les
+            # cycles restants.
+            print(f"WARNING: {exc}", file=sys.stderr)
+            forced = False
         cold_start_seconds = 0.0
 
         def on_retry(delay: float) -> None:
@@ -136,6 +149,7 @@ def measure_cold_start(
             "cycle": cycle,
             "elapsed_seconds": round(elapsed, 1),
             "cold_start_seconds": round(cold_start_seconds, 1),
+            "forced_cold": forced,
             "error": error,
         }
         _record(row, results_path=results_path)
