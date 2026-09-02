@@ -43,7 +43,11 @@ from scripts.gold_dataset_eval import (  # noqa: E402
 )
 from scripts.gold_dataset_sync import DATASET_NAME  # noqa: E402
 
-Extractor = Callable[[bytes, list[Field]], list[ExtractionResult]]
+# `on_retry` accepté en kwarg optionnel par les extracteurs réels
+# (`nuextract_client.extract`) -- Callable[..., ...] plutôt qu'une
+# signature positionnelle stricte, pour ne pas obliger chaque extracteur
+# factice de test à le déclarer explicitement.
+Extractor = Callable[..., list[ExtractionResult]]
 
 # Tarif GPU L4 Modal (€/h), voir docs/ideas/nuextract-langfuse-eval.md —
 # constante en dur (décision utilisateur), à ajuster manuellement si le
@@ -68,14 +72,25 @@ def build_task(
         field_keys = item.input["field_keys"]
         fields = [fields_by_key[key] for key in field_keys]
 
+        # Accumulateur local à cet appel de task() -- thread-safe sous
+        # max_concurrency>1 (chaque exécution a sa propre closure, aucun
+        # état partagé entre documents concurrents). Voir
+        # docs/ideas/nuextract-cold-start-latency.md.
+        cold_start_seconds = 0.0
+
+        def on_retry(delay: float) -> None:
+            nonlocal cold_start_seconds
+            cold_start_seconds += delay
+
         start = time.perf_counter()
         pdf_bytes = (data_test_dir / source_file).read_bytes()
-        results = extractor(pdf_bytes, fields)
+        results = extractor(pdf_bytes, fields, on_retry=on_retry)
         latency_seconds = time.perf_counter() - start
 
         return {
             "extraction_results": [result.model_dump() for result in results],
             "latency_seconds": latency_seconds,
+            "cold_start_seconds": cold_start_seconds,
         }
 
     return task

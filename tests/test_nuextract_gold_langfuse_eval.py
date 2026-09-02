@@ -16,12 +16,18 @@ _NUMERO_DEVIS = Field(
 
 
 class _FakeExtractor:
-    def __init__(self, results: list[ExtractionResult]):
+    def __init__(self, results: list[ExtractionResult], *, retry_delays: list[float] = []):
         self.results = results
         self.received: dict | None = None
+        self._retry_delays = retry_delays
 
-    def __call__(self, pdf_bytes: bytes, fields: list[Field]) -> list[ExtractionResult]:
+    def __call__(
+        self, pdf_bytes: bytes, fields: list[Field], *, on_retry=None, **kwargs
+    ) -> list[ExtractionResult]:
         self.received = {"pdf_bytes": pdf_bytes, "fields": fields}
+        if on_retry is not None:
+            for delay in self._retry_delays:
+                on_retry(delay)
         return self.results
 
 
@@ -56,6 +62,21 @@ def test_build_task_reads_the_referenced_pdf_and_extracts_selected_fields(tmp_pa
         }
     ]
     assert output["latency_seconds"] >= 0
+    assert output["cold_start_seconds"] == 0.0  # aucun retry simulé ici
+
+
+def test_build_task_accumulates_cold_start_seconds_from_on_retry(tmp_path):
+    (tmp_path / "devis.pdf").write_bytes(b"%PDF-fake-bytes")
+    extractor = _FakeExtractor([], retry_delays=[5.0, 10.0, 20.0])
+
+    task = build_task(
+        {"numero_devis": _NUMERO_DEVIS}, extractor=extractor, data_test_dir=tmp_path
+    )
+    item = SimpleNamespace(input={"source_file": "devis.pdf", "field_keys": ["numero_devis"]})
+
+    output = task(item=item)
+
+    assert output["cold_start_seconds"] == 35.0
 
 
 def test_build_task_resolves_only_the_fields_listed_for_this_item(tmp_path):
