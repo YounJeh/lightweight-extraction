@@ -6,6 +6,9 @@ import pymupdf
 
 from app.models import Field
 from scripts.nuextract_client import (
+    _MAX_RETRIES,
+    _WINDOW_OVERLAP_PAGES,
+    _WINDOW_SIZE_PAGES,
     _create_completion_with_retries,
     _merge_window_results,
     _page_windows,
@@ -51,14 +54,24 @@ def test_render_pdf_pages_on_a_single_page_document():
 
 
 def test_page_windows_returns_a_single_window_for_a_short_document():
-    assert _page_windows(3) == [(0, 3)]
-    assert _page_windows(5) == [(0, 5)]  # == taille de fenêtre, pas de découpage
+    assert _page_windows(2) == [(0, 2)]
+    # == taille de fenêtre configurée, pas de découpage
+    assert _page_windows(_WINDOW_SIZE_PAGES) == [(0, _WINDOW_SIZE_PAGES)]
 
 
 def test_page_windows_splits_a_long_document_with_overlap():
-    windows = _page_windows(12)
+    # Dérivé de la config réelle plutôt que des bornes en dur, pour rester
+    # correct si _WINDOW_SIZE_PAGES/_WINDOW_OVERLAP_PAGES sont retouchées
+    # (voir choix_techniques.md -- déjà ajusté une fois en réel, 5 -> 4).
+    step = _WINDOW_SIZE_PAGES - _WINDOW_OVERLAP_PAGES
+    page_count = _WINDOW_SIZE_PAGES * 3  # garantit plusieurs fenêtres
 
-    assert windows == [(0, 5), (4, 9), (8, 12)]
+    windows = _page_windows(page_count)
+
+    assert windows[0] == (0, _WINDOW_SIZE_PAGES)
+    assert windows[1] == (step, step + _WINDOW_SIZE_PAGES)
+    assert windows[-1][1] == page_count
+    assert len(windows) > 1
 
 
 def test_page_windows_covers_every_page_exactly_once_at_the_boundaries():
@@ -227,7 +240,7 @@ def test_create_completion_with_retries_calls_on_retry_with_each_delay():
 
 
 def test_create_completion_with_retries_raises_after_exhausting_attempts():
-    completions = _FlakyCompletions([_server_error_503() for _ in range(8)], "unreachable")
+    completions = _FlakyCompletions([_server_error_503() for _ in range(_MAX_RETRIES)], "unreachable")
     fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
 
     try:
@@ -236,7 +249,23 @@ def test_create_completion_with_retries_raises_after_exhausting_attempts():
     except openai.InternalServerError:
         pass
 
-    assert completions.call_count == 8  # _MAX_RETRIES, aucune tentative en plus
+    assert completions.call_count == _MAX_RETRIES  # aucune tentative en plus
+
+
+def test_create_completion_with_retries_tolerates_a_slow_cold_start():
+    # Régression : "item 0" du gold (data_test/OFR2603012513 - ENTECH.pdf)
+    # a épuisé un budget de 8 tentatives (~155s) en réel avant ce fix --
+    # reproduit deux fois, cold-start plus lent qu'anticipé, pas un bug
+    # propre au document. 10 échecs consécutifs auraient fait lever cette
+    # fonction sous l'ancien _MAX_RETRIES=8 ; le budget élargi (20) les
+    # tolère.
+    completions = _FlakyCompletions([_server_error_503() for _ in range(10)], "ok")
+    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+
+    result = _create_completion_with_retries(fake_client, sleep=lambda _: None)
+
+    assert result == "ok"
+    assert completions.call_count == 11
 
 
 def test_extract_sends_one_image_per_page_and_the_verbatim_string_template():
@@ -275,11 +304,17 @@ class _FakeClientSequence:
 
 
 def test_extract_windows_a_long_document_and_merges_across_calls():
-    # 7 pages -> 2 fenêtres (0,5) et (4,7), voir _page_windows.
-    pdf_bytes = _build_pdf(*[f"page {i}" for i in range(7)])
+    # Nombre de pages dérivé de la config réelle plutôt qu'en dur --
+    # garantit exactement 2 fenêtres quels que soient
+    # _WINDOW_SIZE_PAGES/_WINDOW_OVERLAP_PAGES (voir _page_windows).
+    page_count = 2 * _WINDOW_SIZE_PAGES - _WINDOW_OVERLAP_PAGES
+    expected_windows = _page_windows(page_count)
+    assert len(expected_windows) == 2  # sinon la formule ci-dessus ne tient plus
+
+    pdf_bytes = _build_pdf(*[f"page {i}" for i in range(page_count)])
     fields = [_field("numero_devis")]
-    # 1ère fenêtre : rien trouvé. 2e fenêtre : trouvé (page 4-6, avec
-    # overlap sur la page 4 de la 1ère fenêtre).
+    # 1ère fenêtre : rien trouvé. 2e fenêtre : trouvé (dans la zone
+    # d'overlap avec la 1ère fenêtre).
     fake_client = _FakeClientSequence(
         [json.dumps({"numero_devis": ""}), json.dumps({"numero_devis": "n°6952"})]
     )
@@ -288,8 +323,8 @@ def test_extract_windows_a_long_document_and_merges_across_calls():
 
     calls = fake_client.chat.completions.received_kwargs_per_call
     assert len(calls) == 2  # deux appels, un par fenêtre
-    assert len(calls[0]["messages"][0]["content"]) == 5  # fenêtre 1 : pages 0-4
-    assert len(calls[1]["messages"][0]["content"]) == 3  # fenêtre 2 : pages 4-6
+    for call, (start, end) in zip(calls, expected_windows):
+        assert len(call["messages"][0]["content"]) == end - start
     assert results[0].value == "n°6952"  # trouvé en fenêtre 2, fusionné correctement
 
 

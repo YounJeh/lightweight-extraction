@@ -21,15 +21,25 @@ _RENDER_DPI = 150
 _DEFAULT_MODEL = "numind/NuExtract3"
 
 # Un serveur Modal scale-to-zero (min_containers=0) renvoie "503 no
-# upstreams available" immédiatement -- pas d'attente du cold-start (~2-3
-# min observés en réel) -- quand un burst de requêtes concurrentes arrive
-# avant qu'un conteneur soit prêt. Retry avec backoff exponentiel plafonné
-# plutôt qu'un échec immédiat ; couvre aussi une coupure de connexion
-# transitoire pendant le démarrage. Pas de retry sur une erreur non
-# transitoire (ex. 400 schéma invalide) -- seules ces deux exceptions sont
-# ciblées.
+# upstreams available" immédiatement -- pas d'attente du cold-start --
+# quand une requête arrive avant qu'un conteneur soit prêt. Retry avec
+# backoff exponentiel plafonné plutôt qu'un échec immédiat ; couvre aussi
+# une coupure de connexion transitoire pendant le démarrage. Pas de retry
+# sur une erreur non transitoire (ex. 400 schéma invalide) -- seules ces
+# deux exceptions sont ciblées.
+#
+# _MAX_RETRIES=8 (~155s de budget) s'est révélé insuffisant en réel :
+# reproduit deux fois de suite sur le même document (data_test/OFR2603012513
+# - ENTECH.pdf, "item 0" du gold), la 1ère tentative a épuisé les 8 retries
+# en 503 persistant, la 2e a réussi après seulement 3 retries -- le
+# cold-start est plus variable que les ~2-3 min observées au départ, pas
+# un bug propre au document. Budget élargi à ~515s (20 tentatives, 19
+# sleeps : 5+10+20+30x16), proche du startup_timeout=600 déjà configuré
+# côté serveur (scripts/modal_nuextract_server.py) -- au-delà, Modal
+# lui-même aurait abandonné le démarrage, continuer à retenter ne servirait
+# à rien.
 _RETRYABLE_EXCEPTIONS = (openai.InternalServerError, openai.APIConnectionError)
-_MAX_RETRIES = 8
+_MAX_RETRIES = 20
 _INITIAL_BACKOFF_SECONDS = 5.0
 _MAX_BACKOFF_SECONDS = 30.0
 
@@ -37,10 +47,10 @@ _MAX_BACKOFF_SECONDS = 30.0
 # de _WINDOW_SIZE_PAGES pages est découpé en fenêtres glissantes plutôt
 # qu'envoyé en un seul appel. Constantes dérivées d'un ratio observé en
 # réel (~2000-2200 tokens/page, 3 échecs "context length exceeded" sur des
-# documents de 12-14 pages contre une limite serveur de 16384 tokens) : 5
+# documents de 12-14 pages contre une limite serveur de 16384 tokens) : 4
 # pages ≈ 11000 tokens, marge confortable. Overlap de 1 page pour ne pas
 # couper une valeur à cheval sur une frontière de page.
-_WINDOW_SIZE_PAGES = 5
+_WINDOW_SIZE_PAGES = 4
 _WINDOW_OVERLAP_PAGES = 1
 
 
@@ -232,9 +242,11 @@ def extract(
             on_retry=on_retry,
             model=model,
             temperature=0,
-            messages=[{"role": "user", "content": _image_message_content(images[start:end])}],
+            messages=[
+                {"role": "user", "content": _image_message_content(images[start:end])}],
             extra_body={"chat_template_kwargs": {"template": template_json}},
         )
-        window_results.append(parse_response(response.choices[0].message.content, fields))
+        window_results.append(parse_response(
+            response.choices[0].message.content, fields))
 
     return _merge_window_results(window_results)
