@@ -31,9 +31,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import load_env  # noqa: E402
 from app.models import ExtractionResult, Field  # noqa: E402
 from scripts import nuextract_client  # noqa: E402
-from scripts.gold_dataset_eval import DATA_TEST_DIR, load_gold_fields  # noqa: E402
+from scripts.gold_dataset_eval import (  # noqa: E402
+    DATA_TEST_DIR,
+    _exact_match_accuracy,
+    _field_metrics_evaluations,
+    _grounding_accuracy,
+    _item_evaluation_value,
+    _latency_evaluations,
+    load_gold_fields,
+)
 
 Extractor = Callable[[bytes, list[Field]], list[ExtractionResult]]
+
+# Tarif GPU L4 Modal (€/h), voir docs/ideas/nuextract-langfuse-eval.md —
+# constante en dur (décision utilisateur), à ajuster manuellement si le
+# type de GPU/la région change.
+_GPU_COST_PER_HOUR = 0.80
 
 
 def build_task(
@@ -64,3 +77,62 @@ def build_task(
         }
 
     return task
+
+
+def _cost_evaluation(item_results: list[Any]) -> Any:
+    """Coût approximatif du run : somme des `latency_seconds` par item /
+    3600 x `_GPU_COST_PER_HOUR` — traite chaque item comme s'il avait tourné
+    séquentiellement, donc **surestime** sous concurrence (les items
+    concurrents se chevauchent en horloge murale). Décidé en cadrage :
+    préférable à un `0.0` silencieux (voir le `cost_usd_total` figé de
+    `gold_dataset_eval.build_run_evaluator`, LangExtract n'exposant aucun
+    usage token)."""
+    from langfuse.experiment import Evaluation
+
+    total_seconds = sum(
+        r.output.get("latency_seconds", 0.0)
+        for r in item_results
+        if isinstance(r.output, dict)
+    )
+    cost = total_seconds / 3600 * _GPU_COST_PER_HOUR
+    return Evaluation(
+        name="cost_usd_total",
+        value=cost,
+        comment=(
+            f"Approximation : somme des latences item ({total_seconds:.1f}s) / 3600 x "
+            f"{_GPU_COST_PER_HOUR}€/h (GPU L4 Modal) -- majorant sous concurrence "
+            "(les items concurrents se chevauchent en horloge murale, cette somme "
+            "les traite comme séquentiels)."
+        ),
+    )
+
+
+def build_run_evaluator():
+    """Évaluateur run-level, composé à partir des helpers déjà réutilisables
+    de `gold_dataset_eval.py` (importés, jamais modifiés) + un coût réel
+    calculé (`_cost_evaluation`) à la place du `0.0` figé de
+    `gold_dataset_eval.build_run_evaluator`. Pas de split OCR
+    (`_ocr_split_evaluations`) : ce pipeline n'OCRise rien, la métrique
+    n'aurait aucun sens."""
+    from langfuse.experiment import Evaluation
+
+    def run_evaluator(*, item_results, **kwargs) -> list[Any]:
+        validated = [
+            r for r in item_results if _item_evaluation_value(r, "human_validation") is True
+        ]
+
+        evaluations = [
+            Evaluation(name="documents_evaluated", value=len(validated)),
+            Evaluation(
+                name="documents_excluded_unvalidated",
+                value=len(item_results) - len(validated),
+            ),
+        ]
+        evaluations.extend(_field_metrics_evaluations(validated))
+        evaluations.append(_exact_match_accuracy(validated))
+        evaluations.append(_grounding_accuracy(validated))
+        evaluations.extend(_latency_evaluations(validated))
+        evaluations.append(_cost_evaluation(validated))
+        return evaluations
+
+    return run_evaluator
