@@ -54,13 +54,20 @@ script fonctionnel — un seul chemin d'éval à maintenir.
 
 ### Phase 0 : Risque le plus élevé — vérifier avant de coder
 
-- [ ] Task 1: Vérifier le comportement Langfuse pour des runs de noms
+- [x] Task 1: Vérifier le comportement Langfuse pour des runs de noms
       distincts sur le même dataset
 
 ### Checkpoint : Phase 0
-- [ ] Comportement confirmé (doc SDK ou lecture du code installé), noté en
-      commentaire dans le futur `scripts/nuextract_gold_langfuse_eval.py`
-      (même pratique que `gold_dataset_sync.py`, "Documentation First").
+- [x] Comportement confirmé par lecture du SDK installé
+      (`.venv/.../langfuse/_client/datasets.py:81-291`, docstring de
+      `DatasetClient.run_experiment`) : le `run_name` réellement affiché
+      dans l'UI est **auto-généré** (`name` + timestamp ISO) sauf `run_name`
+      explicite — l'exemple officiel "Comparing different model versions"
+      confirme que plusieurs appels avec un `name` **stable** restent des
+      runs distincts et comparables. **Simplification retenue** : `name`
+      n'a donc pas besoin d'embarquer la date nous-mêmes — Langfuse s'en
+      charge déjà. `_run_name(model)` (Task 4) devient
+      `f"gold-devis-nuextract-{model_sanitized}"`, sans `date.today()`.
 
 ### Phase 1 : Foundation — task callable + run-evaluator
 

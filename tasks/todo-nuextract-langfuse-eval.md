@@ -116,7 +116,9 @@ filtrage `human_validation` identique à l'existant (le champ vient de
 ## Task 4: `run_eval()`/`main()` — nom de run, wiring complet
 
 **Description:** Ajouter `_run_name(model: str) -> str` (fonction pure,
-`f"gold-devis-nuextract-{model.replace('/', '_')}-{date.today().isoformat()}"`),
+`f"gold-devis-nuextract-{model.replace('/', '_')}"` — **pas de date
+manuelle** : Langfuse auto-génère un `run_name` unique par appel via un
+timestamp ISO ajouté à `name`, voir Task 1),
 `run_eval(client=None, *, max_concurrency=14, model=None)` (résout
 `fields_by_key` via `load_gold_fields()`, `dataset = client.get_dataset(DATASET_NAME)`
 — `DATASET_NAME` importé de `gold_dataset_sync.py`, construit `task` via
@@ -127,8 +129,7 @@ Inclure en tête de fichier la note de Task 1 (comportement Langfuse
 vérifié).
 
 **Acceptance criteria:**
-- [ ] `_run_name("numind/NuExtract3")` ne contient pas de `/` et inclut la
-      date du jour au format ISO.
+- [ ] `_run_name("numind/NuExtract3")` ne contient pas de `/`.
 - [ ] `run_eval` appelle `client.get_dataset("gold-devis")` puis
       `dataset.run_experiment` avec les bons `name`/`task`/`evaluators`/
       `run_evaluators`/`max_concurrency=14` par défaut.
