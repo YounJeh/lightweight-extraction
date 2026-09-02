@@ -3,7 +3,12 @@ from types import SimpleNamespace
 from langfuse.experiment import Evaluation
 
 from app.models import ExtractionResult, Field
-from scripts.nuextract_gold_langfuse_eval import build_run_evaluator, build_task
+from scripts.nuextract_gold_langfuse_eval import (
+    _run_name,
+    build_run_evaluator,
+    build_task,
+    run_eval,
+)
 
 _NUMERO_DEVIS = Field(
     id=1, key="numero_devis", title="Numéro de devis", definition="d", type="text"
@@ -162,3 +167,41 @@ def test_run_evaluator_has_no_ocr_split_evaluations():
     names = {ev.name for ev in evaluations}
     assert "documents_with_ocr" not in names
     assert "documents_without_ocr" not in names
+
+
+def test_run_name_sanitizes_slashes_in_the_model_id():
+    assert _run_name("numind/NuExtract3") == "gold-devis-nuextract-numind_NuExtract3"
+
+
+class _FakeDataset:
+    def __init__(self):
+        self.received_kwargs: dict | None = None
+
+    def run_experiment(self, **kwargs):
+        self.received_kwargs = kwargs
+        return "sentinel-result"
+
+
+class _FakeLangfuseClient:
+    def __init__(self):
+        self.dataset = _FakeDataset()
+        self.received_dataset_name: str | None = None
+
+    def get_dataset(self, name: str):
+        self.received_dataset_name = name
+        return self.dataset
+
+
+def test_run_eval_wires_the_dataset_run_experiment_call():
+    fake_client = _FakeLangfuseClient()
+
+    result = run_eval(fake_client, max_concurrency=14, model="numind/NuExtract3")
+
+    assert fake_client.received_dataset_name == "gold-devis"
+    kwargs = fake_client.dataset.received_kwargs
+    assert kwargs["name"] == "gold-devis-nuextract-numind_NuExtract3"
+    assert kwargs["max_concurrency"] == 14
+    assert callable(kwargs["task"])
+    assert len(kwargs["evaluators"]) == 1
+    assert len(kwargs["run_evaluators"]) == 1
+    assert result == "sentinel-result"

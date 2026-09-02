@@ -38,8 +38,10 @@ from scripts.gold_dataset_eval import (  # noqa: E402
     _grounding_accuracy,
     _item_evaluation_value,
     _latency_evaluations,
+    build_field_evaluator,
     load_gold_fields,
 )
+from scripts.gold_dataset_sync import DATASET_NAME  # noqa: E402
 
 Extractor = Callable[[bytes, list[Field]], list[ExtractionResult]]
 
@@ -136,3 +138,51 @@ def build_run_evaluator():
         return evaluations
 
     return run_evaluator
+
+
+def _run_name(model: str) -> str:
+    """`name` passé à `dataset.run_experiment` — stable par modèle (`/`
+    remplacé, invalide dans certains contextes d'URL). Pas de date : voir
+    docstring du module, Langfuse auto-génère un `run_name` unique par
+    appel."""
+    return f"gold-devis-nuextract-{model.replace('/', '_')}"
+
+
+def run_eval(
+    client: Any = None,
+    *,
+    max_concurrency: int = 14,
+    model: str = nuextract_client._DEFAULT_MODEL,
+):
+    """Rejoue le pipeline NuExtract sur les items du Dataset Langfuse
+    `gold-devis` (déjà synchronisé par `gold_dataset_sync.py`) via
+    `dataset.run_experiment`. `max_concurrency=14` (= nombre de documents
+    gold) : vLLM bat les requêtes concurrentes en interne (continuous
+    batching), un seul conteneur Modal (`max_containers=1`) les absorbe
+    sans coût GPU supplémentaire — décidé en cadrage."""
+    if client is None:
+        from langfuse import Langfuse
+
+        client = Langfuse()
+
+    fields_by_key = {field.key: field for field in load_gold_fields()}
+    dataset = client.get_dataset(DATASET_NAME)
+    task = build_task(fields_by_key)
+
+    return dataset.run_experiment(
+        name=_run_name(model),
+        task=task,
+        evaluators=[build_field_evaluator(fields_by_key)],
+        run_evaluators=[build_run_evaluator()],
+        max_concurrency=max_concurrency,
+    )
+
+
+def main() -> None:
+    load_env()
+    result = run_eval()
+    print(result.format())
+
+
+if __name__ == "__main__":
+    main()
