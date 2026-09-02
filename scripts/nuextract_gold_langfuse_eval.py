@@ -38,6 +38,7 @@ from scripts.gold_dataset_eval import (  # noqa: E402
     _grounding_accuracy,
     _item_evaluation_value,
     _latency_evaluations,
+    _percentile,
     build_field_evaluator,
     load_gold_fields,
 )
@@ -124,6 +125,28 @@ def _cost_evaluation(item_results: list[Any]) -> Any:
     )
 
 
+def _extraction_latency_evaluations(item_results: list[Any]) -> list[Any]:
+    """p50/p95 de la latence "nettoyée" (`latency_seconds -
+    cold_start_seconds`) par item -- le temps d'attente de retry (cold-start,
+    essentiellement) exclu, contrairement à `latency_p50/p95` (réutilisé de
+    `gold_dataset_eval.py`, mesure brute qui inclut ce temps d'attente).
+    Même calcul de percentile que l'existant (`_percentile`, importé, pas
+    réimplémenté). Voir docs/ideas/nuextract-cold-start-latency.md."""
+    from langfuse.experiment import Evaluation
+
+    net_latencies = sorted(
+        r.output["latency_seconds"] - r.output.get("cold_start_seconds", 0.0)
+        for r in item_results
+        if isinstance(r.output, dict) and "latency_seconds" in r.output
+    )
+    if not net_latencies:
+        return []
+    return [
+        Evaluation(name="extraction_latency_p50_seconds", value=_percentile(net_latencies, 50)),
+        Evaluation(name="extraction_latency_p95_seconds", value=_percentile(net_latencies, 95)),
+    ]
+
+
 def build_run_evaluator():
     """Évaluateur run-level, composé à partir des helpers déjà réutilisables
     de `gold_dataset_eval.py` (importés, jamais modifiés) + un coût réel
@@ -149,6 +172,7 @@ def build_run_evaluator():
         evaluations.append(_exact_match_accuracy(validated))
         evaluations.append(_grounding_accuracy(validated))
         evaluations.extend(_latency_evaluations(validated))
+        evaluations.extend(_extraction_latency_evaluations(validated))
         evaluations.append(_cost_evaluation(validated))
         return evaluations
 

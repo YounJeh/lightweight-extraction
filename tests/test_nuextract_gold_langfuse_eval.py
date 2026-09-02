@@ -180,6 +180,44 @@ def test_run_evaluator_cost_sums_latency_across_items():
     assert by_name["cost_usd_total"].comment  # explique l'approximation, pas un chiffre nu
 
 
+def test_run_evaluator_computes_extraction_latency_net_of_cold_start():
+    items = [
+        _item_result(
+            evaluations=[Evaluation(name="human_validation", value=True)],
+            output={
+                "extraction_results": [],
+                "latency_seconds": total,
+                "cold_start_seconds": cold_start,
+            },
+        )
+        for total, cold_start in [(10.0, 8.0), (20.0, 15.0), (30.0, 25.0)]
+    ]
+    # latences nettoyées : 2.0, 5.0, 5.0
+
+    run_evaluator = build_run_evaluator()
+    evaluations = run_evaluator(item_results=items)
+    by_name = _evaluations_by_name(evaluations)
+
+    assert by_name["extraction_latency_p50_seconds"].value == 5.0
+    # latence brute (inchangée, cold-start inclus) toujours présente aussi
+    assert by_name["latency_p50_seconds"].value == 20.0
+
+
+def test_run_evaluator_extraction_latency_defaults_to_zero_cold_start():
+    items = [
+        _item_result(
+            evaluations=[Evaluation(name="human_validation", value=True)],
+            output={"extraction_results": [], "latency_seconds": 7.0},  # pas de cold_start_seconds
+        )
+    ]
+
+    run_evaluator = build_run_evaluator()
+    evaluations = run_evaluator(item_results=items)
+    by_name = _evaluations_by_name(evaluations)
+
+    assert by_name["extraction_latency_p50_seconds"].value == 7.0
+
+
 def test_run_evaluator_has_no_ocr_split_evaluations():
     run_evaluator = build_run_evaluator()
 
