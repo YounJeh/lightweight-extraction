@@ -7,7 +7,9 @@ Voir specs/nuextract-pipeline-spike.md pour le contexte complet.
 import base64
 import json
 import os
+import time
 
+import openai
 import pymupdf
 from openai import OpenAI
 
@@ -16,6 +18,19 @@ from app.tools import type_coercion
 
 _RENDER_DPI = 150
 _DEFAULT_MODEL = "numind/NuExtract3"
+
+# Un serveur Modal scale-to-zero (min_containers=0) renvoie "503 no
+# upstreams available" immédiatement -- pas d'attente du cold-start (~2-3
+# min observés en réel) -- quand un burst de requêtes concurrentes arrive
+# avant qu'un conteneur soit prêt. Retry avec backoff exponentiel plafonné
+# plutôt qu'un échec immédiat ; couvre aussi une coupure de connexion
+# transitoire pendant le démarrage. Pas de retry sur une erreur non
+# transitoire (ex. 400 schéma invalide) -- seules ces deux exceptions sont
+# ciblées.
+_RETRYABLE_EXCEPTIONS = (openai.InternalServerError, openai.APIConnectionError)
+_MAX_RETRIES = 8
+_INITIAL_BACKOFF_SECONDS = 5.0
+_MAX_BACKOFF_SECONDS = 30.0
 
 
 def render_pdf_pages(pdf_bytes: bytes, *, dpi: int = _RENDER_DPI) -> list[bytes]:
@@ -84,6 +99,18 @@ def _image_message_content(images: list[bytes]) -> list[dict]:
     ]
 
 
+def _create_completion_with_retries(client: OpenAI, *, sleep=time.sleep, **kwargs):
+    delay = _INITIAL_BACKOFF_SECONDS
+    for attempt in range(_MAX_RETRIES):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except _RETRYABLE_EXCEPTIONS:
+            if attempt == _MAX_RETRIES - 1:
+                raise
+            sleep(delay)
+            delay = min(delay * 2, _MAX_BACKOFF_SECONDS)
+
+
 def build_client(*, base_url: str | None = None, api_key: str | None = None) -> OpenAI:
     """`api_key` retombe sur `"EMPTY"` si absent — convention des serveurs
     vLLM auto-hébergés sans authentification (voir exemple officiel,
@@ -116,7 +143,8 @@ def extract(
     images = render_pdf_pages(pdf_bytes)
     template = build_template(fields)
 
-    response = client.chat.completions.create(
+    response = _create_completion_with_retries(
+        client,
         model=model,
         temperature=0,
         messages=[{"role": "user", "content": _image_message_content(images)}],

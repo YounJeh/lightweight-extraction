@@ -1,9 +1,17 @@
 import json
 
+import httpx
+import openai
 import pymupdf
 
 from app.models import Field
-from scripts.nuextract_client import build_template, extract, parse_response, render_pdf_pages
+from scripts.nuextract_client import (
+    _create_completion_with_retries,
+    build_template,
+    extract,
+    parse_response,
+    render_pdf_pages,
+)
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -112,6 +120,55 @@ class _FakeClient:
     def __init__(self, content: str):
         self.chat = type("_Chat", (), {})()
         self.chat.completions = _FakeCompletions(content)
+
+
+def _server_error_503() -> openai.InternalServerError:
+    request = httpx.Request("POST", "http://test")
+    return openai.InternalServerError(
+        "no upstreams available", response=httpx.Response(503, request=request), body=None
+    )
+
+
+class _FlakyCompletions:
+    """Simule `client.chat.completions.create` : lève chaque exception de
+    `side_effects` dans l'ordre, puis renvoie `result` au premier appel
+    restant."""
+
+    def __init__(self, side_effects: list[Exception], result):
+        self._side_effects = list(side_effects)
+        self._result = result
+        self.call_count = 0
+
+    def create(self, **kwargs):
+        self.call_count += 1
+        if self._side_effects:
+            raise self._side_effects.pop(0)
+        return self._result
+
+
+def test_create_completion_with_retries_succeeds_after_transient_503s():
+    completions = _FlakyCompletions([_server_error_503(), _server_error_503()], "ok")
+    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+    sleeps: list[float] = []
+
+    result = _create_completion_with_retries(fake_client, sleep=sleeps.append)
+
+    assert result == "ok"
+    assert completions.call_count == 3
+    assert sleeps == [5.0, 10.0]  # backoff exponentiel : 5s puis 10s
+
+
+def test_create_completion_with_retries_raises_after_exhausting_attempts():
+    completions = _FlakyCompletions([_server_error_503() for _ in range(8)], "unreachable")
+    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+
+    try:
+        _create_completion_with_retries(fake_client, sleep=lambda _: None)
+        assert False, "devrait lever après _MAX_RETRIES tentatives"
+    except openai.InternalServerError:
+        pass
+
+    assert completions.call_count == 8  # _MAX_RETRIES, aucune tentative en plus
 
 
 def test_extract_sends_one_image_per_page_and_the_verbatim_string_template():
