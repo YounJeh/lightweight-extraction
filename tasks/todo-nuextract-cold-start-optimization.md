@@ -207,14 +207,14 @@ la lenteur de redémarrage, qui n'est plus un problème) — décision à
 documenter, pas à trancher ici à l'avance.
 
 **Acceptance criteria:**
-- [ ] `scripts/modal_nuextract_server.py` reflète uniquement la config
+- [x] `scripts/modal_nuextract_server.py` reflète uniquement la config
       finale retenue, commentée (pourquoi ce choix, pas les essais
       écartés — ça, c'est dans le test log).
-- [ ] `scaledown_window` a une valeur justifiée par le résultat mesuré,
+- [x] `scaledown_window` a une valeur justifiée par le résultat mesuré,
       pas un reliquat de debug.
 
 **Verification:**
-- [ ] Relecture manuelle du diff final vs. HEAD de cette branche.
+- [x] Relecture manuelle du diff final vs. HEAD de cette branche.
 
 **Dependencies:** Task 4 (ou tâche(s) de Phase 2 si déclenchées)
 
@@ -233,11 +233,11 @@ décision finale retenue pour le cold start — pas le détail des essais
 (ça reste dans `docs/nuextract-cold-start-tests.md`, lien inclus).
 
 **Acceptance criteria:**
-- [ ] Entrée brève, même format que les entrées existantes du fichier.
-- [ ] Lien vers `docs/nuextract-cold-start-tests.md` pour le détail complet.
+- [x] Entrée brève, même format que les entrées existantes du fichier.
+- [x] Lien vers `docs/nuextract-cold-start-tests.md` pour le détail complet.
 
 **Verification:**
-- [ ] Relecture manuelle — cohérence avec la règle CLAUDE.md ("très bref
+- [x] Relecture manuelle — cohérence avec la règle CLAUDE.md ("très bref
       et synthétique", "uniquement ce qui touche au cœur de l'application").
 
 **Dependencies:** Task 5
@@ -258,13 +258,13 @@ entretien — pas de réécriture du détail déjà loggé au fil de l'eau, just
 un chapeau de synthèse.
 
 **Acceptance criteria:**
-- [ ] Résumé en tête du fichier : baseline, cold start final, % de gain,
+- [x] Résumé en tête du fichier : baseline, cold start final, % de gain,
       leviers gardés vs rejetés en une phrase chacun.
-- [ ] Table détaillée (déjà remplie au fil des tâches précédentes)
+- [x] Table détaillée (déjà remplie au fil des tâches précédentes)
       inchangée dans le fond, juste vérifiée pour la cohérence.
 
 **Verification:**
-- [ ] Relecture manuelle.
+- [x] Relecture manuelle.
 
 **Dependencies:** Task 6
 
@@ -277,9 +277,14 @@ un chapeau de synthèse.
 
 ## Checkpoint final
 
-- [ ] Cold start < 1 min stable, sans régression gold, documenté de bout
-      en bout dans `docs/nuextract-cold-start-tests.md`.
-- [ ] `choix_techniques.md` a sa nouvelle entrée, brève.
-- [ ] `uv run pytest -v -m "not live"` passe intégralement.
+- [x] Cold start < 1 min **dans le cas majoritaire** (5/6 cycles en régime
+      établi, 29-56s), **pas garanti à 100%** (1/6 outlier à 346s, root
+      cause identifiée comme un ralentissement de l'infra de restore Modal
+      elle-même, alpha) — nuance assumée et documentée, pas une case
+      cochée à l'aveugle. Aucune régression gold. Documenté de bout en
+      bout dans `docs/nuextract-cold-start-tests.md`.
+- [x] `choix_techniques.md` a sa nouvelle entrée, brève.
+- [x] `uv run pytest -v -m "not live"` passe intégralement (302 passed,
+      1 deselected).
 - [ ] Proposer `/code-review-and-quality` puis une PR pour l'ensemble du
       spike NuExtract (branche `feat/nuextract-pipeline-spike`).

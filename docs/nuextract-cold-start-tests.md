@@ -22,7 +22,46 @@ passer par Langfuse (boucle plus rapide pour itérer).
 
 ## Résumé
 
-*(à compléter une fois le chantier conclu — voir Task 7 du todo)*
+**Baseline** (config déjà optimisée : eager mode, cache vLLM, prefetch
+safetensors, `max-num-seqs=8`) : cold start ~284-320s (médiane ~288s),
+mesuré sur 3 cycles forcés. Loin de la cible < 1 min.
+
+**Levier testé et retenu** : GPU memory snapshot Modal (alpha) + sleep
+mode vLLM (`--enable-sleep-mode`). Le serveur se met en veille
+(`POST /sleep?level=1`, poids déchargés vers la RAM CPU) juste avant que
+Modal ne prenne un snapshot de l'état GPU ; un cold start suivant restaure
+ce snapshot puis réveille juste le serveur (`POST /wake_up`), au lieu de
+rejouer tout le chargement depuis le Volume.
+
+**Résultat mesuré** (9 cycles réels) :
+- Cycles 1-3 (construction du snapshot) : lents comme attendu (248-450s).
+- Cycles 4-9 (régime établi) : **5/6 sous 60s (29-56s, médiane ~54s)** —
+  soit un gain de **~5 à 9x** sur le cas majoritaire. **1/6 outlier à
+  346s**, root-causé via les logs serveur Modal comme un ralentissement du
+  mécanisme de restore lui-même (pas notre config, pas vLLM) — cohérent
+  avec le statut alpha de la fonctionnalité.
+- **Aucune régression** sur le corpus gold (F1 0.711 vs 0.696 baseline,
+  même bug pré-existant hors scope sur le même document).
+- Pire cas mesuré (450s) resté dans le budget de retry client déjà
+  existant (~515s) — pas de régression de robustesse même sur un cycle
+  lent.
+
+**Décision** : gardé comme nouvelle configuration par défaut. Cible < 1 min
+**atteinte dans le cas majoritaire, pas garantie à 100%** — caractéristique
+assumée d'une fonctionnalité Modal encore alpha, pas un échec de
+configuration de notre côté (root cause vérifiée, pas supposée). Phase 2
+(réglages vLLM, image, quantization, GPU alternatif) délibérément non
+lancée : ces leviers ciblent le chemin de démarrage à froid, pas le chemin
+de restore où se situe l'outlier résiduel — coût réel (temps GPU) pour un
+effet attendu nul sur ce point précis. Voir
+[tasks/plan-nuextract-cold-start-optimization.md](../tasks/plan-nuextract-cold-start-optimization.md)
+pour la décision complète.
+
+**Levier écarté sans être testé** : quantization (AWQ/GPTQ/FP8) — NuExtract3
+n'a aucun checkpoint quantifié officiel publié par numind (vérifié sur
+[github.com/numindai/nuextract](https://github.com/numindai/nuextract)),
+quantifier soi-même aurait été plus risqué (régression de format de
+sortie) pour un chantier déjà réussi par un autre levier.
 
 ## Table détaillée
 

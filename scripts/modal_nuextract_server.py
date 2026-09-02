@@ -111,9 +111,15 @@ image = (
     # Aucun GPU lorsque le service n'est pas utilisé.
     min_containers=0,
 
-    # Garde le container chaud pendant 600 s après la dernière requête.
-    # À augmenter plus tard si les appels arrivent par batch/rafales.
-    scaledown_window=600,
+    # Garde le container chaud 120s après la dernière requête -- juste de
+    # quoi absorber des appels rapprochés (import par lot) sans repayer un
+    # cold start à chaque fois, sans reproduire l'ancien contournement
+    # (600s) qui masquait le vrai problème plutôt que de le résoudre. Le
+    # cold start réel étant désormais ~30-55s dans le cas majoritaire (voir
+    # docs/nuextract-cold-start-tests.md, GPU snapshot + sleep mode), la
+    # justification initiale de 600s (cold start ~5 min, pénible à chaque
+    # scale-to-zero) ne tient plus.
+    scaledown_window=120,
 
     # NuExtract + vLLM peuvent rester assez longs à initialiser.
     startup_timeout=600,

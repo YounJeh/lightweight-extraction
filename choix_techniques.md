@@ -261,3 +261,29 @@ migration de contrainte, SQLite ne le permet pas via `ALTER TABLE`).
 
 **Réf :** [tasks/plan-gold-export-from-extraction.md](tasks/plan-gold-export-from-extraction.md) ·
 [app/gold_export.py](app/gold_export.py)
+
+---
+
+## Cold start serveur NuExtract (Modal) : GPU memory snapshot + sleep mode vLLM
+
+**Contexte :** cold start du serveur Modal (scale-to-zero) mesuré à
+~4,7-5,3 min (baseline instrumentée). Cible : sous 1 min.
+
+**Décision** (`scripts/modal_nuextract_server.py`) : GPU memory snapshot
+Modal (alpha, `enable_memory_snapshot` + `experimental_options`) combiné
+au sleep mode vLLM (`--enable-sleep-mode`) — le serveur se met en veille
+avant le snapshot, se réveille (`/wake_up`) au cold start suivant au lieu
+de rejouer tout le chargement. Mesuré en réel sur 9 cycles : 5/6 cycles en
+régime établi sous 60s (29-56s), 1/6 outlier à 346s dont la cause,
+identifiée via les logs Modal, est le mécanisme de restore lui-même (pas
+notre config) — pire cas mesuré (450s) resté dans le budget de retry
+client déjà existant, aucune régression sur le corpus gold (F1 0.711 vs
+0.696 baseline).
+
+**Écarté :** quantization (aucun checkpoint officiel NuExtract3 publié par
+numind) · changement de moteur d'inférence (vLLM → autre) · compter sur un
+`scaledown_window` long pour masquer le cold start plutôt que le réduire.
+
+**Réf :** [docs/ideas/nuextract-cold-start-optimization.md](docs/ideas/nuextract-cold-start-optimization.md) ·
+[tasks/plan-nuextract-cold-start-optimization.md](tasks/plan-nuextract-cold-start-optimization.md) ·
+[docs/nuextract-cold-start-tests.md](docs/nuextract-cold-start-tests.md)
