@@ -71,24 +71,25 @@ script fonctionnel — un seul chemin d'éval à maintenir.
 
 ### Phase 1 : Foundation — task callable + run-evaluator
 
-- [ ] Task 2: `build_task` — extraction NuExtract par item du dataset gold
-- [ ] Task 3: `build_run_evaluator` — coût réel + helpers réutilisés
+- [x] Task 2: `build_task` — extraction NuExtract par item du dataset gold
+- [x] Task 3: `build_run_evaluator` — coût réel + helpers réutilisés
 
 ### Checkpoint : Phase 1
-- [ ] `uv run pytest -v -m "not live"` passe, y compris les nouveaux tests
+- [x] `uv run pytest -v -m "not live"` passe, y compris les nouveaux tests
       offline.
-- [ ] Aucune régression sur `tests/test_gold_dataset_eval.py` (les helpers
-      importés ne sont pas modifiés, juste réutilisés).
+- [x] Aucune régression sur `tests/test_gold_dataset_eval.py` (les helpers
+      importés ne sont pas modifiés, juste réutilisés) — 15 passed.
 
 ### Phase 2 : Wiring + nettoyage
 
-- [ ] Task 4: `run_eval()`/`main()` — nom de run, `dataset.run_experiment`,
+- [x] Task 4: `run_eval()`/`main()` — nom de run, `dataset.run_experiment`,
       wiring complet
-- [ ] Task 5: Suppression du chemin CSV
+- [x] Task 5: Suppression du chemin CSV
       (`scripts/nuextract_pipeline_eval.py` + son test)
 
 ### Checkpoint : Complete
-- [ ] `uv run pytest -v -m "not live"` passe intégralement.
+- [x] `uv run pytest -v -m "not live"` passe intégralement (286 passed,
+      1 deselected).
 - [ ] `scripts/nuextract_gold_langfuse_eval.py` prêt pour un premier run
       réel — **fait par l'humain**, pas par Claude (règle CLAUDE.md, ce
       chantier n'est pas du DSPy).

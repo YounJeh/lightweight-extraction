@@ -138,16 +138,18 @@ Mapping `ExtractionResult` (mêmes conventions que
       `verbatim-string`, `typed_value` coercée.
       *`render_pdf_pages`/`build_template`/`parse_response`/`extract` —
       7 tests offline, `tests/test_nuextract_client.py`.*
-- [x] `scripts/nuextract_pipeline_eval.py` rejoue ce pipeline sur (un
-      sous-ensemble du) dataset gold et produit un CSV avec précision/
-      recall/F1 par champ + macro — comparable au format déjà produit par
-      les runs DSPy existants (`tasks/*.csv`).
-      *`run`/`run_document`/`aggregate_scores`/`write_results_csv` —
-      8 tests offline, `tests/test_nuextract_pipeline_eval.py`. `--limit`
-      ajouté pour valider sur un sous-ensemble avant un run complet.*
+- [x] ~~`scripts/nuextract_pipeline_eval.py` rejoue ce pipeline sur (un
+      sous-ensemble du) dataset gold et produit un CSV~~ — **remplacé**
+      par `scripts/nuextract_gold_langfuse_eval.py` (branché sur le
+      Dataset Langfuse `gold-devis` existant, voir
+      [docs/ideas/nuextract-langfuse-eval.md](../docs/ideas/nuextract-langfuse-eval.md) /
+      [tasks/plan-nuextract-langfuse-eval.md](../tasks/plan-nuextract-langfuse-eval.md)) —
+      chemin CSV supprimé (fichier + test), un seul chemin d'éval à
+      maintenir, décidé en cadrage.
 - [x] `uv run pytest -v -m "not live"` passe, y compris les nouveaux tests
       offline, sans régression sur la suite existante.
-      *286 passed, 1 deselected (`-m live`).*
+      *286 passed, 1 deselected (`-m live`) après le remplacement du
+      chemin CSV par `nuextract_gold_langfuse_eval.py` (voir ci-dessus).*
 - [x] Aucune modification de `app/` (`Protocol` `NerExtractor`/
       `PdfTextExtractor` inchangés, aucune route/UI touchée).
       *Fichiers touchés : `scripts/`, `tests/`, `.env.example`, `docs/`,

@@ -161,15 +161,15 @@ vérifié).
 chemin d'éval NuExtract à maintenir (Langfuse), le CSV devient redondant.
 
 **Acceptance criteria:**
-- [ ] Les deux fichiers n'existent plus.
-- [ ] Aucune référence résiduelle à `nuextract_pipeline_eval` ailleurs
-      dans le repo (grep avant suppression).
+- [x] Les deux fichiers n'existent plus.
+- [x] Aucune référence résiduelle à `nuextract_pipeline_eval` dans le code
+      (`*.py`) — les mentions restantes dans `specs/`/`tasks/`/`docs/` sont
+      un historique de décision, pas du code, laissées telles quelles.
 
 **Verification:**
-- [ ] `grep -rn "nuextract_pipeline_eval" --include="*.py" --include="*.md" .`
-      ne renvoie rien après suppression.
-- [ ] `uv run pytest -v -m "not live"` — suite complète toujours verte
-      après suppression.
+- [x] `grep -rn "nuextract_pipeline_eval" --include="*.py" .` ne renvoie
+      rien après suppression.
+- [x] `uv run pytest -v -m "not live"` — 286 passed, 1 deselected.
 
 **Dependencies:** Task 4 (le nouveau script doit être fonctionnel et testé
 avant de retirer l'ancien chemin)
@@ -184,8 +184,9 @@ avant de retirer l'ancien chemin)
 
 ## Checkpoint final
 
-- [ ] `uv run pytest -v -m "not live"` passe intégralement.
-- [ ] Aucune modification de `app/`, `scripts/gold_dataset_eval.py`,
+- [x] `uv run pytest -v -m "not live"` passe intégralement (286 passed,
+      1 deselected).
+- [x] Aucune modification de `app/`, `scripts/gold_dataset_eval.py`,
       `scripts/gold_dataset_sync.py`, `scripts/gold_matching.py` (tous
       seulement importés, jamais édités).
 - [ ] `scripts/nuextract_gold_langfuse_eval.py` prêt pour un premier run
