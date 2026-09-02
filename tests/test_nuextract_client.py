@@ -7,6 +7,8 @@ import pymupdf
 from app.models import Field
 from scripts.nuextract_client import (
     _create_completion_with_retries,
+    _merge_window_results,
+    _page_windows,
     build_template,
     extract,
     parse_response,
@@ -46,6 +48,62 @@ def test_render_pdf_pages_on_a_single_page_document():
 
     assert len(images) == 1
     assert images[0].startswith(_PNG_MAGIC)
+
+
+def test_page_windows_returns_a_single_window_for_a_short_document():
+    assert _page_windows(3) == [(0, 3)]
+    assert _page_windows(5) == [(0, 5)]  # == taille de fenêtre, pas de découpage
+
+
+def test_page_windows_splits_a_long_document_with_overlap():
+    windows = _page_windows(12)
+
+    assert windows == [(0, 5), (4, 9), (8, 12)]
+
+
+def test_page_windows_covers_every_page_exactly_once_at_the_boundaries():
+    windows = _page_windows(25)
+
+    covered = set()
+    for start, end in windows:
+        covered.update(range(start, end))
+    assert covered == set(range(25))
+    assert windows[-1][1] == 25  # la dernière fenêtre atteint bien la fin
+
+
+def _extraction(field_title: str, value: str) -> "ExtractionResult":
+    from app.models import ExtractionResult
+
+    return ExtractionResult(
+        field_title=field_title, value=value, source="nuextract", typed_value=value or None
+    )
+
+
+def test_merge_window_results_keeps_the_first_non_empty_value():
+    window1 = [_extraction("Numéro de devis", "")]
+    window2 = [_extraction("Numéro de devis", "n°6952")]
+    window3 = [_extraction("Numéro de devis", "AUTRE")]
+
+    merged = _merge_window_results([window1, window2, window3])
+
+    assert [r.value for r in merged] == ["n°6952"]
+
+
+def test_merge_window_results_stays_empty_when_no_window_finds_a_value():
+    merged = _merge_window_results(
+        [[_extraction("Numéro de devis", "")], [_extraction("Numéro de devis", "")]]
+    )
+
+    assert merged[0].value == ""
+
+
+def test_merge_window_results_preserves_field_order():
+    window1 = [_extraction("A", ""), _extraction("B", "")]
+    window2 = [_extraction("A", ""), _extraction("B", "valeur B")]
+
+    merged = _merge_window_results([window1, window2])
+
+    assert [r.field_title for r in merged] == ["A", "B"]
 
 
 def test_build_template_maps_every_field_to_verbatim_string():
@@ -184,3 +242,52 @@ def test_extract_sends_one_image_per_page_and_the_verbatim_string_template():
     assert template == {"numero_devis": "verbatim-string"}
     assert results[0].value == "n°6952"
     assert results[0].source == "nuextract"
+
+
+class _FakeCompletionsSequence:
+    """Comme `_FakeCompletions`, mais renvoie un contenu différent à
+    chaque appel (dans l'ordre) — simule plusieurs fenêtres d'un même
+    document, chacune avec sa propre réponse."""
+
+    def __init__(self, contents: list[str]):
+        self._contents = list(contents)
+        self.received_kwargs_per_call: list[dict] = []
+
+    def create(self, **kwargs):
+        self.received_kwargs_per_call.append(kwargs)
+        return _FakeResponse(self._contents[len(self.received_kwargs_per_call) - 1])
+
+
+class _FakeClientSequence:
+    def __init__(self, contents: list[str]):
+        self.chat = type("_Chat", (), {})()
+        self.chat.completions = _FakeCompletionsSequence(contents)
+
+
+def test_extract_windows_a_long_document_and_merges_across_calls():
+    # 7 pages -> 2 fenêtres (0,5) et (4,7), voir _page_windows.
+    pdf_bytes = _build_pdf(*[f"page {i}" for i in range(7)])
+    fields = [_field("numero_devis")]
+    # 1ère fenêtre : rien trouvé. 2e fenêtre : trouvé (page 4-6, avec
+    # overlap sur la page 4 de la 1ère fenêtre).
+    fake_client = _FakeClientSequence(
+        [json.dumps({"numero_devis": ""}), json.dumps({"numero_devis": "n°6952"})]
+    )
+
+    results = extract(pdf_bytes, fields, client=fake_client)
+
+    calls = fake_client.chat.completions.received_kwargs_per_call
+    assert len(calls) == 2  # deux appels, un par fenêtre
+    assert len(calls[0]["messages"][0]["content"]) == 5  # fenêtre 1 : pages 0-4
+    assert len(calls[1]["messages"][0]["content"]) == 3  # fenêtre 2 : pages 4-6
+    assert results[0].value == "n°6952"  # trouvé en fenêtre 2, fusionné correctement
+
+
+def test_extract_makes_a_single_call_for_a_short_document():
+    pdf_bytes = _build_pdf(*[f"page {i}" for i in range(3)])
+    fields = [_field("numero_devis")]
+    fake_client = _FakeClientSequence([json.dumps({"numero_devis": "n°6952"})])
+
+    extract(pdf_bytes, fields, client=fake_client)
+
+    assert len(fake_client.chat.completions.received_kwargs_per_call) == 1

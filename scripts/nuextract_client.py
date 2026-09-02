@@ -32,6 +32,16 @@ _MAX_RETRIES = 8
 _INITIAL_BACKOFF_SECONDS = 5.0
 _MAX_BACKOFF_SECONDS = 30.0
 
+# Windowing (voir docs/ideas/nuextract-windowing.md) : un document de plus
+# de _WINDOW_SIZE_PAGES pages est découpé en fenêtres glissantes plutôt
+# qu'envoyé en un seul appel. Constantes dérivées d'un ratio observé en
+# réel (~2000-2200 tokens/page, 3 échecs "context length exceeded" sur des
+# documents de 12-14 pages contre une limite serveur de 16384 tokens) : 5
+# pages ≈ 11000 tokens, marge confortable. Overlap de 1 page pour ne pas
+# couper une valeur à cheval sur une frontière de page.
+_WINDOW_SIZE_PAGES = 5
+_WINDOW_OVERLAP_PAGES = 1
+
 
 def render_pdf_pages(pdf_bytes: bytes, *, dpi: int = _RENDER_DPI) -> list[bytes]:
     """Rend chaque page du PDF en PNG (une image par page, dans l'ordre du
@@ -99,6 +109,46 @@ def _image_message_content(images: list[bytes]) -> list[dict]:
     ]
 
 
+def _page_windows(
+    page_count: int, *, size: int = _WINDOW_SIZE_PAGES, overlap: int = _WINDOW_OVERLAP_PAGES
+) -> list[tuple[int, int]]:
+    """Bornes `[start, end)` de chaque fenêtre de pages, avec chevauchement.
+    Une seule fenêtre couvrant tout le document si `page_count <= size`
+    (comportement d'avant le windowing, inchangé dans ce cas)."""
+    if page_count <= size:
+        return [(0, page_count)]
+    step = size - overlap
+    windows = []
+    start = 0
+    while start < page_count:
+        end = min(start + size, page_count)
+        windows.append((start, end))
+        if end == page_count:
+            break
+        start += step
+    return windows
+
+
+def _merge_window_results(
+    window_results: list[list[ExtractionResult]],
+) -> list[ExtractionResult]:
+    """Fusionne les résultats de plusieurs fenêtres, par champ : la
+    **première fenêtre (dans l'ordre du document) qui renvoie une valeur
+    non vide gagne** — pas d'arbitrage LLM cross-fenêtre pour cette version
+    (voir docs/ideas/nuextract-windowing.md). Une seule fenêtre (cas
+    courant, document court) traverse cette fonction sans effet : chaque
+    champ n'a qu'un candidat, retenu tel quel."""
+    merged: dict[str, ExtractionResult] = {}
+    for results in window_results:
+        for result in results:
+            existing = merged.get(result.field_title)
+            if existing is not None and existing.value:
+                continue
+            if existing is None or result.value:
+                merged[result.field_title] = result
+    return list(merged.values())
+
+
 def _create_completion_with_retries(client: OpenAI, *, sleep=time.sleep, **kwargs):
     delay = _INITIAL_BACKOFF_SECONDS
     for attempt in range(_MAX_RETRIES):
@@ -129,10 +179,15 @@ def extract(
     client: OpenAI | None = None,
     model: str = _DEFAULT_MODEL,
 ) -> list[ExtractionResult]:
-    """Extrait `fields` depuis `pdf_bytes` en un **seul** appel
-    `chat/completions` — toutes les pages du document envoyées d'un coup,
-    sans découpage en fenêtres (voir specs/nuextract-pipeline-spike.md,
-    windowing repoussé tant que le corpus gold n'en a pas besoin).
+    """Extrait `fields` depuis `pdf_bytes` via un ou plusieurs appels
+    `chat/completions` selon le nombre de pages : un seul appel si le
+    document tient dans `_WINDOW_SIZE_PAGES`, sinon découpage en fenêtres
+    glissantes avec chevauchement (`_page_windows`) — transparent pour
+    l'appelant, signature et type de retour inchangés (voir
+    docs/ideas/nuextract-windowing.md). Les résultats de plusieurs fenêtres
+    sont fusionnés par `_merge_window_results` (1ère valeur non vide
+    gagne).
+
     `client` injectable pour les tests offline (mock) ; par défaut construit
     depuis `NUEXTRACT_BASE_URL`/`NUEXTRACT_API_KEY`.
 
@@ -142,12 +197,17 @@ def extract(
     client = client or build_client()
     images = render_pdf_pages(pdf_bytes)
     template = build_template(fields)
+    template_json = json.dumps(template)
 
-    response = _create_completion_with_retries(
-        client,
-        model=model,
-        temperature=0,
-        messages=[{"role": "user", "content": _image_message_content(images)}],
-        extra_body={"chat_template_kwargs": {"template": json.dumps(template)}},
-    )
-    return parse_response(response.choices[0].message.content, fields)
+    window_results = []
+    for start, end in _page_windows(len(images)):
+        response = _create_completion_with_retries(
+            client,
+            model=model,
+            temperature=0,
+            messages=[{"role": "user", "content": _image_message_content(images[start:end])}],
+            extra_body={"chat_template_kwargs": {"template": template_json}},
+        )
+        window_results.append(parse_response(response.choices[0].message.content, fields))
+
+    return _merge_window_results(window_results)
