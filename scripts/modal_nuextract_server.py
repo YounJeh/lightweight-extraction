@@ -7,14 +7,12 @@ Objectifs :
 - Cold start réduit avec --enforce-eager.
 - Préchargement des poids safetensors.
 - Concurrence limitée à 8 séquences.
-- Cold start encore réduit via GPU memory snapshot Modal (alpha) + sleep
-  mode vLLM (voir tasks/plan-nuextract-cold-start-optimization.md, Task 4) :
-  au premier démarrage (avant snapshot), le serveur charge le modèle,
-  s'auto-teste (warmup), puis se met en veille (POST /sleep?level=1,
-  poids déchargés vers la RAM CPU) -- c'est cet état "chaud mais endormi"
-  que Modal snapshotte. Un cold start suivant restaure ce snapshot puis
-  réveille juste le serveur (POST /wake_up), au lieu de rejouer tout le
-  chargement depuis le Volume.
+- Cold start réduit en sautant le profiling mémoire vLLM via
+  --kv-cache-memory (voir tasks/plan-nuextract-cold-start-optimization.md,
+  Task 4bis, et docs/nuextract-cold-start-tests.md pour le contexte complet
+  -- y compris l'essai GPU memory snapshot Modal + sleep mode, testé puis
+  abandonné : peu fiable en usage réel espacé, root-causé via les logs
+  serveur plutôt que supposé).
 
 Déploiement :
     modal deploy scripts/modal_nuextract_server.py
@@ -26,24 +24,13 @@ L'API OpenAI-compatible est disponible sous :
     /v1/chat/completions
 """
 
-import http.client
-import json
 import subprocess
-import time
 
 import modal
 
 
 MODEL_NAME = "numind/NuExtract3"
 PORT = 8000
-
-# PNG 1x1 transparent -- payload minimal pour exercer le chemin de code
-# multimodal complet pendant le warmup, sans dépendre de pymupdf (non
-# installé dans cette image) ni d'un vrai document.
-_WARMUP_IMAGE_PNG_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
-    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
-)
 
 
 app = modal.App("nuextract3")
@@ -88,12 +75,17 @@ image = (
     .env(
         {
             "VLLM_USE_FLASHINFER_SAMPLER": "0",
-            # Expose /sleep, /wake_up, /is_sleeping sur le serveur API vLLM
-            # -- endpoints "dev", non exposés par défaut (voir
-            # https://docs.vllm.ai/en/latest/features/sleep_mode/). Appelés
-            # uniquement en localhost depuis ce même fichier (@modal.enter),
-            # jamais via l'URL publique Modal -- pas un risque d'exposition.
-            "VLLM_SERVER_DEV_MODE": "1",
+            # Les kernels Triton écrits à la main (attention MM, GDN linear
+            # attn, etc.) sont JIT-compilés par Triton directement -- pas
+            # via torch.compile (désactivé par --enforce-eager), donc pas
+            # couverts par le cache torch.compile de vLLM
+            # (~/.cache/vllm/torch_compile_cache, déjà dans le volume
+            # vllm_cache monté ci-dessous). Triton a son propre cache
+            # (TRITON_CACHE_DIR, ~/.triton/cache par défaut -- jamais
+            # persisté jusqu'ici). Repointé dans vllm_cache pour survivre
+            # aux cold starts : log réel observé, ~1m46 de silence complet
+            # entre un warning Triton et la reprise des logs, sans ce fix.
+            "TRITON_CACHE_DIR": "/root/.cache/vllm/triton",
         }
     )
 )
@@ -113,12 +105,7 @@ image = (
 
     # Garde le container chaud 120s après la dernière requête -- juste de
     # quoi absorber des appels rapprochés (import par lot) sans repayer un
-    # cold start à chaque fois, sans reproduire l'ancien contournement
-    # (600s) qui masquait le vrai problème plutôt que de le résoudre. Le
-    # cold start réel étant désormais ~30-55s dans le cas majoritaire (voir
-    # docs/nuextract-cold-start-tests.md, GPU snapshot + sleep mode), la
-    # justification initiale de 600s (cold start ~5 min, pénible à chaque
-    # scale-to-zero) ne tient plus.
+    # cold start à chaque fois.
     scaledown_window=120,
 
     # NuExtract + vLLM peuvent rester assez longs à initialiser.
@@ -132,20 +119,14 @@ image = (
         "/root/.cache/vllm": vllm_cache,
     },
 
-    # GPU memory snapshot (alpha, opt-in) -- voir
-    # tasks/plan-nuextract-cold-start-optimization.md, Task 4. Support GPU
-    # L4 non confirmé explicitement par la doc Modal (exemples officiels :
-    # a10/a10g/h100) -- à valider par la mesure réelle, pas supposé.
-    enable_memory_snapshot=True,
-    experimental_options={"enable_gpu_snapshot": True},
-
     # Tests uniquement.
     unauthenticated=True,
 )
 class NuExtractServer:
 
-    def _vllm_command(self) -> list[str]:
-        return [
+    @modal.enter()
+    def start_server(self):
+        cmd = [
             "vllm",
             "serve",
             MODEL_NAME,
@@ -191,6 +172,22 @@ class NuExtractServer:
             #
             "--enforce-eager",
 
+            # vLLM exécute normalement un forward pass de profiling pour
+            # déterminer combien de mémoire allouer au KV cache -- mesuré à
+            # 121s sur ce modèle/GPU (log réel : "init engine (profile,
+            # create kv cache, warmup model) took 121.00 s"). Fournir la
+            # valeur directement saute cette mesure.
+            #
+            # Valeur reprise telle quelle du message que vLLM lui-même a
+            # loggé lors d'un run sans ce flag ("Replace gpu_memory_utilization
+            # config with --kv-cache-memory=10382653748 (9.67 GiB) to fit
+            # into requested memory") -- cohérente avec --max-model-len=16384
+            # et --max-num-seqs=8 ci-dessous. À RECALCULER (relancer une fois
+            # sans ce flag, relire la valeur suggérée dans les logs) si l'un
+            # des deux change.
+            "--kv-cache-memory",
+            "10382653748",
+
             # ----------------------------------------------------------------
             # Concurrency
             # ----------------------------------------------------------------
@@ -221,102 +218,6 @@ class NuExtractServer:
 
             "--limit-mm-per-prompt",
             '{"image": 15, "video": 0}',
-
-            # ----------------------------------------------------------------
-            # Sleep mode (snapshot cold start, voir docstring module)
-            # ----------------------------------------------------------------
-            "--enable-sleep-mode",
         ]
 
-    def _wait_ready(self, timeout: float = 570.0) -> None:
-        """Poll /health jusqu'à ce que vLLM réponde -- `timeout` sous
-        `startup_timeout=600` (marge pour warmup + mise en veille avant que
-        Modal ne considère le démarrage en échec)."""
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            try:
-                conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=5)
-                try:
-                    conn.request("GET", "/health")
-                    if conn.getresponse().status == 200:
-                        return
-                finally:
-                    conn.close()
-            except OSError:
-                pass
-            time.sleep(1)
-        raise TimeoutError("vLLM n'est pas devenu ready avant le timeout")
-
-    def _post(self, path: str, *, timeout: float = 120.0) -> None:
-        conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=timeout)
-        try:
-            conn.request("POST", path)
-            conn.getresponse().read()
-        finally:
-            conn.close()
-
-    def _warmup(self, attempts: int = 2) -> None:
-        """Envoie quelques requêtes réelles avant la mise en veille --
-        exerce le chemin de code multimodal complet (comme l'exemple
-        officiel Modal vLLM+snapshot) pour que le snapshot capture un état
-        déjà sollicité, pas juste un modèle chargé mais jamais utilisé.
-        Image 1x1 minimale (_WARMUP_IMAGE_PNG_BASE64) : le contenu n'a pas
-        d'importance, seul le chemin de code compte."""
-        body = json.dumps(
-            {
-                "model": MODEL_NAME,
-                "temperature": 0,
-                "max_tokens": 16,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": (
-                                        "data:image/png;base64,"
-                                        f"{_WARMUP_IMAGE_PNG_BASE64}"
-                                    )
-                                },
-                            }
-                        ],
-                    }
-                ],
-                "chat_template_kwargs": {
-                    "template": json.dumps({"warmup": "verbatim-string"})
-                },
-            }
-        ).encode()
-
-        for _ in range(attempts):
-            conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=120)
-            try:
-                conn.request(
-                    "POST",
-                    "/v1/chat/completions",
-                    body=body,
-                    headers={"Content-Type": "application/json"},
-                )
-                conn.getresponse().read()
-            finally:
-                conn.close()
-
-    @modal.enter(snap=True)
-    def start_and_sleep(self):
-        """Démarre vLLM, l'exerce (warmup), puis le met en veille (poids
-        déchargés vers la RAM CPU, `level=1` -- récupération rapide, voir
-        docstring module) juste avant que Modal ne prenne le snapshot GPU.
-        Ne s'exécute qu'au (re)build du snapshot, pas à chaque cold start
-        -- voir `wake` (`snap=False`) pour le chemin rapide."""
-        self.process = subprocess.Popen(self._vllm_command())
-        self._wait_ready()
-        self._warmup()
-        self._post("/sleep?level=1")
-
-    @modal.enter(snap=False)
-    def wake(self):
-        """Restaure depuis le snapshot GPU (poids déjà en RAM CPU) --
-        chemin rapide emprunté à chaque cold start une fois le snapshot
-        construit."""
-        self._post("/wake_up")
+        subprocess.Popen(cmd)

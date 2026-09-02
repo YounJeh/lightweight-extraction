@@ -171,24 +171,28 @@ réels, pas juste un edit de fichier)
 
 ## Checkpoint : Phase 1
 
-**Décision (2026-09-02)** : résultat **majoritaire, pas strictement stable**
-— 5/6 cycles en régime établi sous 60s (29-56s), 1/6 outlier à 346.3s, root
-cause identifiée via `modal app logs` comme un ralentissement côté
-infrastructure de restore Modal elle-même (pas vLLM, pas notre config —
-voir `docs/nuextract-cold-start-tests.md`). Pas de régression gold (F1
-0.711 vs 0.696 baseline).
+**Décision initiale (2026-09-02, cycles rapprochés)** : résultat
+**majoritaire, pas strictement stable** — 5/6 cycles en régime établi sous
+60s (29-56s), 1/6 outlier à 346.3s, root cause identifiée via
+`modal app logs` comme un ralentissement côté infrastructure de restore
+Modal elle-même. Pas de régression gold.
 
-**Phase 2 volontairement non déclenchée** : ses leviers (réglages vLLM,
-image, GPU alternatif, quantization) ciblent tous le chemin de démarrage
-*à froid* — inopérants sur un ralentissement situé dans le chemin de
-*restore* du snapshot lui-même. Les poursuivre n'aurait probablement aucun
-effet sur l'outlier observé, pour un coût réel (temps GPU) certain. Le pire
-cas mesuré (450.5s) reste dans le budget de retry client déjà existant
-(~515s) — pas de régression de robustesse, seulement une variance
-résiduelle assumée (caractéristique documentée d'une fonctionnalité Modal
-encore alpha).
+**CORRIGÉ le même jour, suite à un signalement utilisateur** (cold start
+toujours > 3 min via `nuextract_gold_langfuse_eval.py`) : re-testé en
+usage réel espacé (pas les cycles rapprochés du harness) — 0/3
+restaurations rapides sur 3 tentatives réalistes (1 reconstruction
+attendue au 1er usage, 1 reconstruction inattendue ~13 min plus tard, 1
+restauration réussie mais lente ~2m46). **Le levier GPU snapshot est
+retiré** — la décision "majoritaire" ci-dessus reposait sur une méthodo de
+test (cycles rapprochés via `container stop`) qui ne représente pas
+l'usage réel. Voir `docs/nuextract-cold-start-tests.md` pour le détail
+complet, y compris deux leviers de remplacement testés ensuite
+(`--kv-cache-memory`, `TRITON_CACHE_DIR`) — aucun n'a encore résolu le
+problème. **Chantier rouvert, pas classé "Phase 2 inutile" comme prévu
+initialement.**
 
-- [x] Décision explicite et documentée (ci-dessus + test log).
+- [x] Décision explicite et documentée (ci-dessus + test log), y compris
+      la correction.
 - [x] Config gardée comme nouvelle base pour la Phase 3 (wrap-up) —
       gain net majoritaire, pas de régression, pas pire que baseline dans
       le pire cas. Phase 2 non nécessaire dans l'immédiat (voir ci-dessus).
@@ -277,14 +281,23 @@ un chapeau de synthèse.
 
 ## Checkpoint final
 
-- [x] Cold start < 1 min **dans le cas majoritaire** (5/6 cycles en régime
-      établi, 29-56s), **pas garanti à 100%** (1/6 outlier à 346s, root
-      cause identifiée comme un ralentissement de l'infra de restore Modal
-      elle-même, alpha) — nuance assumée et documentée, pas une case
-      cochée à l'aveugle. Aucune régression gold. Documenté de bout en
-      bout dans `docs/nuextract-cold-start-tests.md`.
-- [x] `choix_techniques.md` a sa nouvelle entrée, brève.
+**RÉOUVERT (2026-09-02)** : la conclusion "cold start < 1 min dans le cas
+majoritaire" ci-dessous a été invalidée par un test en usage réel (voir
+Checkpoint Phase 1). Ce checkpoint ne peut pas être coché comme atteint
+tant qu'un fix fiable n'est pas confirmé.
+
+- [ ] Cold start < 1 min, vérifié en usage réel (pas seulement en cycles
+      rapprochés via le harness) — **non atteint à ce stade**. Trois
+      leviers testés (GPU snapshot, `--kv-cache-memory`, `TRITON_CACHE_DIR`),
+      aucun n'a réduit le cold start de façon mesurée. Piste ouverte non
+      vérifiée : commit de volume Modal potentiellement bloqué par l'arrêt
+      SIGINT du harness (`docs/nuextract-cold-start-tests.md`, section
+      "Pistes pour la suite"). Aucune régression gold sur les configs
+      testées.
+- [x] `choix_techniques.md` reflète l'état réel (non résolu), pas une
+      fausse victoire.
 - [x] `uv run pytest -v -m "not live"` passe intégralement (302 passed,
       1 deselected).
-- [ ] Proposer `/code-review-and-quality` puis une PR pour l'ensemble du
-      spike NuExtract (branche `feat/nuextract-pipeline-spike`).
+- [ ] Proposer `/code-review-and-quality` puis une PR — **prématuré tant
+      que le chantier n'est pas résolu ou explicitement mis en pause avec
+      l'accord de l'utilisateur.**

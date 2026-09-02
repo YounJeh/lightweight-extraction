@@ -264,26 +264,35 @@ migration de contrainte, SQLite ne le permet pas via `ALTER TABLE`).
 
 ---
 
-## Cold start serveur NuExtract (Modal) : GPU memory snapshot + sleep mode vLLM
+## Cold start serveur NuExtract (Modal) : investigation en cours, pas encore résolu
 
 **Contexte :** cold start du serveur Modal (scale-to-zero) mesuré à
 ~4,7-5,3 min (baseline instrumentée). Cible : sous 1 min.
 
-**Décision** (`scripts/modal_nuextract_server.py`) : GPU memory snapshot
-Modal (alpha, `enable_memory_snapshot` + `experimental_options`) combiné
-au sleep mode vLLM (`--enable-sleep-mode`) — le serveur se met en veille
-avant le snapshot, se réveille (`/wake_up`) au cold start suivant au lieu
-de rejouer tout le chargement. Mesuré en réel sur 9 cycles : 5/6 cycles en
-régime établi sous 60s (29-56s), 1/6 outlier à 346s dont la cause,
-identifiée via les logs Modal, est le mécanisme de restore lui-même (pas
-notre config) — pire cas mesuré (450s) resté dans le budget de retry
-client déjà existant, aucune régression sur le corpus gold (F1 0.711 vs
-0.696 baseline).
+**État (2026-09-02) : non résolu.** Trois leviers testés en réel, aucun
+n'a réduit le cold start de façon fiable :
 
-**Écarté :** quantization (aucun checkpoint officiel NuExtract3 publié par
-numind) · changement de moteur d'inférence (vLLM → autre) · compter sur un
-`scaledown_window` long pour masquer le cold start plutôt que le réduire.
+- **GPU memory snapshot Modal (alpha) + sleep mode vLLM** — testé,
+  d'abord validé (5/6 cycles < 60s) puis **retiré** après re-test en usage
+  réel espacé (requêtes à plusieurs minutes d'intervalle, pas en rafale) :
+  0/3 restaurations rapides, root-causé via les logs Modal comme un
+  mécanisme de restore/reconstruction peu fiable hors du cas "cycles
+  rapprochés" — première conclusion corrigée, pas cachée.
+- **`--kv-cache-memory`** (saute le profiling mémoire vLLM) — implémenté,
+  actif (confirmé dans les logs), aucun gain mesuré : la mesure mémoire
+  n'était pas le vrai goulot.
+- **`TRITON_CACHE_DIR` persisté** (cache des kernels Triton compilés à
+  chaud) — implémenté, cache bien peuplé dans le volume, mais le gain
+  attendu ne s'est pas confirmé sur les cycles mesurés.
+
+Aucune régression sur le corpus gold sur les configs testées.
+
+**Écarté sans être testé :** quantization (aucun checkpoint officiel
+NuExtract3 publié par numind) · changement de moteur d'inférence (vLLM →
+autre) · compter sur un `scaledown_window` long pour masquer le cold start
+plutôt que le réduire.
 
 **Réf :** [docs/ideas/nuextract-cold-start-optimization.md](docs/ideas/nuextract-cold-start-optimization.md) ·
 [tasks/plan-nuextract-cold-start-optimization.md](tasks/plan-nuextract-cold-start-optimization.md) ·
-[docs/nuextract-cold-start-tests.md](docs/nuextract-cold-start-tests.md)
+[docs/nuextract-cold-start-tests.md](docs/nuextract-cold-start-tests.md) (détail complet, y compris
+la piste ouverte non vérifiée sur le commit des volumes Modal)
