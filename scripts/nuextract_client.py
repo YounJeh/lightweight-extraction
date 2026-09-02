@@ -242,11 +242,9 @@ def extract(
             on_retry=on_retry,
             model=model,
             temperature=0,
-            messages=[
-                {"role": "user", "content": _image_message_content(images[start:end])}],
+            messages=[{"role": "user", "content": _image_message_content(images[start:end])}],
             extra_body={"chat_template_kwargs": {"template": template_json}},
         )
-        window_results.append(parse_response(
-            response.choices[0].message.content, fields))
+        window_results.append(parse_response(response.choices[0].message.content, fields))
 
     return _merge_window_results(window_results)

@@ -177,22 +177,6 @@ class _FakeResponse:
         self.choices = [_FakeChoice(content)]
 
 
-class _FakeCompletions:
-    def __init__(self, content: str):
-        self._content = content
-        self.received_kwargs: dict | None = None
-
-    def create(self, **kwargs):
-        self.received_kwargs = kwargs
-        return _FakeResponse(self._content)
-
-
-class _FakeClient:
-    def __init__(self, content: str):
-        self.chat = type("_Chat", (), {})()
-        self.chat.completions = _FakeCompletions(content)
-
-
 def _server_error_503() -> openai.InternalServerError:
     request = httpx.Request("POST", "http://test")
     return openai.InternalServerError(
@@ -200,38 +184,45 @@ def _server_error_503() -> openai.InternalServerError:
     )
 
 
-class _FlakyCompletions:
-    """Simule `client.chat.completions.create` : lève chaque exception de
-    `side_effects` dans l'ordre, puis renvoie `result` au premier appel
-    restant."""
+class _ScriptedCompletions:
+    """Simule `client.chat.completions.create` : consomme `outcomes` dans
+    l'ordre, un par appel -- une exception est levée, une chaîne est
+    renvoyée comme contenu de réponse. Un seul type de faux client pour
+    tous les scénarios de ce fichier (contenu fixe, séquence de fenêtres,
+    échecs transitoires suivis d'un succès) : une séquence d'exceptions
+    et/ou de contenus couvre chacun de ces cas."""
 
-    def __init__(self, side_effects: list[Exception], result):
-        self._side_effects = list(side_effects)
-        self._result = result
-        self.call_count = 0
+    def __init__(self, outcomes: list):
+        self._outcomes = list(outcomes)
+        self.received_kwargs_per_call: list[dict] = []
 
     def create(self, **kwargs):
-        self.call_count += 1
-        if self._side_effects:
-            raise self._side_effects.pop(0)
-        return self._result
+        self.received_kwargs_per_call.append(kwargs)
+        outcome = self._outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return _FakeResponse(outcome)
+
+
+class _ScriptedClient:
+    def __init__(self, outcomes: list):
+        self.chat = type("_Chat", (), {})()
+        self.chat.completions = _ScriptedCompletions(outcomes)
 
 
 def test_create_completion_with_retries_succeeds_after_transient_503s():
-    completions = _FlakyCompletions([_server_error_503(), _server_error_503()], "ok")
-    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+    fake_client = _ScriptedClient([_server_error_503(), _server_error_503(), "ok"])
     sleeps: list[float] = []
 
     result = _create_completion_with_retries(fake_client, sleep=sleeps.append)
 
-    assert result == "ok"
-    assert completions.call_count == 3
+    assert result.choices[0].message.content == "ok"
+    assert len(fake_client.chat.completions.received_kwargs_per_call) == 3
     assert sleeps == [5.0, 10.0]  # backoff exponentiel : 5s puis 10s
 
 
 def test_create_completion_with_retries_calls_on_retry_with_each_delay():
-    completions = _FlakyCompletions([_server_error_503(), _server_error_503()], "ok")
-    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+    fake_client = _ScriptedClient([_server_error_503(), _server_error_503(), "ok"])
     delays: list[float] = []
 
     _create_completion_with_retries(fake_client, sleep=lambda _: None, on_retry=delays.append)
@@ -240,8 +231,7 @@ def test_create_completion_with_retries_calls_on_retry_with_each_delay():
 
 
 def test_create_completion_with_retries_raises_after_exhausting_attempts():
-    completions = _FlakyCompletions([_server_error_503() for _ in range(_MAX_RETRIES)], "unreachable")
-    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+    fake_client = _ScriptedClient([_server_error_503() for _ in range(_MAX_RETRIES)])
 
     try:
         _create_completion_with_retries(fake_client, sleep=lambda _: None)
@@ -249,7 +239,7 @@ def test_create_completion_with_retries_raises_after_exhausting_attempts():
     except openai.InternalServerError:
         pass
 
-    assert completions.call_count == _MAX_RETRIES  # aucune tentative en plus
+    assert len(fake_client.chat.completions.received_kwargs_per_call) == _MAX_RETRIES
 
 
 def test_create_completion_with_retries_tolerates_a_slow_cold_start():
@@ -259,48 +249,27 @@ def test_create_completion_with_retries_tolerates_a_slow_cold_start():
     # propre au document. 10 échecs consécutifs auraient fait lever cette
     # fonction sous l'ancien _MAX_RETRIES=8 ; le budget élargi (20) les
     # tolère.
-    completions = _FlakyCompletions([_server_error_503() for _ in range(10)], "ok")
-    fake_client = type("_C", (), {"chat": type("_Chat", (), {"completions": completions})()})()
+    fake_client = _ScriptedClient([_server_error_503() for _ in range(10)] + ["ok"])
 
     result = _create_completion_with_retries(fake_client, sleep=lambda _: None)
 
-    assert result == "ok"
-    assert completions.call_count == 11
+    assert result.choices[0].message.content == "ok"
+    assert len(fake_client.chat.completions.received_kwargs_per_call) == 11
 
 
 def test_extract_sends_one_image_per_page_and_the_verbatim_string_template():
     pdf_bytes = _build_pdf("page un", "page deux")
     fields = [_field("numero_devis")]
-    fake_client = _FakeClient(json.dumps({"numero_devis": "n°6952"}))
+    fake_client = _ScriptedClient([json.dumps({"numero_devis": "n°6952"})])
 
     results = extract(pdf_bytes, fields, client=fake_client)
 
-    kwargs = fake_client.chat.completions.received_kwargs
+    kwargs = fake_client.chat.completions.received_kwargs_per_call[0]
     assert len(kwargs["messages"][0]["content"]) == 2  # une image par page
     template = json.loads(kwargs["extra_body"]["chat_template_kwargs"]["template"])
     assert template == {"numero_devis": "verbatim-string"}
     assert results[0].value == "n°6952"
     assert results[0].source == "nuextract"
-
-
-class _FakeCompletionsSequence:
-    """Comme `_FakeCompletions`, mais renvoie un contenu différent à
-    chaque appel (dans l'ordre) — simule plusieurs fenêtres d'un même
-    document, chacune avec sa propre réponse."""
-
-    def __init__(self, contents: list[str]):
-        self._contents = list(contents)
-        self.received_kwargs_per_call: list[dict] = []
-
-    def create(self, **kwargs):
-        self.received_kwargs_per_call.append(kwargs)
-        return _FakeResponse(self._contents[len(self.received_kwargs_per_call) - 1])
-
-
-class _FakeClientSequence:
-    def __init__(self, contents: list[str]):
-        self.chat = type("_Chat", (), {})()
-        self.chat.completions = _FakeCompletionsSequence(contents)
 
 
 def test_extract_windows_a_long_document_and_merges_across_calls():
@@ -315,7 +284,7 @@ def test_extract_windows_a_long_document_and_merges_across_calls():
     fields = [_field("numero_devis")]
     # 1ère fenêtre : rien trouvé. 2e fenêtre : trouvé (dans la zone
     # d'overlap avec la 1ère fenêtre).
-    fake_client = _FakeClientSequence(
+    fake_client = _ScriptedClient(
         [json.dumps({"numero_devis": ""}), json.dumps({"numero_devis": "n°6952"})]
     )
 
@@ -326,27 +295,6 @@ def test_extract_windows_a_long_document_and_merges_across_calls():
     for call, (start, end) in zip(calls, expected_windows):
         assert len(call["messages"][0]["content"]) == end - start
     assert results[0].value == "n°6952"  # trouvé en fenêtre 2, fusionné correctement
-
-
-class _ScriptedCompletions:
-    """Consomme `outcomes` dans l'ordre : une exception est levée, une
-    chaîne est renvoyée comme contenu de réponse -- simule une séquence
-    échec/succès arbitraire à travers plusieurs fenêtres."""
-
-    def __init__(self, outcomes: list):
-        self._outcomes = list(outcomes)
-
-    def create(self, **kwargs):
-        outcome = self._outcomes.pop(0)
-        if isinstance(outcome, Exception):
-            raise outcome
-        return _FakeResponse(outcome)
-
-
-class _ScriptedClient:
-    def __init__(self, outcomes: list):
-        self.chat = type("_Chat", (), {})()
-        self.chat.completions = _ScriptedCompletions(outcomes)
 
 
 def test_extract_accumulates_on_retry_across_multiple_windows(monkeypatch):
@@ -372,7 +320,7 @@ def test_extract_accumulates_on_retry_across_multiple_windows(monkeypatch):
 def test_extract_makes_a_single_call_for_a_short_document():
     pdf_bytes = _build_pdf(*[f"page {i}" for i in range(3)])
     fields = [_field("numero_devis")]
-    fake_client = _FakeClientSequence([json.dumps({"numero_devis": "n°6952"})])
+    fake_client = _ScriptedClient([json.dumps({"numero_devis": "n°6952"})])
 
     extract(pdf_bytes, fields, client=fake_client)
 

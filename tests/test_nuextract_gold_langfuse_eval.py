@@ -16,10 +16,12 @@ _NUMERO_DEVIS = Field(
 
 
 class _FakeExtractor:
-    def __init__(self, results: list[ExtractionResult], *, retry_delays: list[float] = []):
+    def __init__(
+        self, results: list[ExtractionResult], *, retry_delays: list[float] | None = None
+    ):
         self.results = results
         self.received: dict | None = None
-        self._retry_delays = retry_delays
+        self._retry_delays = retry_delays or []
 
     def __call__(
         self, pdf_bytes: bytes, fields: list[Field], *, on_retry=None, **kwargs
