@@ -178,6 +178,7 @@ def _warmup_image_kernels():
     précédent via un volume monté : jamais confirmé fiable)."""
     import http.client
     import json
+    import shutil
     import time
 
     process = subprocess.Popen(_vllm_command())
@@ -241,16 +242,17 @@ def _warmup_image_kernels():
         except subprocess.TimeoutExpired:
             process.kill()
 
-    # vLLM écrit son propre cache dans /root/.cache/vllm par défaut (pas
-    # seulement le cache Triton, qui lui vit dans ~/.triton/cache -- pas
-    # touché ici). Si on laisse ce dossier non-vide dans l'image, le
-    # montage du volume vllm_cache au même chemin échoue au runtime
-    # ("cannot mount volume on non-empty path") -- crash-loop total,
-    # observé en réel sur ce déploiement. On vide donc ce chemin précis
-    # avant la fin du build, sans toucher au cache Triton baked-in.
-    import shutil
-
-    shutil.rmtree("/root/.cache/vllm", ignore_errors=True)
+        # vLLM écrit son propre cache dans /root/.cache/vllm par défaut
+        # (pas seulement le cache Triton, qui lui vit dans
+        # ~/.triton/cache -- pas touché ici). Si on laisse ce dossier
+        # non-vide dans l'image, le montage du volume vllm_cache au même
+        # chemin échoue au runtime ("cannot mount volume on non-empty
+        # path") -- crash-loop total, observé en réel sur ce déploiement.
+        # Dans ce `finally` (pas juste en fin de fonction) pour nettoyer
+        # même si le warmup échoue avant d'arriver ici -- même si un
+        # build en échec ne capture normalement aucun layer, mieux vaut
+        # ne pas dépendre de cette garantie implicitement.
+        shutil.rmtree("/root/.cache/vllm", ignore_errors=True)
 
 
 app = modal.App("nuextract3")
