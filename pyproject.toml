@@ -10,6 +10,7 @@ dependencies = [
     "dspy>=3.3.1",
     "langextract[openai]>=1.6.0",
     "langfuse>=4.14.5",
+    "modal>=1.5.5",
     "opencv-python-headless>=5.0.0.93",
     "openpyxl>=3.1.5",
     "pandas>=3.0.5",
