@@ -1,0 +1,216 @@
+dataset:
+- document_id: 19
+  source_file: musial_cloture_methanisation_2020.pdf
+  source_url: https://www.aisne.gouv.fr/contenu/telechargement/28556/187554/file/ANNEXE%205%20-%20DEVIS%20CLOTURE.pdf
+  sector: clôture / méthanisation
+  collected_at: '2026-09-03'
+  human_validation: true
+  review:
+    relevance: high
+    quality: high
+    extraction_confidence: high
+    novelty: high
+    human_review_priority: medium
+  annotations:
+    numero_devis:
+      value: DE20-0239
+      evidence:
+        text: Devis N° DE20-0239
+        page: 2
+    nom_societe:
+      value: MUSIAL
+      evidence:
+        text: MUSIAL
+        page: 2
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: acpte 30%
+        page: 2
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: acpte 30%
+        page: 2
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: null
+        page: 2
+    duree_validite_offre:
+      value: 1 MOIS
+      evidence:
+        text: VALIDITE DU DEVIS 1 MOIS
+        page: 2
+- document_id: 21
+  source_file: afb_fenetres_penmarch_2025.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/212901581/Actes_reglementaires/2025/978599/5fa5b3ff7316c35e0db517b5a18d4c295bbf7810555e016a6018f2e8d6362a2e.pdf
+  sector: menuiserie extérieure
+  collected_at: '2026-09-03'
+  human_validation: true
+  review:
+    relevance: medium
+    quality: high
+    extraction_confidence: high
+    novelty: high
+    human_review_priority: medium
+  annotations:
+    numero_devis:
+      value: '2503488'
+      evidence:
+        text: DEVIS N° 2503488
+        page: 2
+    nom_societe:
+      value: AFB FENETRES ET FERMETURES
+      evidence:
+        text: AFB FENETRES ET FERMETURES
+        page: 1
+    pourcentage_acompte:
+      value: 40
+      evidence:
+        text: "règlement : 40% à la commande"
+        page: 4
+    pourcentage_solde:
+      value: 60
+      evidence:
+        text: "Règlement : 40% à la commande, le solde à la pose"
+        page: 4
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: "Votre devis est valable 1 mois"
+        page: 4
+- document_id: 22
+  source_file: valgorge_tp_borne_2021.pdf
+  source_url: https://borne-ardeche.fr/wp-content/uploads/sites/100/2021/10/DEVIS-PLACIDE.pdf
+  sector: travaux publics / terrassement
+  collected_at: '2026-09-03'
+  human_validation: true
+  review:
+    relevance: high
+    quality: high
+    extraction_confidence: high
+    novelty: high
+    human_review_priority: low
+  annotations:
+    numero_devis:
+      value: '679'
+      evidence:
+        text: DEVIS N° 679
+        page: 1
+    nom_societe:
+      value: VALGORGE TP
+      evidence:
+        text: VALGORGE TP
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: un acompte de 30% sera demandé lors de la signature du devis
+        page: 1
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: "Validité : 3 mois"
+        page: 1
+- document_id: 24
+  source_file: solution_chez_soi_solaire_dalsace_2025.pdf
+  source_url: https://www.les-energies-renouvelables.eu/wp-content/uploads/2025/10/DEVIS-I-25-10-20-DALSACE.pdf
+  sector: photovoltaïque
+  collected_at: '2026-09-03'
+  human_validation: true
+  review:
+    relevance: high
+    quality: high
+    extraction_confidence: medium
+    novelty: high
+    human_review_priority: high
+  annotations:
+    numero_devis:
+      value: I-25-10-20
+      evidence:
+        text: DEVIS N° I-25-10-20
+        page: 1
+    nom_societe:
+      value: SOL'UTION CHEZ SOI, SOLAIRE
+      evidence:
+        text: S.A.S. SOL'UTION CHEZ SOI, SOLAIRE
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: "30,00 % soit 5 494,05 € : Acompte"
+        page: 3
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: "70,00 % soit 12 819,46 € : Paiement solde"
+        page: 3
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: "Devis valable 1 mois à compter de la date d'émission"
+        page: 3
+- document_id: 26
+  source_file: bet_hemery_passerelles_royat_2024.pdf
+  source_url: https://www.royat.fr/wp-content/uploads/2024/04/DM2024-036-Parc-Thermal-Etude-de-structure-des-passerelles-BET-HEMERY.pdf
+  sector: bureau d'études / structure
+  collected_at: '2026-09-03'
+  human_validation: true
+  review:
+    relevance: medium
+    quality: high
+    extraction_confidence: high
+    novelty: high
+    human_review_priority: medium
+  annotations:
+    numero_devis:
+      value: 2024 / 2023562
+      evidence:
+        text: "DEVIS N' : 2024 / 2023562"
+        page: 1
+    nom_societe:
+      value: BET HEMERY
+      evidence:
+        text: BET HEMERY
+        page: 1
+    pourcentage_acompte:
+      value: 50
+      evidence:
+        text: 50% d'acompte devra être versé à la commande
+        page: 1
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text:  "Le Client s'oblige à payer toute facture émise par BET HEMERY dans un délais de trente (30) jours à compter de la date d'émission de la facture"
+        page: 3
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null

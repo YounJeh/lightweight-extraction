@@ -1,0 +1,721 @@
+dataset:
+- document_id: 19
+  source_file: COLAS_Baie_Armor_devis_1919420.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/200069409/Autres/2025/919224/9999c2939f50ab85c62e4b09e1fd912318f015e6525394f8d7cdf49c3620fabc.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '1919420'
+      evidence:
+        text: Devis n°1919420
+        page: 1
+    nom_societe:
+      value: COLAS Agence Baie d'Armor
+      evidence:
+        text: COLAS Agence Baie d'Armor
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: 'Conditions de règlement : EFT (Virt) - 30 jours date de facture'
+        page: 2
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: La présente offre est valable 3 mois.
+        page: 1
+- document_id: 20
+  source_file: COLAS_Tarbes_devis_894388.pdf
+  source_url: https://cdn.netboard.me/339716/files/fc7553cb08ecf9cd12963951b8331163.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '894388'
+      evidence:
+        text: Devis n°1919420
+        page: 1
+    nom_societe:
+      value: COLAS France - Établissement de Tarbes
+      evidence:
+        text: COLAS France - Établissement de Tarbes
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: 'Conditions de règlement : EFT (Virt) - 30 jours date de facture'
+        page: 1
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: La présente offre est valable 3 mois.
+        page: 1
+- document_id: 21
+  source_file: MLG_CONSTRUCTION_devis_241009_2.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/212902209/Deliberation/2025/946030/4f7d58fef8f1b4165b3afdc269688788f03bd8feaf605bee95b6da5ede98f77c.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '241009.2'
+      evidence:
+        text: 'DEVIS N° 241009.2'
+        page: 1
+    nom_societe:
+      value: MLG CONSTRUCTION
+      evidence:
+        text: MLG CONSTRUCTION
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: 'Règlement : 30 % à la commande'
+        page: 1
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: 'Validité du devis : 1 mois'
+        page: 1
+- document_id: 22
+  source_file: PIGEON_TP_devis_161425_1.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/200043990/Actes_reglementaires/2023/492976/fbda6747685ef271cb628fd076ae8924fccae485a8020f8908280588426d87bd.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '161425.1'
+      evidence:
+        text: 'Devis n° : 161425.1'
+        page: 1
+    nom_societe:
+      value: PIGEON T.P.
+      evidence:
+        text: PIGEON T.P.
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: 'Conditions de règlement : VIREMENT 30 JOURS'
+        page: 1
+    duree_validite_offre:
+      value: 15 jours
+      evidence:
+        text: 'Ce devis est valable 15 jours'
+        page: 1
+- document_id: 23
+  source_file: BOUYGUES_ES_offre_FT5450_04.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/212900658/Deliberation/2025/879210/744f15cebf06d982a160e3901174d1a3204609b5d14998083979e396f75d0eeb.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: FT5450.04-Ind-REUNION-CLEOS
+      evidence:
+        text: 'Devis n° : FT5450.04-Ind-REUNION-CLEOS'
+        page: 1
+    nom_societe:
+      value: Bouygues Energies & Services
+      evidence:
+        text: Bouygues Energies & Services
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null
+- document_id: 24
+  source_file: MEYZIE_TP_devis_23_103.pdf
+  source_url: https://communaute-saint-yrieix.fr/sites/default/files/field/dp2024-047_-_amenagement_dun_terrain_de_padel_-_marches_de_travaux.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 23-103
+      evidence:
+        text: 23-103
+        page: 2
+    nom_societe:
+      value: MEYZIE TP
+      evidence:
+        text: MEYZIE TP
+        page: 2
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: 'validité du devis : 1 mois'
+        page: 9
+- document_id: 26
+  source_file: EIFFAGE_CONSTRUCTION_offre_micropieux_6_ind_C.pdf
+  source_url: https://www.crous-lyon.fr/wp-content/uploads/sites/16/2025/07/A06_Annexe-2_Devis-Travaux-Supplementaires.pdf
+  secteur: fondations
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 6 ind C
+      evidence:
+        text: 'n°6 ind C'
+        page: 1
+    nom_societe:
+      value: EIFFAGE CONSTRUCTION
+      evidence:
+        text: EIFFAGE CONSTRUCTION
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: 'Validité devis: 3 mois'
+        page: 2
+- document_id: 27
+  source_file: GINGER_CEBTP_offre_SL_G2_0_0202.pdf
+  source_url: https://www.communaute-saint-yrieix.fr/sites/default/files/field/dp2024-140_-_construction_dun_batiment_industriel_pour_une_association_dur_la_commune_du_chalard_-_etude_geotechnique.pdf
+  secteur: fondations
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: SL.G2.0.0202
+      evidence:
+        text: 'N° du devis : SL.G2.0.0202'
+        page: 2
+    nom_societe:
+      value: GINGER CEBTP
+      evidence:
+        text: GINGER CEBTP
+        page: 2
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: règlement du solde à 30 jours à la réception du rapport
+        page: null
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: les prix sont valables 3 mois
+        page: 15
+- document_id: 29
+  source_file: BATIMONTAGE_devis_2021176-BLCREA.pdf
+  source_url: https://www.saone-et-loire.gouv.fr/contenu/telechargement/22127/189682/file/pj_no5_capacites_techniques_et_financieres_damien_schied_v2.pdf
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 'DEV-2022-0188'
+      evidence:
+        text: 'Devis n° DEV-2022-0188'
+        page: 1
+    nom_societe:
+      value: BL CREA
+      evidence:
+        text: BL CREA
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: 'Réglement : 30% à la commande'
+        page: 2
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: 'Réglement : 30% à la commande solde fin des travaux'
+        page: 2
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 15 jours
+      evidence:
+        text: 'Valable 15 jours'
+        page: 1
+- document_id: 291
+  source_file: BATIMONTAGE_devis_2021176-12-14.pdf
+  source_url: https://www.saone-et-loire.gouv.fr/contenu/telechargement/22127/189682/file/pj_no5_capacites_techniques_et_financieres_damien_schied_v2.pdf
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 'DEV03335'
+      evidence:
+        text: 'Numéro : DEV03335'
+        page: 1
+    nom_societe:
+      value: AUCLERCL Electricité
+      evidence:
+        text: AUCLERCL Electricité
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 05/07/2022
+      evidence:
+        text: 'Date de validité : 05/07/2022'
+        page: 1
+- document_id: 292
+  source_file: BATIMONTAGE_devis_2021176-16-31.pdf
+  source_url: https://www.saone-et-loire.gouv.fr/contenu/telechargement/22127/189682/file/pj_no5_capacites_techniques_et_financieres_damien_schied_v2.pdf
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 'DEV2103953V000000266/1'
+      evidence:
+        text: 'DEVIS N° : DEV2103953V000000266/1'
+        page: 3
+    nom_societe:
+      value: SOCOTEC
+      evidence:
+        text: SOCOTEC
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: virement au plus tard 30 jours
+        page: 5
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: 'La présente proposition est valable 3 mois'
+        page: 6
+- document_id: 293
+  source_file: BATIMONTAGE_devis_2021176-33-34.pdf
+  source_url: https://www.saone-et-loire.gouv.fr/contenu/telechargement/22127/189682/file/pj_no5_capacites_techniques_et_financieres_damien_schied_v2.pdf
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '2021176'
+      evidence:
+        text: 'Devis N° 2021176'
+        page: 1
+    nom_societe:
+      value: BATIMONTAGE
+      evidence:
+        text: BATIMONTAGE
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 8 jours
+      evidence:
+        text: 'nous ne pouvons pas garantir une durée de validité de cette offre supérieure à 8 jours'
+        page: 2
+- document_id: 30
+  source_file: MERLOT_devis_N231_23_TS2.pdf
+  source_url: https://www.niortagglo.fr/fileadmin/CAN/agglo/Conseils_d_Agglo/CA_070425/C07-04-2025-1.pdf
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: N231 23 - TS2
+      evidence:
+        text: 'Affaire : N231 23 - TS2'
+        page: 3
+    nom_societe:
+      value: MERLOT
+      evidence:
+        text: MERLOT
+        page: 3
+    pourcentage_acompte:
+      value: 20
+      evidence:
+        text: '20 % au démarrage de la fabrication ou des travaux'
+        page: 4
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 3 mois
+      evidence:
+        text: 'Date de validité : 3 mois à dater de ce jour'
+        page: 4
+- document_id: 31
+  source_file: CRUARD_devis_10559_03.pdf
+  source_url: https://bddbois.fibois-france.fr/docvisu/5815/documents/17602
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '10559.03'
+      evidence:
+        text: 'Devis N°10559.03'
+        page: 1
+    nom_societe:
+      value: CRUARD
+      evidence:
+        text: CRUARD
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: '60 jours'
+      evidence:
+        text: '60 jours à compter de la date de facture'
+        page: 11
+    duree_validite_offre:
+      value: un mois
+      evidence:
+        text: "délais maximum d'un mois à partir de cette date"
+        page: null
+- document_id: 33
+  source_file: SICAE_ELY_devis_D2024157.pdf
+  source_url: https://www.cc-payshoudanais.fr/wp-content/uploads/2025/03/111.3-Devis-SICAE-ELY-1.pdf
+  secteur: electricite_hta_bt
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: D2024157
+      evidence:
+        text: 'DEVIS N°D2024157'
+        page: 1
+    nom_societe:
+      value: SICAE ELY
+      evidence:
+        text: SICAE ELY
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 2 mois
+      evidence:
+        text: 'Le présent devis, établi suivant les conditions économiques en vigueur, est valable 2 mois.'
+        page: 2
+- document_id: 34
+  source_file: ENEDIS_offre_DC25_036126_001003.pdf
+  source_url: https://deliberations.departement13.fr/webdelibplus/jsp/showFile.jsp?datePub=&dateRetLega=28%2F06%2F2022&pdf=u4Eiw8QpdJ7HjVMtD%2BCKHPEhHfZZR7Sr3%2BBT7h7CiShTiu8lBkwp6%2Fj3rIyrPadGhadpulRRQmXlPLNaqU91dnHdk4fyanYRRBu5BtU2tFfp5T2YP5QiFA%3D%3D
+  secteur: electricite_hta_bt
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DC25/036126/001003
+      evidence:
+        text: DEVIS DE TRAVAUX ELECTRICITE N° DC25/036126/001003
+        page: 1
+    nom_societe:
+      value: Enedis
+      evidence:
+        text: Enedis
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null
+- document_id: 35
+  source_file: ENEDIS_offre_DC26_051764_001005.pdf
+  source_url: https://respect-sante-nature.fr/wp-content/uploads/2021/10/ENEDIS-DEVIS-SOCNATCHM-.pdf
+  secteur: electricite_hta_bt
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DC26/051764/001005
+      evidence:
+        text: Devis n° DC26/051764/001005
+        page: 1
+    nom_societe:
+      value: Enedis
+      evidence:
+        text: Enedis
+        page: 1
+    pourcentage_acompte:
+      value: 28.11
+      evidence:
+        text: Le règlement d’un acompte de 28.11%
+        page: 7
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null
+- document_id: 36
+  source_file: EREMA_devis_2025_15.pdf
+  source_url: https://deliberations.departement13.fr/webdelibplus/jsp/showFile.jsp?datePub=01%2F07%2F2025&dateRetLega=01%2F07%2F2025&pdf=u4Eiw8QpdJ7HjVMtD%2BCKHPEhHfZZR7Sr3%2BBT7h7CiShTiu8lBkwp6xLH4cvZUXCrjaILtmQsCcSuLsByo3KduUJmBDiDt11Vzwf407PDicFg4rH0s4tJoc23VolOptji14h6l%2Fmz%2Foo%3D
+  secteur: electricite_hta_bt
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 2025/15
+      evidence:
+        text: Devis n° 2025/15
+        page: 1
+    nom_societe:
+      value: EREMA
+      evidence:
+        text: EREMA
+        page: 1
+    pourcentage_acompte:
+      value: 50
+      evidence:
+        text: 'Conditions de réglement: 50% à la commande'
+        page: 1
+    pourcentage_solde:
+      value: 50
+      evidence:
+        text: 'Conditions de réglement: 50% à la commande ,50% à la fin de la mission'
+        page: 1
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 21/05/2025
+      evidence:
+        text: "Devis valable jusqu'au :21/05/2025"
+        page: 1
+- document_id: 37
+  source_file: CHARGEGURU_devis_D02856_1.pdf
+  source_url: https://s4dd5f6b0d0b1c375.jimcontent.com/download/version/1599849277/module/10114375450/name/2020%2003%2002%20CHARGE%20GURU%20Etude%20faisabilit%C3%A9%20dispositif%20recharhe%20v%C3%A9hicules%20ELEC363.pdf
+  secteur: irve
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: D02856-1
+      evidence:
+        text: 'Devis n° D0285Ô-1'
+        page: 1
+    nom_societe:
+      value: ChargeGuru
+      evidence:
+        text: ChargeGuru
+        page: 1
+    pourcentage_acompte:
+      value: 50
+      evidence:
+        text: 50 % d'acompte
+        page: 1
+    pourcentage_solde:
+      value: 50
+      evidence:
+        text: 50 % à la réception des travaux
+        page: 1
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 30 jours
+      evidence:
+        text: 'DUREE DE VALIDfTE DU DEVIS 30 jours'
+        page: 1
+- document_id: 38
+  source_file: JLP_ELECTRICITE_devis_D25110581JP.pdf
+  source_url: https://sf75598a05bcb6b12.jimcontent.com/download/version/1766062943/module/20067190325/name/Dossier_Offre%2Bcopro-114-116%2Brue%2BT%C3%AAte%2Bd%27Or.pdf
+  secteur: irve
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: D25110581JP
+      evidence:
+        text: 'N° D25110581JP'
+        page: 6
+    nom_societe:
+      value: JLP Électricité
+      evidence:
+        text: JLP Électricité
+        page: 1
+    pourcentage_acompte:
+      value: 40
+      evidence:
+        text: 40% d'acompte à la signature du devis
+        page: 5
+    pourcentage_solde:
+      value: 60
+      evidence:
+        text: 40% d'acompte à la signature du devis et le solde à réception des travaux
+        page: 5
+    delai_paiement_solde_jours:
+      value: 8 jours
+      evidence:
+        text: Le solde sera réglé dans un délai maximum du 8 jours après réception de la facture.
+        page: 9
+    duree_validite_offre:
+      value: 2 mois
+      evidence:
+        text: 'Durée de validité du devis : 2 mois'
+        page: 5
