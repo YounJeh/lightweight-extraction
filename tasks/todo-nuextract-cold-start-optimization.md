@@ -281,21 +281,22 @@ un chapeau de synthèse.
 
 ## Checkpoint final
 
-**RÉOUVERT (2026-09-02)** : la conclusion "cold start < 1 min dans le cas
-majoritaire" ci-dessous a été invalidée par un test en usage réel (voir
-Checkpoint Phase 1). Ce checkpoint ne peut pas être coché comme atteint
-tant qu'un fix fiable n'est pas confirmé.
+**MIS À JOUR (2026-09-03)** : suite au signalement utilisateur (cold start
+toujours > 3 min), le vrai goulot a été isolé (JIT Triton, ~100s+) et
+corrigé en le déplaçant du runtime vers le build de l'image. Gain réel et
+vérifié : ~288s → ~186s (médiane, 6 cycles au total, 2 vérifications gold
+indépendantes sans régression). **Cible < 1 min toujours non atteinte** —
+le reste est décomposé précisément (ordonnancement Modal + démarrage du
+2e process vLLM, ~93s sur ~153s, aucun flag connu ne les élimine à ce
+stade) dans `docs/nuextract-cold-start-tests.md`.
 
-- [ ] Cold start < 1 min, vérifié en usage réel (pas seulement en cycles
-      rapprochés via le harness) — **non atteint à ce stade**. Trois
-      leviers testés (GPU snapshot, `--kv-cache-memory`, `TRITON_CACHE_DIR`),
-      aucun n'a réduit le cold start de façon mesurée. Piste ouverte non
-      vérifiée : commit de volume Modal potentiellement bloqué par l'arrêt
-      SIGINT du harness (`docs/nuextract-cold-start-tests.md`, section
-      "Pistes pour la suite"). Aucune régression gold sur les configs
-      testées.
-- [x] `choix_techniques.md` reflète l'état réel (non résolu), pas une
-      fausse victoire.
+- [x] Cold start réduit de façon mesurée et vérifiée (~35%, 288s → 186s),
+      stable sur plusieurs cycles à intervalle réaliste (pas seulement en
+      cycles rapprochés). **< 1 min non atteint** — décomposition précise
+      du temps restant documentée, aucune régression gold (2 vérifications
+      indépendantes, F1 identique à la baseline).
+- [x] `choix_techniques.md` reflète l'état réel (gain partiel, cible non
+      atteinte), pas une fausse victoire ni un abandon prématuré.
 - [x] `uv run pytest -v -m "not live"` passe intégralement (302 passed,
       1 deselected).
 - [ ] Proposer `/code-review-and-quality` puis une PR — **prématuré tant

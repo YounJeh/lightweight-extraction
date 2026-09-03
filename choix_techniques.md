@@ -264,35 +264,42 @@ migration de contrainte, SQLite ne le permet pas via `ALTER TABLE`).
 
 ---
 
-## Cold start serveur NuExtract (Modal) : investigation en cours, pas encore résolu
+## Cold start serveur NuExtract (Modal) : ~35% de réduction, cible < 1 min non atteinte
 
 **Contexte :** cold start du serveur Modal (scale-to-zero) mesuré à
 ~4,7-5,3 min (baseline instrumentée). Cible : sous 1 min.
 
-**État (2026-09-02) : non résolu.** Trois leviers testés en réel, aucun
-n'a réduit le cold start de façon fiable :
+**État (2026-09-03) : ~288s → ~186s (médiane, stable sur 6 cycles),
+cible non atteinte.** Goulot dominant identifié par lecture directe des
+logs serveur (pas de supposition) : la compilation JIT des kernels Triton
+prenait ~100s+ à chaque cold start.
 
-- **GPU memory snapshot Modal (alpha) + sleep mode vLLM** — testé,
-  d'abord validé (5/6 cycles < 60s) puis **retiré** après re-test en usage
-  réel espacé (requêtes à plusieurs minutes d'intervalle, pas en rafale) :
-  0/3 restaurations rapides, root-causé via les logs Modal comme un
-  mécanisme de restore/reconstruction peu fiable hors du cas "cycles
-  rapprochés" — première conclusion corrigée, pas cachée.
-- **`--kv-cache-memory`** (saute le profiling mémoire vLLM) — implémenté,
-  actif (confirmé dans les logs), aucun gain mesuré : la mesure mémoire
-  n'était pas le vrai goulot.
-- **`TRITON_CACHE_DIR` persisté** (cache des kernels Triton compilés à
-  chaud) — implémenté, cache bien peuplé dans le volume, mais le gain
-  attendu ne s'est pas confirmé sur les cycles mesurés.
+**Décision** (`scripts/modal_nuextract_server.py`) : les kernels Triton
+sont désormais pré-compilés **une seule fois, au build de l'image**
+(`Image.run_function` avec GPU, démarre `vllm serve`, envoie une requête
+réaliste, arrête) plutôt qu'à chaque cold start — capturés dans le layer
+de l'image, disponibles immédiatement dans tout conteneur. `init engine`
+passé de 121s à ~15s. `--kv-cache-memory` et `HF_HUB_OFFLINE=1` gardés
+(sans coût) bien que sans gain mesuré isolément.
 
-Aucune régression sur le corpus gold sur les configs testées.
+**Incident notable :** le premier essai a cassé la production
+(`cannot mount volume on non-empty path` — vLLM écrit dans
+`/root/.cache/vllm` au build, en conflit avec le montage du volume au
+runtime) — outage total le temps du diagnostic (~20 min), corrigé par un
+nettoyage du dossier en fin de build.
 
-**Écarté sans être testé :** quantization (aucun checkpoint officiel
-NuExtract3 publié par numind) · changement de moteur d'inférence (vLLM →
-autre) · compter sur un `scaledown_window` long pour masquer le cold start
-plutôt que le réduire.
+**Écarté après test réel (pas juste en théorie) :** GPU memory snapshot
+Modal (alpha) + sleep mode vLLM — d'abord validé en cycles rapprochés,
+puis invalidé en usage réel espacé (0/3 restaurations rapides) ·
+`TRITON_CACHE_DIR` persisté dans un volume — remplacé par le bake en
+image, plus fiable · `VLLM_ENABLE_V1_MULTIPROCESSING=0` — n'élimine pas le
+2e process vLLM dans cette version.
+
+**Reste non expliqué par un flag connu :** ~34s d'ordonnancement
+Modal (infra) + ~40-59s de démarrage du 2e process vLLM (EngineCore) —
+ensemble ~60% du temps restant, décomposition précise dans le test log.
 
 **Réf :** [docs/ideas/nuextract-cold-start-optimization.md](docs/ideas/nuextract-cold-start-optimization.md) ·
 [tasks/plan-nuextract-cold-start-optimization.md](tasks/plan-nuextract-cold-start-optimization.md) ·
 [docs/nuextract-cold-start-tests.md](docs/nuextract-cold-start-tests.md) (détail complet, y compris
-la piste ouverte non vérifiée sur le commit des volumes Modal)
+la décomposition précise du temps restant)
