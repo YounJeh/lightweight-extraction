@@ -261,3 +261,45 @@ migration de contrainte, SQLite ne le permet pas via `ALTER TABLE`).
 
 **Réf :** [tasks/plan-gold-export-from-extraction.md](tasks/plan-gold-export-from-extraction.md) ·
 [app/gold_export.py](app/gold_export.py)
+
+---
+
+## Cold start serveur NuExtract (Modal) : ~35% de réduction, cible < 1 min non atteinte
+
+**Contexte :** cold start du serveur Modal (scale-to-zero) mesuré à
+~4,7-5,3 min (baseline instrumentée). Cible : sous 1 min.
+
+**État (2026-09-03) : ~288s → ~186s (médiane, stable sur 6 cycles),
+cible non atteinte.** Goulot dominant identifié par lecture directe des
+logs serveur (pas de supposition) : la compilation JIT des kernels Triton
+prenait ~100s+ à chaque cold start.
+
+**Décision** (`scripts/modal_nuextract_server.py`) : les kernels Triton
+sont désormais pré-compilés **une seule fois, au build de l'image**
+(`Image.run_function` avec GPU, démarre `vllm serve`, envoie une requête
+réaliste, arrête) plutôt qu'à chaque cold start — capturés dans le layer
+de l'image, disponibles immédiatement dans tout conteneur. `init engine`
+passé de 121s à ~15s. `--kv-cache-memory` et `HF_HUB_OFFLINE=1` gardés
+(sans coût) bien que sans gain mesuré isolément.
+
+**Incident notable :** le premier essai a cassé la production
+(`cannot mount volume on non-empty path` — vLLM écrit dans
+`/root/.cache/vllm` au build, en conflit avec le montage du volume au
+runtime) — outage total le temps du diagnostic (~20 min), corrigé par un
+nettoyage du dossier en fin de build.
+
+**Écarté après test réel (pas juste en théorie) :** GPU memory snapshot
+Modal (alpha) + sleep mode vLLM — d'abord validé en cycles rapprochés,
+puis invalidé en usage réel espacé (0/3 restaurations rapides) ·
+`TRITON_CACHE_DIR` persisté dans un volume — remplacé par le bake en
+image, plus fiable · `VLLM_ENABLE_V1_MULTIPROCESSING=0` — n'élimine pas le
+2e process vLLM dans cette version.
+
+**Reste non expliqué par un flag connu :** ~34s d'ordonnancement
+Modal (infra) + ~40-59s de démarrage du 2e process vLLM (EngineCore) —
+ensemble ~60% du temps restant, décomposition précise dans le test log.
+
+**Réf :** [docs/ideas/nuextract-cold-start-optimization.md](docs/ideas/nuextract-cold-start-optimization.md) ·
+[tasks/plan-nuextract-cold-start-optimization.md](tasks/plan-nuextract-cold-start-optimization.md) ·
+[docs/nuextract-cold-start-tests.md](docs/nuextract-cold-start-tests.md) (détail complet, y compris
+la décomposition précise du temps restant)

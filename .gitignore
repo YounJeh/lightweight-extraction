@@ -58,3 +58,7 @@ scripts/_ocr_tuning_cache/
 scripts/_dspy_markdown_cache/
 tasks/dspy-prompt-tuning-results.csv
 tasks/dspy-error-context-results.csv
+# Cache local du bench cold start (scripts/nuextract_cold_start_bench.py) —
+# données brutes régénérées à chaque run, synthèse versionnée séparément
+# dans docs/nuextract-cold-start-tests.md.
+scripts/_cold_start_bench_cache/
