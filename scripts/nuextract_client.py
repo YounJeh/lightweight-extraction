@@ -66,28 +66,37 @@ def render_pdf_pages(pdf_bytes: bytes, *, dpi: int = _RENDER_DPI) -> list[bytes]
         doc.close()
 
 
-def build_template(fields: list[Field]) -> dict[str, str]:
-    """Template NuExtract : un champ JSON plat par `Field.key`, toujours
-    typé `"verbatim-string"` — un seul type pour tous les `FieldType` de
-    l'app (pas de schéma imbriqué `{value, evidence}` par champ, non
-    confirmé dans la doc publique de NuExtract). La coercion vers le type
-    de l'app se fait ensuite côté client, via `type_coercion.validate`,
-    comme pour un champ LangExtract sans `attributes['value']` (voir
-    `_typed_value`, `app/tools/ner_langextract.py`)."""
-    return {field.key: "verbatim-string" for field in fields}
+def build_template(fields: list[Field]) -> dict[str, dict[str, str]]:
+    """Template NuExtract : un objet imbriqué `{value, evidence}` par
+    `Field.key`, tous deux typés `"verbatim-string"` — un seul type pour
+    tous les `FieldType` de l'app, la coercion vers le type de l'app se
+    faisant ensuite côté client via `type_coercion.validate` (comme pour un
+    champ LangExtract sans `attributes['value']`, voir `_typed_value`,
+    `app/tools/ner_langextract.py`). NuExtract supporte les objets JSON
+    imbriqués dans son template (voir le README à jour du repo
+    numindai/nuextract, ex. `line_items`) : `evidence` porte la citation
+    verbatim justifiant `value`, jamais typée/coercée elle-même."""
+    return {
+        field.key: {"value": "verbatim-string", "evidence": "verbatim-string"}
+        for field in fields
+    }
 
 
 def parse_response(content: str, fields: list[Field]) -> list[ExtractionResult]:
-    """Convertit le JSON plat renvoyé par NuExtract (`{field.key: texte
-    verbatim}`) en `ExtractionResult`, un par champ demandé — y compris les
-    champs absents du JSON ou à valeur vide, avec `value=""` plutôt qu'une
-    absence silencieuse (même convention que `LangExtractNerExtractor`,
-    voir choix_techniques.md § "Export vers le gold dataset")."""
+    """Convertit le JSON imbriqué renvoyé par NuExtract (`{field.key:
+    {"value": ..., "evidence": ...}}`) en `ExtractionResult`, un par champ
+    demandé — y compris les champs absents du JSON ou à `value` vide, avec
+    `value=""` et `evidence=None` plutôt qu'une absence silencieuse (même
+    convention que `LangExtractNerExtractor`, voir choix_techniques.md §
+    "Export vers le gold dataset"). `evidence` n'est peuplée que lorsque
+    `value` l'est aussi -- une citation sans valeur associée n'a pas de
+    sens pour ce champ."""
     parsed = json.loads(content)
     results = []
     for field in fields:
         raw = parsed.get(field.key)
-        raw_value = str(raw).strip() if raw else ""
+        raw = raw if isinstance(raw, dict) else {}
+        raw_value = str(raw.get("value") or "").strip()
         if not raw_value:
             results.append(
                 ExtractionResult(
@@ -95,10 +104,12 @@ def parse_response(content: str, fields: list[Field]) -> list[ExtractionResult]:
                 )
             )
             continue
+        raw_evidence = str(raw.get("evidence") or "").strip() or None
         results.append(
             ExtractionResult(
                 field_title=field.title,
                 value=raw_value,
+                evidence=raw_evidence,
                 source="nuextract",
                 value_type=field.type,
                 typed_value=raw_value,
@@ -228,8 +239,8 @@ def extract(
     (voir docs/ideas/nuextract-cold-start-latency.md).
 
     `temperature=0` : on veut une recopie fidèle du document
-    (`verbatim-string`), pas de variation créative — cohérent avec l'usage
-    de "evidence" par le cadrage."""
+    (`verbatim-string`), pas de variation créative — cohérent avec
+    `evidence`, qui doit être une citation verbatim, pas une paraphrase."""
     client = client or build_client()
     images = render_pdf_pages(pdf_bytes)
     template = build_template(fields)

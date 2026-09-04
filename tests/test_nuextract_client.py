@@ -84,11 +84,15 @@ def test_page_windows_covers_every_page_exactly_once_at_the_boundaries():
     assert windows[-1][1] == 25  # la dernière fenêtre atteint bien la fin
 
 
-def _extraction(field_title: str, value: str) -> "ExtractionResult":
+def _extraction(field_title: str, value: str, evidence: str | None = None) -> "ExtractionResult":
     from app.models import ExtractionResult
 
     return ExtractionResult(
-        field_title=field_title, value=value, source="nuextract", typed_value=value or None
+        field_title=field_title,
+        value=value,
+        evidence=evidence,
+        source="nuextract",
+        typed_value=value or None,
     )
 
 
@@ -110,6 +114,15 @@ def test_merge_window_results_stays_empty_when_no_window_finds_a_value():
     assert merged[0].value == ""
 
 
+def test_merge_window_results_carries_the_evidence_of_the_winning_window():
+    window1 = [_extraction("Numéro de devis", "")]
+    window2 = [_extraction("Numéro de devis", "n°6952", evidence="Devis n°6952")]
+
+    merged = _merge_window_results([window1, window2])
+
+    assert merged[0].evidence == "Devis n°6952"
+
+
 def test_merge_window_results_preserves_field_order():
     window1 = [_extraction("A", ""), _extraction("B", "")]
     window2 = [_extraction("A", ""), _extraction("B", "valeur B")]
@@ -119,17 +132,25 @@ def test_merge_window_results_preserves_field_order():
     assert [r.field_title for r in merged] == ["A", "B"]
 
 
-def test_build_template_maps_every_field_to_verbatim_string():
+def test_build_template_maps_every_field_to_a_value_and_evidence_verbatim_string():
     fields = [_field("numero_devis"), _field("montant", "float")]
 
     template = build_template(fields)
 
-    assert template == {"numero_devis": "verbatim-string", "montant": "verbatim-string"}
+    assert template == {
+        "numero_devis": {"value": "verbatim-string", "evidence": "verbatim-string"},
+        "montant": {"value": "verbatim-string", "evidence": "verbatim-string"},
+    }
 
 
 def test_parse_response_maps_present_fields_with_type_coercion():
     fields = [_field("numero_devis"), _field("pourcentage", "int")]
-    content = json.dumps({"numero_devis": "n°6952", "pourcentage": "30"})
+    content = json.dumps(
+        {
+            "numero_devis": {"value": "n°6952", "evidence": "Devis n°6952"},
+            "pourcentage": {"value": "30", "evidence": "acompte de 30%"},
+        }
+    )
 
     results = parse_response(content, fields)
 
@@ -141,9 +162,18 @@ def test_parse_response_maps_present_fields_with_type_coercion():
     assert by_title["Titre pourcentage"].type_error is None
 
 
+def test_parse_response_extracts_the_evidence_alongside_the_value():
+    fields = [_field("numero_devis")]
+    content = json.dumps({"numero_devis": {"value": "n°6952", "evidence": "Devis n°6952"}})
+
+    results = parse_response(content, fields)
+
+    assert results[0].evidence == "Devis n°6952"
+
+
 def test_parse_response_flags_a_value_that_does_not_coerce_to_the_field_type():
     fields = [_field("pourcentage", "int")]
-    content = json.dumps({"pourcentage": "trente"})
+    content = json.dumps({"pourcentage": {"value": "trente", "evidence": "trente pourcents"}})
 
     results = parse_response(content, fields)
 
@@ -152,14 +182,21 @@ def test_parse_response_flags_a_value_that_does_not_coerce_to_the_field_type():
 
 def test_parse_response_produces_an_empty_row_for_a_missing_or_blank_field():
     fields = [_field("numero_devis"), _field("nom_societe")]
-    content = json.dumps({"numero_devis": "  ", "autre_champ": "valeur"})
+    content = json.dumps(
+        {
+            "numero_devis": {"value": "  ", "evidence": "sans intérêt"},
+            "autre_champ": {"value": "valeur", "evidence": "..."},
+        }
+    )
 
     results = parse_response(content, fields)
 
     by_title = {r.field_title: r for r in results}
     assert by_title["Titre numero_devis"].value == ""
     assert by_title["Titre numero_devis"].typed_value is None
+    assert by_title["Titre numero_devis"].evidence is None
     assert by_title["Titre nom_societe"].value == ""
+    assert by_title["Titre nom_societe"].evidence is None
 
 
 class _FakeMessage:
@@ -257,18 +294,23 @@ def test_create_completion_with_retries_tolerates_a_slow_cold_start():
     assert len(fake_client.chat.completions.received_kwargs_per_call) == 11
 
 
-def test_extract_sends_one_image_per_page_and_the_verbatim_string_template():
+def test_extract_sends_one_image_per_page_and_the_nested_value_evidence_template():
     pdf_bytes = _build_pdf("page un", "page deux")
     fields = [_field("numero_devis")]
-    fake_client = _ScriptedClient([json.dumps({"numero_devis": "n°6952"})])
+    fake_client = _ScriptedClient(
+        [json.dumps({"numero_devis": {"value": "n°6952", "evidence": "Devis n°6952"}})]
+    )
 
     results = extract(pdf_bytes, fields, client=fake_client)
 
     kwargs = fake_client.chat.completions.received_kwargs_per_call[0]
     assert len(kwargs["messages"][0]["content"]) == 2  # une image par page
     template = json.loads(kwargs["extra_body"]["chat_template_kwargs"]["template"])
-    assert template == {"numero_devis": "verbatim-string"}
+    assert template == {
+        "numero_devis": {"value": "verbatim-string", "evidence": "verbatim-string"}
+    }
     assert results[0].value == "n°6952"
+    assert results[0].evidence == "Devis n°6952"
     assert results[0].source == "nuextract"
 
 
@@ -285,7 +327,10 @@ def test_extract_windows_a_long_document_and_merges_across_calls():
     # 1ère fenêtre : rien trouvé. 2e fenêtre : trouvé (dans la zone
     # d'overlap avec la 1ère fenêtre).
     fake_client = _ScriptedClient(
-        [json.dumps({"numero_devis": ""}), json.dumps({"numero_devis": "n°6952"})]
+        [
+            json.dumps({"numero_devis": {"value": "", "evidence": ""}}),
+            json.dumps({"numero_devis": {"value": "n°6952", "evidence": "Devis n°6952"}}),
+        ]
     )
 
     results = extract(pdf_bytes, fields, client=fake_client)
@@ -304,9 +349,11 @@ def test_extract_accumulates_on_retry_across_multiple_windows(monkeypatch):
     fake_client = _ScriptedClient(
         [
             _server_error_503(),
-            json.dumps({"numero_devis": ""}),  # fenêtre 1 : échoue puis réussit
+            json.dumps({"numero_devis": {"value": "", "evidence": ""}}),  # fenêtre 1 : échoue puis réussit
             _server_error_503(),
-            json.dumps({"numero_devis": "n°6952"}),  # fenêtre 2 : échoue puis réussit
+            json.dumps(
+                {"numero_devis": {"value": "n°6952", "evidence": "Devis n°6952"}}
+            ),  # fenêtre 2 : échoue puis réussit
         ]
     )
     delays: list[float] = []
@@ -320,7 +367,9 @@ def test_extract_accumulates_on_retry_across_multiple_windows(monkeypatch):
 def test_extract_makes_a_single_call_for_a_short_document():
     pdf_bytes = _build_pdf(*[f"page {i}" for i in range(3)])
     fields = [_field("numero_devis")]
-    fake_client = _ScriptedClient([json.dumps({"numero_devis": "n°6952"})])
+    fake_client = _ScriptedClient(
+        [json.dumps({"numero_devis": {"value": "n°6952", "evidence": "Devis n°6952"}})]
+    )
 
     extract(pdf_bytes, fields, client=fake_client)
 

@@ -36,6 +36,7 @@ class Field(FieldBase):
 class ExtractionResult(BaseModel):
     field_title: str
     value: str
+    evidence: str | None = None
     source: str = "mock"
     page_number: int | None = None
     text_position: str | None = None
