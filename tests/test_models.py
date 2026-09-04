@@ -48,6 +48,18 @@ def test_extraction_result_valid_without_grounding():
     assert result.text_position is None
 
 
+def test_extraction_result_evidence_defaults_to_none():
+    result = ExtractionResult(field_title="Titre", value="Contrat")
+    assert result.evidence is None
+
+
+def test_extraction_result_accepts_evidence():
+    result = ExtractionResult(
+        field_title="Titre", value="Contrat", evidence="Le présent Contrat..."
+    )
+    assert result.evidence == "Le présent Contrat..."
+
+
 def test_extraction_result_accepts_grounding():
     result = ExtractionResult(
         field_title="Titre",
