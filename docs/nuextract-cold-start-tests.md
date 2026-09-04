@@ -31,13 +31,30 @@ plutôt que par le harness).
 
 ## Résumé
 
-**État actuel (2026-09-03) : cible < 1 min NON atteinte, mais gain réel et
-vérifié.** Cold start baseline ~288s → **~155-190s, stable sur 6 cycles au
-total (2 sessions de test), aucune régression gold**. Root cause du reste
-identifiée précisément (voir "Décomposition précise" plus bas) : la marge
-restante est dominée par de l'overhead d'infrastructure (ordonnancement
-Modal + démarrage du 2e process vLLM) plutôt que par quelque chose
-d'encore réglable via un flag vLLM.
+**État actuel (2026-09-03, suite) : cible < 1 min toujours NON atteinte,
+mais un 2e gain réel et vérifié via un changement d'architecture.** Cold
+start baseline ~288s → ~186s (config prod, Leviers 1-6) → **~120-153s
+(médiane ~153s) avec le moteur vLLM piloté en mono-process
+(`scripts/modal_nuextract_server_singleprocess.py`, expérimental, pas
+encore en prod)**, aucune régression gold (F1 identique, mêmes tp/fp/fn
+qu'avec le serveur actuel). Root cause du reste identifiée précisément
+(voir "Décomposition précise" plus bas) : la marge restante est dominée
+par de l'overhead d'infrastructure (ordonnancement Modal + démarrage du 2e
+process vLLM) plutôt que par quelque chose d'encore réglable via un flag
+vLLM.
+
+**Session du 2026-09-03 (suite 2, sur demande explicite -- tester
+l'architecture mono-process malgré le coût d'implémentation)** : la piste
+"sortir du CLI `vllm serve`" listée en fin de section précédente comme non
+tentée a été testée. Root-causée via lecture du code source vLLM installé
+(pas de supposition) : `AsyncLLM` (utilisé par `vllm serve`) ignore
+totalement `VLLM_ENABLE_V1_MULTIPROCESSING` -- seule l'API offline
+synchrone (`vllm.LLM`) le respecte. Un serveur expérimental construit
+autour de `vllm.LLM.chat()` donne ~120-153s, un gain net d'environ 30s
+supplémentaires par rapport à la config prod actuelle, confirmé par les
+logs serveur (voir Levier 7 plus bas) -- toujours pas sous la barre des 60s
+visée, et avec un compromis de concurrence à trancher avant adoption
+éventuelle en prod.
 
 Session du 2026-09-02 : investigation rigoureuse (root-cause vérifiée via
 les logs serveur à chaque étape, pas de supposition) qui n'avait pas
@@ -188,6 +205,104 @@ coût réel d'un test (rebuild complet + plusieurs cycles) n'a pas semblé
 justifié face à cette hypothèse défavorable, mais reste une piste
 possible si l'hypothèse s'avère fausse à l'usage.
 
+### Suite (2026-09-03, session 2) — architecture mono-process
+
+**Levier 7 — piloter `vllm.LLM` (API offline synchrone) directement en
+Python plutôt que `vllm serve` (CLI, API async) — testé, GAGNANT sur le
+cold start, mais avec un compromis de concurrence non trivial. Pas encore
+adopté en prod.**
+
+**Diagnostic préalable (gratuit, CPU-only, lecture du code source vLLM
+0.28.0 réellement installé -- `scripts/_diag_engine_arch.py`,
+`scripts/_diag_llm_offline_api.py`, `scripts/_diag_sampling_defaults.py`,
+tous jetables)**, avant tout cycle payant sur GPU :
+
+- `AsyncLLM.__init__` (utilisé par `vllm serve`, notre serveur actuel)
+  appelle **inconditionnellement**
+  `EngineCoreClient.make_async_mp_client(...)`, qui retourne toujours un
+  client multiprocess. `VLLM_ENABLE_V1_MULTIPROCESSING` n'est **jamais lu**
+  sur ce chemin de code -- ceci confirme et explique, avec le code source à
+  l'appui, l'échec du Levier 6 (le flag était bien "pris en compte" quelque
+  part dans les logs, mais sur un chemin de code -- `LLMEngine`, pas
+  `AsyncLLM` -- qui n'est pas celui emprunté par `vllm serve`).
+- `LLMEngine` (utilisé par l'API offline synchrone `vllm.LLM`) lit bien cet
+  env var (`vllm/v1/engine/llm_engine.py:157`) et, si mis à `0`, obtient un
+  `InprocClient` -- l'EngineCore tourne dans le **même process**, aucun
+  fork. C'est le seul chemin mono-process disponible dans cette version de
+  vLLM.
+- `LLM.chat()` accepte `chat_template_kwargs` et des messages multimodaux
+  exactement comme le serveur OpenAI (même mécanisme interne) -- pas besoin
+  de réimplémenter l'application du chat template à la main.
+- `SamplingParams.max_tokens` vaut `16` par défaut si non fourni -- le
+  serveur OpenAI vLLM calcule sa propre valeur par défaut à partir du
+  contexte restant (code non localisé précisément, plusieurs refactors
+  entre versions) ; repris ici comme une constante fixe plus simple à
+  raisonner (`_MAX_COMPLETION_TOKENS = 4096`, calculée à la main à partir
+  de `_WINDOW_SIZE_PAGES`/`--max-model-len`, voir le commentaire dans le
+  fichier) plutôt que répliquer ce calcul dynamique.
+
+**Implémentation** : `scripts/modal_nuextract_server_singleprocess.py`.
+Remplace `subprocess.Popen(_vllm_command())` par `vllm.LLM(...)` construit
+une fois dans `@modal.enter()`, servi par un serveur HTTP minimal (stdlib
+`http.server.ThreadingHTTPServer`, aucune dépendance ajoutée) qui traduit
+`POST /v1/chat/completions` en un appel `llm.chat(...)` -- juste assez de
+l'API OpenAI pour rester compatible avec `scripts/nuextract_client.py`
+(SDK `openai`) sans le modifier. Même config moteur que
+`scripts/modal_nuextract_server.py` (`_engine_kwargs()` -- équivalent
+`EngineArgs` de chaque flag CLI de `_vllm_command()`), même stratégie de
+warmup Triton au build (`Image.run_function`, mêmes précautions
+`shutil.rmtree("/root/.cache/vllm")` que le Levier 4).
+
+**Déployé sur une app Modal séparée**
+(`nuextract3-singleprocess-experiment`, pas `nuextract3`) pour ne jamais
+risquer la prod pendant l'expérimentation -- l'incident de crash-loop du
+Levier 4 avait eu lieu directement sur l'app de prod.
+
+**Compromis assumé, documenté, pas encore tranché** : `vllm.LLM.chat()`
+est bloquant. Le serveur maison sérialise les requêtes via un verrou
+global (`self.server.llm_lock`) -- une seule extraction à la fois, pas de
+continuous batching multi-requêtes comme `AsyncLLM`/`vllm serve` le
+permettent nativement. Sans effet sur la latence d'une requête isolée
+(déjà `max_containers=1`), mais un usage concurrent réel (ex.
+`nuextract_gold_langfuse_eval.py`, `max_concurrency=14`) serait sérialisé
+au lieu d'être traité en parallèle sur le GPU -- à réévaluer avant toute
+adoption en prod au-delà de l'expérimentation.
+
+**Résultat mesuré** :
+
+- Cold start, 3 cycles forcés : **120.1s, 152.7s, 152.6s (médiane
+  ~152.7s)**, contre 184.5-189.6s (médiane ~185.8s) pour la config prod
+  actuelle sur les mêmes 3 cycles de référence -- un gain net d'environ
+  30s.
+- Régression gold (18 documents) : **F1 0.6963 (tp=47, fp=22, fn=19,
+  tn=32) -- identique bit pour bit à la config prod actuelle**, y compris
+  le même document en échec pré-existant (`Offre BRIAND Métal...pdf`, bug
+  windowing hors scope, message d'erreur légèrement différent --
+  `VLLMValidationError` en 500 au lieu d'un `BadRequestError` en 400 --
+  parce que le serveur maison ne réplique pas la validation de longueur de
+  prompt du serveur OpenAI officiel avant de soumettre la requête au
+  moteur ; même cause, pas une nouvelle régression).
+- Décomposition d'un cycle via les logs serveur horodatés (`modal app logs
+  --timestamps`, méthodologie inchangée -- pas de supposition) : du
+  démarrage du process (`non-default args` loggé) à l'ouverture du tunnel
+  Modal (serveur prêt), **86s au total**, contre ~112-117s pour les étapes
+  équivalentes en config prod (hors ordonnancement Modal, externe aux deux
+  architectures). Le gain se concentre précisément là où l'hypothèse le
+  prédisait : "process start → engine annoncé" passe de ~40s (fork + import
+  du 2e process) à ~23s (pas de fork, juste la résolution de config), et
+  "engine annoncé → début chargement poids" passe de ~19s à ~2s (plus de
+  second `distributed_init_method`/init NCCL à recréer pour un 2e
+  process). Le chargement des poids (~11s), la préparation du KV cache
+  (~16s) et le warmup multimodal (~25s, calcul réel, pas de la
+  compilation) restent inchangés -- attendu, ces étapes ne dépendent pas
+  de l'architecture process.
+
+**Décision** : gain réel et vérifié, mais **pas encore adopté en
+production** -- nécessite un arbitrage sur le compromis de concurrence
+(sérialisation) avant de remplacer `scripts/modal_nuextract_server.py`.
+Laissé comme fichier expérimental séparé et déployé sur une app Modal
+distincte, documenté ici pour référence future.
+
 ## Table détaillée
 
 | Date | Levier | Config (diff) | Cold start (s) — cycles individuels | Régression gold (F1, tp/fp/fn) | Décision | Notes |
@@ -202,6 +317,7 @@ possible si l'hypothèse s'avère fausse à l'usage.
 | 2026-09-03 | **`HF_HUB_OFFLINE=1`** | `.env()` de l'image | 3 cycles : 186.0, 188.2, 190.0 | Non re-mesuré (flag sans risque fonctionnel) | **Gardé** (pas de coût) | Aucun changement mesuré -- l'appel réseau HF Hub n'était pas un goulot significatif, juste un avertissement dans les logs. |
 | 2026-09-03 | **`VLLM_ENABLE_V1_MULTIPROCESSING=0`** | `.env()` de l'image | 3 cycles : 218.3, 31.2*, 185.7 (*cycle non garanti froid, `forced_cold=false`, exclu) | Non re-mesuré | **Retiré** | Flag pris en compte (log : affecte le seed aléatoire) mais **n'a pas fusionné les 2 process** -- `EngineCore pid` reste distinct de `APIServer pid` sur une trace complète. Hypothèse "double init CUDA" non éliminée par ce flag dans vLLM 0.28.0. Aucun gain, effet de bord ajouté : retiré. |
 | 2026-09-03 | **Config finale** (Levier 4 + `--kv-cache-memory` + `HF_HUB_OFFLINE`, sans snapshot/`TRITON_CACHE_DIR` volume/multiprocessing) | Voir `scripts/modal_nuextract_server.py` (état final) | 3 cycles de vérification : 184.5, 185.8, 189.6 (médiane 185.8) | F1 0.6963 (tp=47, fp=22, fn=19) -- **identique à la baseline**, même document en échec pré-existant | **Config de production** | Gain vérifié et stable : baseline ~288s → ~186s, soit **~35% de réduction**, sans aucune régression fonctionnelle sur 2 vérifications gold indépendantes (Levier 4 initial + config finale). |
+| 2026-09-03 (suite) | **Levier 7 — `vllm.LLM` mono-process au lieu de `vllm serve`** | `scripts/modal_nuextract_server_singleprocess.py`, app Modal séparée (`nuextract3-singleprocess-experiment`), `VLLM_ENABLE_V1_MULTIPROCESSING=0` + `vllm.LLM.chat()` derrière un serveur HTTP maison (stdlib), requêtes sérialisées (verrou global) | 3 cycles : 120.1, 152.7, 152.6 (médiane 152.7) | F1 0.6963 (tp=47, fp=22, fn=19, tn=32) -- **identique à la config prod**, même document en échec pré-existant (message d'erreur différent, même cause) | **Gain confirmé, pas encore adopté en prod** | ~30s de gain net vs config prod (185.8 → 152.7 médiane). Root-causé via logs horodatés : le gain vient bien de l'élimination du fork EngineCore (~40s → ~23s sur "process start → engine annoncé", ~19s → ~2s sur "engine annoncé → chargement poids"). Compromis non tranché : sérialisation des requêtes (pas de continuous batching) -- voir section dédiée pour le détail. |
 
 ## Pistes pour la suite (non résolues à ce stade)
 
@@ -209,15 +325,17 @@ possible si l'hypothèse s'avère fausse à l'usage.
   applicative actuelle — pourrait varier selon la région/le type de GPU,
   non testé (voir décomposition ci-dessus, hypothèse défavorable : coût
   CPU/infra-bound, pas GPU-compute-bound).
-- **Démarrage du 2e process vLLM (EngineCore, ~40-59s)** : le flag
-  documenté (`VLLM_ENABLE_V1_MULTIPROCESSING=0`) ne suffit pas à
-  l'éliminer dans cette version de vLLM. Éliminer ce coût nécessiterait
-  probablement de sortir du CLI `vllm serve` pour piloter directement
-  `LLMEngine`/`AsyncLLMEngine` dans un seul process — changement
-  d'architecture plus profond qu'un flag, non tenté dans cette session.
+- **Démarrage du 2e process vLLM (EngineCore, ~40-59s)** — **testé et
+  résolu (Levier 7)**, mais pas encore adopté en prod. Piloter `vllm.LLM`
+  (API offline synchrone) au lieu de `vllm serve` élimine effectivement ce
+  coût (~30s de gain net, confirmé par les logs) mais sérialise les
+  requêtes (plus de continuous batching multi-requêtes) — arbitrage à
+  trancher avant un remplacement de `scripts/modal_nuextract_server.py`
+  (voir la section dédiée ci-dessus).
 - **Warmup multimodal vLLM (~20-25s)** : semble être du calcul réel
   (profiling), pas juste de la compilation — pas de flag connu pour le
   sauter sans risquer une latence spike sur la première vraie requête.
+  Inchangé par le Levier 7 (même coût dans les deux architectures).
 - **GPU alternatif (A10G/A100)** : non testé, analyse défavorable (voir
   ci-dessus) mais pas définitivement exclu.
 - **Quantization** : toujours écartée (aucun checkpoint officiel

@@ -236,10 +236,19 @@ def main() -> None:
     parser.add_argument("mode", choices=["cold-start", "regress"])
     parser.add_argument("--label", required=True, help="Nom du levier testé, ex. 'baseline'")
     parser.add_argument("--cycles", type=int, default=3)
+    parser.add_argument(
+        "--app-name",
+        default=APP_NAME,
+        help=(
+            "App Modal à cibler pour forcer les cold starts (ex. app "
+            "d'expérimentation séparée). L'URL réellement appelée reste "
+            "NUEXTRACT_BASE_URL -- doit pointer vers le même déploiement."
+        ),
+    )
     args = parser.parse_args()
 
     if args.mode == "cold-start":
-        measure_cold_start(label=args.label, cycles=args.cycles)
+        measure_cold_start(label=args.label, cycles=args.cycles, app_name=args.app_name)
     else:
         check_gold_regression(label=args.label)
 
