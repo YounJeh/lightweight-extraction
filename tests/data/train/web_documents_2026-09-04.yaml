@@ -296,7 +296,7 @@ dataset:
     numero_devis:
       value: D2407087
       evidence:
-        text: Devis N° : D2407087
+        text: "Devis N° : D2407087"
         page: 1
     nom_societe:
       value: MIPE HABITAT (ex AD VALIDEM)
@@ -342,7 +342,7 @@ dataset:
     pourcentage_acompte:
       value: 40
       evidence:
-        text: Mode de règlement classic: 40% d'acompte à la signature du devis
+        text: "Mode de règlement classic: 40% d'acompte à la signature du devis"
         page: 3
     pourcentage_solde:
       value: 60
@@ -357,5 +357,5 @@ dataset:
     duree_validite_offre:
       value: 04/10/24
       evidence:
-        text: Limite de validité : 04/10/24
+        text: "Limite de validité : 04/10/24"
         page: 1
