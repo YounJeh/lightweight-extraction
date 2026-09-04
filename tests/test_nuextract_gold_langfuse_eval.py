@@ -1,3 +1,5 @@
+import asyncio
+import time
 from types import SimpleNamespace
 
 from langfuse.experiment import Evaluation
@@ -48,7 +50,7 @@ def test_build_task_reads_the_referenced_pdf_and_extracts_selected_fields(tmp_pa
     )
     item = SimpleNamespace(input={"source_file": "devis.pdf", "field_keys": ["numero_devis"]})
 
-    output = task(item=item)
+    output = asyncio.run(task(item=item))
 
     assert extractor.received == {"pdf_bytes": b"%PDF-fake-bytes", "fields": [_NUMERO_DEVIS]}
     assert output["extraction_results"] == [
@@ -77,7 +79,7 @@ def test_build_task_accumulates_cold_start_seconds_from_on_retry(tmp_path):
     )
     item = SimpleNamespace(input={"source_file": "devis.pdf", "field_keys": ["numero_devis"]})
 
-    output = task(item=item)
+    output = asyncio.run(task(item=item))
 
     assert output["cold_start_seconds"] == 35.0
 
@@ -94,9 +96,36 @@ def test_build_task_resolves_only_the_fields_listed_for_this_item(tmp_path):
     )
     item = SimpleNamespace(input={"source_file": "devis.pdf", "field_keys": ["numero_devis"]})
 
-    task(item=item)
+    asyncio.run(task(item=item))
 
     assert extractor.received["fields"] == [_NUMERO_DEVIS]
+
+
+def test_build_task_runs_two_items_concurrently_not_sequentially(tmp_path):
+    # Preuve du fix de concurrence (voir docstring de build_task) : sans
+    # asyncio.to_thread, task() bloquerait la boucle asyncio pendant le
+    # time.sleep de chaque extracteur, sérialisant les deux items (~0.4s).
+    # Avec le fix, les deux threads dorment en parallèle (~0.2s de mur).
+    def _slow_extract(pdf_bytes, fields, *, on_retry=None, **kwargs):
+        time.sleep(0.2)
+        return []
+
+    (tmp_path / "a.pdf").write_bytes(b"%PDF-A")
+    (tmp_path / "b.pdf").write_bytes(b"%PDF-B")
+    task = build_task(
+        {"numero_devis": _NUMERO_DEVIS}, extractor=_slow_extract, data_test_dir=tmp_path
+    )
+    item_a = SimpleNamespace(input={"source_file": "a.pdf", "field_keys": ["numero_devis"]})
+    item_b = SimpleNamespace(input={"source_file": "b.pdf", "field_keys": ["numero_devis"]})
+
+    async def _run_both():
+        return await asyncio.gather(task(item=item_a), task(item=item_b))
+
+    start = time.perf_counter()
+    asyncio.run(_run_both())
+    elapsed = time.perf_counter() - start
+
+    assert elapsed < 0.35  # séquentiel aurait pris ~0.4s+
 
 
 def _item_result(*, evaluations, output):
