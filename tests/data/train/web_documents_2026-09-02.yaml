@@ -287,42 +287,6 @@ dataset:
       evidence:
         text: les prix sont valables 3 mois
         page: 15
-- document_id: 29
-  source_file: BATIMONTAGE_devis_2021176-BLCREA.pdf
-  source_url: https://www.saone-et-loire.gouv.fr/contenu/telechargement/22127/189682/file/pj_no5_capacites_techniques_et_financieres_damien_schied_v2.pdf
-  secteur: structure_charpente
-  human_validation: true
-  annotations:
-    numero_devis:
-      value: 'DEV-2022-0188'
-      evidence:
-        text: 'Devis n° DEV-2022-0188'
-        page: 1
-    nom_societe:
-      value: BL CREA
-      evidence:
-        text: BL CREA
-        page: 1
-    pourcentage_acompte:
-      value: 30
-      evidence:
-        text: 'Réglement : 30% à la commande'
-        page: 2
-    pourcentage_solde:
-      value: 70
-      evidence:
-        text: 'Réglement : 30% à la commande solde fin des travaux'
-        page: 2
-    delai_paiement_solde_jours:
-      value: null
-      evidence:
-        text: null
-        page: null
-    duree_validite_offre:
-      value: 15 jours
-      evidence:
-        text: 'Valable 15 jours'
-        page: 1
 - document_id: 291
   source_file: BATIMONTAGE_devis_2021176-12-14.pdf
   source_url: https://www.saone-et-loire.gouv.fr/contenu/telechargement/22127/189682/file/pj_no5_capacites_techniques_et_financieres_damien_schied_v2.pdf

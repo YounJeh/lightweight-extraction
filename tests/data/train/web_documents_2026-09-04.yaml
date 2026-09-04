@@ -1,0 +1,361 @@
+dataset:
+- document_id: 20
+  source_file: GB_BOIS_42_devis_DE00020090.pdf
+  source_url: https://www.chazelles-sur-lyon.fr/wp-content/uploads/2024/11/5.-FINANCES-MARCHE-TRAVAUX-REHABILITATION-MAIRIE-LOT-3-AVENANT-N%C2%B02.pdf
+  secteur: structure_charpente
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DE00020090
+      evidence:
+        text: Devis N° DE00020090
+        page: 1
+    nom_societe:
+      value: GB BOIS 42
+      evidence:
+        text: GB BOIS 42
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: Pour toute acceptation du présent devis, nous vous demandons de bien vouloir nous renvoyer le devis daté et signé avec mention "Bon pour accord" ainsi qu'un chèque d'acompte de 30%.
+        page: 7
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: "Acompte de 30% à la commande - Acompte possible suivant avancement des travaux - Solde à réception de la facture finale"
+        page: 9
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 2 mois
+      evidence:
+        text: La présente proposition est valable dans un délai de 2 mois à partir de la date d'établissement du présent devis
+        page: 9
+- document_id: 21
+  source_file: DUCHESNE_ELECTRICITE_devis_00008833.pdf
+  source_url: https://www.ville-louviers.fr/content/uploads/2026/02/AR-26-010-annexe-2-DUCHESNES-Devis_n.00008833-V2-Controle-dacce%CC%80s-valide%CC%81-ATMOS-19.11.25.pdf
+  secteur: electricite_courant_faible
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 00008833
+      evidence:
+        text: 'Réf. Devis : 00008833'
+        page: 2
+    nom_societe:
+      value: Duchesne électricité
+      evidence:
+        text: La société Duchesne électricité se réserve le droit de réviser ses prix
+        page: 2
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: Ce devis est valable 1 mois
+        page: 2
+- document_id: 22
+  source_file: VOLTSTAGE_devis_DE01717.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/212900989/Deliberation/2025/898151/05ca7117dcafd820a821a9ee9435703b0281745a024e2b47e587ca1a03991ca8.pdf
+  secteur: electricite_courant_faible
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DE01717
+      evidence:
+        text: Devis DE01717
+        page: 1
+    nom_societe:
+      value: VOLTSTAGE
+      evidence:
+        text: Entreprise VOLTSTAGE
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: 'Modalités de paiement : 30 % à la commande'
+        page: 3
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: 'Condition de règlement : Le solde sur présentation de la facture'
+        page: 3
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: Nos devis sont valables 1 mois.
+        page: 3
+- document_id: 23
+  source_file: HERVY_devis_11166839.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/215601543/Deliberation/2025/954268/451cd92726bafae7d51923734308f662a1296d64a1c31c477566682398fd5092.pdf
+  secteur: menuiserie
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '11166839'
+      evidence:
+        text: D E V I S n° YR 11166839
+        page: 1
+    nom_societe:
+      value: HERVY
+      evidence:
+        text: SARL HERVY - ZA La Normandais
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: Acompte de 30% à la signature du devis
+        page: 21
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: Solde à réception des travaux
+        page: 21
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: Ce devis est valable pour son contenu, pour une durée de 1 mois
+        page: 21
+- document_id: 24
+  source_file: CHAUDRONNERIE_GOUDE_devis_DE00000967.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/200069409/Autres/2025/855928/7bdbe415ad10ac38af0fcbe22047cf4505995c77c48e285fbd9016b967f0e740.pdf
+  secteur: structure_charpente_metallerie
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: DE00000967
+      evidence:
+        text: Devis N° DE00000967
+        page: 1
+    nom_societe:
+      value: SARL Chaudronnerie GOUDE
+      evidence:
+        text: Société SARL Chaudronnerie GOUDE
+        page: 3
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: Votre acompte de 30,00 %, soit 5 941,44 €
+        page: 1
+    pourcentage_solde:
+      value: 70
+      evidence:
+        text: le solde du prix total TTC d'acquisition des ouvrages être réglé à la pose des ouvrages sur présentation de la facture
+        page: 3
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 15/04/2025
+      evidence:
+        text: 'Validité : 15/04/2025'
+        page: 1
+- document_id: 25
+  source_file: CONVERSO_TP_devis_22-01-LM-017.pdf
+  source_url: https://ville-vif.fr/wp-content/uploads/2022/06/CM22-06-20-23.2-annexe-Rampe-PMR-Secours-.pdf
+  secteur: vrd_genie_civil
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 22-01-LM/017
+      evidence:
+        text: DEVIS N° 22-01-LM/017
+        page: 1
+    nom_societe:
+      value: CONVERSO TP
+      evidence:
+        text: 'E-mail : l.molliet@converso-tp.com'
+        page: 1
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: Les demandes de paiement et facture à compter de leur émission seront réglées à l'entreprise sous 60 jours calendaires (45 jours fin de mois) pour les marchés privés (loi LME du 4 août 2008) et 30 jours date d'émission de facture pour les marchés publics
+        page: 3
+    duree_validite_offre:
+      value: null
+      evidence:
+        text: null
+        page: null
+- document_id: 26
+  source_file: ONF_VEGETIS_devis_25-22340.pdf
+  source_url: https://www.royat.fr/wp-content/uploads/2025/05/DM2025-044-Culture-170-ans-des-Thermes-Diagnostic-biomecanique-de-2-arbres-ONF.pdf
+  secteur: etude_diagnostic_technique
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: 25-22340
+      evidence:
+        text: DEVIS N°25-22340
+        page: 2
+    nom_societe:
+      value: ONF Vegetis
+      evidence:
+        text: ONF Vegetis
+        page: 3
+    pourcentage_acompte:
+      value: null
+      evidence:
+        text: null
+        page: null
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: 30 jours
+      evidence:
+        text: le délai de paiement des sommes dues par le Client est fixé à trente (30) jours suivant le jour d'émission de la facture
+        page: 5
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: Cette offre est valable 1 mois.
+        page: 3
+- document_id: 28
+  source_file: SARL_SAUVAGE_devis_2510016.pdf
+  source_url: https://data.megalis.bretagne.bzh/OpenData/213500275/Actes_reglementaires/2025/978623/d8a5af787ce9f82a72600e726c2ff7bfd2725f807faacf7f3c5774c5eb80e7e1.pdf
+  secteur: menuiserie
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: '2510016'
+      evidence:
+        text: Devis N° 2510016
+        page: 1
+    nom_societe:
+      value: SAUVAGE
+      evidence:
+        text: 'email : sarlsauvage@orange.fr'
+        page: 1
+    pourcentage_acompte:
+      value: 30
+      evidence:
+        text: Acompte de 30% à la signature du devis
+        page: 1
+    pourcentage_solde:
+      value: null
+      evidence:
+        text: null
+        page: null
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 1 mois
+      evidence:
+        text: la durée de validité est de 1 mois à compter de l'établissement du présent devis
+        page: 9
+- document_id: 29
+  source_file: MIPE_HABITAT_devis_D2407087-31-38.pdf
+  source_url: https://www.brysurmarne.fr/app/uploads/2025/03/CM-du-10-decembre-2024-2024DELIB0121-Annulation-de-la-deliberation-2024DELIB0020-portant-Cession-de-la-maison-situee-au-9-rue-Franchetti.pdf
+  secteur: facade_isolation_ite
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: D2407087
+      evidence:
+        text: Devis N° : D2407087
+        page: 1
+    nom_societe:
+      value: MIPE HABITAT (ex AD VALIDEM)
+      evidence:
+        text: MIPE HABITAT (ex AD VALIDEM)
+        page: 1
+    pourcentage_acompte:
+      value: 5
+      evidence:
+        text: CONDITIONS DE RÈGLEMENTS 5 % à la signature du devis
+        page: 5
+    pourcentage_solde:
+      value: 10
+      evidence:
+        text: 10% le solde à la réception du chantier
+        page: 5
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 30 jours
+      evidence:
+        text: La durée de validité de ce devis est de 30 jours.
+        page: 6
+- document_id: 30
+  source_file: MIPE_HABITAT_devis_D2407087-54-56.pdf
+  source_url: https://www.brysurmarne.fr/app/uploads/2025/03/CM-du-10-decembre-2024-2024DELIB0121-Annulation-de-la-deliberation-2024DELIB0020-portant-Cession-de-la-maison-situee-au-9-rue-Franchetti.pdf
+  secteur: facade_isolation_ite
+  human_validation: true
+  annotations:
+    numero_devis:
+      value: XA/8992-11457-1
+      evidence:
+        text: Devis XA/8992-11457-1
+        page: 1
+    nom_societe:
+      value: QUALITHERMY
+      evidence:
+        text: QUALITHERMY
+        page: 1
+    pourcentage_acompte:
+      value: 40
+      evidence:
+        text: Mode de règlement classic: 40% d'acompte à la signature du devis
+        page: 3
+    pourcentage_solde:
+      value: 60
+      evidence:
+        text: 60% restant en fin de travaux
+        page: 3
+    delai_paiement_solde_jours:
+      value: null
+      evidence:
+        text: null
+        page: null
+    duree_validite_offre:
+      value: 04/10/24
+      evidence:
+        text: Limite de validité : 04/10/24
+        page: 1
