@@ -18,12 +18,15 @@ Usage :
 """
 
 import sys
+from collections import defaultdict
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import load_env  # noqa: E402
+from app.models import Field  # noqa: E402
 from scripts import nuextract_client  # noqa: E402
 from scripts.gold_dataset_eval import (  # noqa: E402
     DATA_TEST_DIR,
@@ -35,6 +38,7 @@ from scripts.gold_dataset_eval import (  # noqa: E402
     build_field_evaluator,
     load_gold_fields,
 )
+from scripts.gold_matching import _normalize_text  # noqa: E402
 from scripts.nuextract_gold_langfuse_eval import (  # noqa: E402
     _cost_evaluation,
     _extraction_latency_evaluations,
@@ -43,6 +47,83 @@ from scripts.nuextract_gold_langfuse_eval import (  # noqa: E402
 from scripts.train_dataset_sync import DATASET_NAME  # noqa: E402
 
 TRAIN_DATA_DIR = DATA_TEST_DIR / "train"
+
+
+def build_evidence_similarity_evaluator(fields_by_key: dict[str, Field]):
+    """Évaluateur item-level séparé de `build_field_evaluator` (importé,
+    inchangé) : score de similarité continu -- pas d'exact match, page non
+    pertinente (décision utilisateur, voir
+    tasks/plan-nuextract-train-eval.md) -- entre `evidence.text` du gold et
+    l'evidence prédite par NuExtract, par champ. Aucun score émis quand le
+    gold n'a pas d'`evidence.text` pour ce champ (rien à comparer) ; `0.0`
+    quand le gold en a une mais que l'extraction n'en produit aucune (un
+    vrai manque, pas une absence de mesure)."""
+    from langfuse.experiment import Evaluation
+
+    title_to_key = {field.title: field.key for field in fields_by_key.values()}
+
+    def evidence_similarity_evaluator(
+        *, output=None, expected_output=None, metadata=None, **kwargs
+    ) -> list[Evaluation]:
+        extraction_results = (output or {}).get("extraction_results", [])
+        output_by_key = {
+            title_to_key[result["field_title"]]: result
+            for result in extraction_results
+            if result["field_title"] in title_to_key
+        }
+
+        evaluations: list[Evaluation] = []
+        for field_key, annotation in (expected_output or {}).items():
+            gold_text = (annotation.get("evidence") or {}).get("text")
+            if not gold_text:
+                continue
+
+            extracted_text = (output_by_key.get(field_key) or {}).get("evidence")
+            score = (
+                0.0
+                if not extracted_text
+                else SequenceMatcher(
+                    None, _normalize_text(gold_text), _normalize_text(extracted_text)
+                ).ratio()
+            )
+            evaluations.append(Evaluation(name=f"evidence_similarity:{field_key}", value=score))
+
+        return evaluations
+
+    return evidence_similarity_evaluator
+
+
+def _evidence_similarity_evaluations(item_results: list[Any]) -> list[Any]:
+    """Moyenne des scores `evidence_similarity:{field_key}` (item-level,
+    voir `build_evidence_similarity_evaluator`) par champ, + une moyenne
+    macro (moyenne des moyennes par champ) -- pas de pooling TP/FP/FN comme
+    `_field_metrics_evaluations` : ce n'est pas une classification, juste
+    une moyenne de scores continus. Un champ sans aucun score (gold sans
+    `evidence.text` pour tous les documents validés) est absent de
+    l'agrégat, pas mis à `0.0`."""
+    from langfuse.experiment import Evaluation
+
+    scores_by_field: dict[str, list[float]] = defaultdict(list)
+    for item_result in item_results:
+        for ev in item_result.evaluations:
+            if ev.name.startswith("evidence_similarity:"):
+                field_key = ev.name.removeprefix("evidence_similarity:")
+                scores_by_field[field_key].append(ev.value)
+
+    evaluations = []
+    field_means = []
+    for field_key, scores in scores_by_field.items():
+        mean = sum(scores) / len(scores)
+        evaluations.append(Evaluation(name=f"evidence_similarity:{field_key}", value=mean))
+        field_means.append(mean)
+
+    if field_means:
+        evaluations.append(
+            Evaluation(
+                name="evidence_similarity_macro", value=sum(field_means) / len(field_means)
+            )
+        )
+    return evaluations
 
 
 def build_run_evaluator():
@@ -71,6 +152,7 @@ def build_run_evaluator():
         evaluations.extend(_latency_evaluations(validated))
         evaluations.extend(_extraction_latency_evaluations(validated))
         evaluations.append(_cost_evaluation(validated))
+        evaluations.extend(_evidence_similarity_evaluations(validated))
         return evaluations
 
     return run_evaluator
@@ -104,7 +186,10 @@ def run_eval(
     return dataset.run_experiment(
         name=_run_name(model),
         task=task,
-        evaluators=[build_field_evaluator(fields_by_key)],
+        evaluators=[
+            build_field_evaluator(fields_by_key),
+            build_evidence_similarity_evaluator(fields_by_key),
+        ],
         run_evaluators=[build_run_evaluator()],
         max_concurrency=max_concurrency,
     )

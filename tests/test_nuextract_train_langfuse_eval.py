@@ -2,12 +2,19 @@ from types import SimpleNamespace
 
 from langfuse.experiment import Evaluation
 
+from app.models import Field
 from scripts.gold_dataset_eval import DATA_TEST_DIR
 from scripts.nuextract_train_langfuse_eval import (
     TRAIN_DATA_DIR,
+    _evidence_similarity_evaluations,
     _run_name,
+    build_evidence_similarity_evaluator,
     build_run_evaluator,
     run_eval,
+)
+
+_NUMERO_DEVIS = Field(
+    id=1, key="numero_devis", title="Numéro de devis", definition="d", type="text"
 )
 
 
@@ -146,9 +153,108 @@ def test_run_eval_wires_the_dataset_run_experiment_call():
     assert kwargs["name"] == "train-devis-nuextract-numind_NuExtract3"
     assert kwargs["max_concurrency"] == 14
     assert callable(kwargs["task"])
-    assert len(kwargs["evaluators"]) == 1
+    assert len(kwargs["evaluators"]) == 2
     assert len(kwargs["run_evaluators"]) == 1
     assert result == "sentinel-result"
+
+
+def test_evidence_similarity_evaluator_scores_one_for_an_identical_evidence():
+    evaluator = build_evidence_similarity_evaluator({"numero_devis": _NUMERO_DEVIS})
+
+    evaluations = evaluator(
+        output={
+            "extraction_results": [
+                {"field_title": "Numéro de devis", "evidence": "Devis N° DE00020090"}
+            ]
+        },
+        expected_output={
+            "numero_devis": {
+                "value": "DE00020090",
+                "evidence": {"text": "Devis N° DE00020090", "page": 1},
+            }
+        },
+    )
+
+    assert len(evaluations) == 1
+    assert evaluations[0].name == "evidence_similarity:numero_devis"
+    assert evaluations[0].value == 1.0
+
+
+def test_evidence_similarity_evaluator_scores_partial_match_between_zero_and_one():
+    evaluator = build_evidence_similarity_evaluator({"numero_devis": _NUMERO_DEVIS})
+
+    evaluations = evaluator(
+        output={
+            "extraction_results": [
+                {"field_title": "Numéro de devis", "evidence": "DE00020090"}
+            ]
+        },
+        expected_output={
+            "numero_devis": {
+                "value": "DE00020090",
+                "evidence": {"text": "Devis N° DE00020090, daté du 12 mars", "page": 1},
+            }
+        },
+    )
+
+    assert 0.0 < evaluations[0].value < 1.0
+
+
+def test_evidence_similarity_evaluator_emits_nothing_when_gold_has_no_evidence_text():
+    evaluator = build_evidence_similarity_evaluator({"numero_devis": _NUMERO_DEVIS})
+
+    evaluations = evaluator(
+        output={"extraction_results": []},
+        expected_output={"numero_devis": {"value": "DE00020090", "evidence": {"text": None}}},
+    )
+
+    assert evaluations == []
+
+
+def test_evidence_similarity_evaluator_scores_zero_when_extraction_has_no_evidence():
+    evaluator = build_evidence_similarity_evaluator({"numero_devis": _NUMERO_DEVIS})
+
+    evaluations = evaluator(
+        output={"extraction_results": [{"field_title": "Numéro de devis", "evidence": None}]},
+        expected_output={
+            "numero_devis": {"value": "DE00020090", "evidence": {"text": "Devis N° DE00020090"}}
+        },
+    )
+
+    assert len(evaluations) == 1
+    assert evaluations[0].name == "evidence_similarity:numero_devis"
+    assert evaluations[0].value == 0.0
+
+
+def test_evidence_similarity_evaluations_averages_scores_per_field_and_macro():
+    items = [
+        _item_result(
+            evaluations=[
+                Evaluation(name="evidence_similarity:numero_devis", value=1.0),
+                Evaluation(name="evidence_similarity:nom_societe", value=0.5),
+            ],
+            output={},
+        ),
+        _item_result(
+            evaluations=[Evaluation(name="evidence_similarity:numero_devis", value=0.0)],
+            output={},
+        ),
+    ]
+
+    evaluations = _evidence_similarity_evaluations(items)
+    by_name = _evaluations_by_name(evaluations)
+
+    assert by_name["evidence_similarity:numero_devis"].value == 0.5  # (1.0 + 0.0) / 2
+    assert by_name["evidence_similarity:nom_societe"].value == 0.5
+    assert by_name["evidence_similarity_macro"].value == 0.5  # moyenne de (0.5, 0.5)
+
+
+def test_evidence_similarity_evaluations_omits_macro_when_no_score_at_all():
+    evaluations = _evidence_similarity_evaluations(
+        [_item_result(evaluations=[Evaluation(name="human_validation", value=True)], output={})]
+    )
+
+    assert evaluations == []
 
 
 def test_run_eval_reads_pdfs_from_the_train_subfolder(monkeypatch, tmp_path):
