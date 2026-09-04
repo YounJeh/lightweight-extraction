@@ -119,6 +119,20 @@ le gold).
       `evidence_similarity_macro`)
 - [ ] Prêt pour revue (`/code-review-and-quality`) puis proposition de PR
 
+## Suivi : concurrence client (branche feat/nuextract-async-concurrency)
+
+Diagnostic + fix documentés dans le plan de session
+(`asyncio.to_thread` dans `build_task`, voir commit "fix(nuextract):
+vraie concurrence client via asyncio.to_thread"). Vérifié en réel sur un
+second run `train-devis` : temps mur total du run 22 min -> 9m11s (~2,4x),
+qualité inchangée (`f1_macro` 0.640 -> 0.645, `evidence_similarity_macro`
+0.763 -> 0.764). Effet de bord repéré, pas corrigé : `cost_usd_total`
+grimpe artificiellement (0.295€ -> 0.626€) car sa formule somme les
+latences comme si elles étaient séquentielles (biais déjà documenté dans
+le code, juste invisible tant que l'exécution était accidentellement
+séquentielle) -- candidat de tâche séparée si un coût fiable est
+nécessaire.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
