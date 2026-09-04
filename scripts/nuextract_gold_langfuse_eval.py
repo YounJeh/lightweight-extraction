@@ -21,6 +21,7 @@ Usage :
     uv run python scripts/nuextract_gold_langfuse_eval.py
 """
 
+import asyncio
 import sys
 import time
 from pathlib import Path
@@ -65,17 +66,33 @@ def build_task(
     """Task callable pour `dataset.run_experiment` — même contrat que
     `gold_dataset_eval.build_task`, sans étape PDF→texte séparée (NuExtract
     lit les pages directement, voir `nuextract_client.extract`) ni
-    `ocr_page_count` (ce pipeline n'OCRise rien)."""
+    `ocr_page_count` (ce pipeline n'OCRise rien).
+
+    `task()` est `async` et délègue tout le travail bloquant (lecture PDF,
+    appel réseau, sleeps de retry) à `asyncio.to_thread` -- sans ça,
+    `dataset.run_experiment` orchestre les items sur une seule boucle
+    asyncio (`asyncio.gather` + `Semaphore(max_concurrency)`, voir le SDK
+    installé, `_run_experiment_async`) et appelle `task(item=item)`
+    directement dans la coroutine ; un appel synchrone bloquant (comme
+    `nuextract_client.extract`, client `openai.OpenAI` non-async) gèle
+    alors toute la boucle, rendant les documents quasi séquentiels côté
+    client malgré `max_concurrency>1` -- observé en réel sur le run
+    train-devis (voir tasks/plan-nuextract-train-eval.md), le serveur vLLM
+    (`--max-num-seqs 8`, continuous batching) ne recevant jamais plus d'une
+    requête à la fois. `asyncio.to_thread` obtient une vraie concurrence
+    (les appels réseau bloquants relâchent le GIL) sans réécrire
+    `nuextract_client.py` en async."""
     extractor = extractor or nuextract_client.extract
 
-    def task(*, item, **kwargs) -> dict:
+    async def task(*, item, **kwargs) -> dict:
         source_file = item.input["source_file"]
         field_keys = item.input["field_keys"]
         fields = [fields_by_key[key] for key in field_keys]
 
         # Accumulateur local à cet appel de task() -- thread-safe sous
         # max_concurrency>1 (chaque exécution a sa propre closure, aucun
-        # état partagé entre documents concurrents). Voir
+        # état partagé entre documents concurrents, exécutée dans le même
+        # thread que _run_sync ci-dessous). Voir
         # docs/ideas/nuextract-cold-start-latency.md.
         cold_start_seconds = 0.0
 
@@ -83,10 +100,13 @@ def build_task(
             nonlocal cold_start_seconds
             cold_start_seconds += delay
 
-        start = time.perf_counter()
-        pdf_bytes = (data_test_dir / source_file).read_bytes()
-        results = extractor(pdf_bytes, fields, on_retry=on_retry)
-        latency_seconds = time.perf_counter() - start
+        def _run_sync() -> tuple[list[ExtractionResult], float]:
+            start = time.perf_counter()
+            pdf_bytes = (data_test_dir / source_file).read_bytes()
+            results = extractor(pdf_bytes, fields, on_retry=on_retry)
+            return results, time.perf_counter() - start
+
+        results, latency_seconds = await asyncio.to_thread(_run_sync)
 
         return {
             "extraction_results": [result.model_dump() for result in results],
@@ -198,7 +218,10 @@ def run_eval(
     `dataset.run_experiment`. `max_concurrency=14` (= nombre de documents
     gold) : vLLM bat les requêtes concurrentes en interne (continuous
     batching), un seul conteneur Modal (`max_containers=1`) les absorbe
-    sans coût GPU supplémentaire — décidé en cadrage."""
+    sans coût GPU supplémentaire — décidé en cadrage. Cette concurrence
+    n'atteint réellement le serveur que depuis que `build_task` délègue son
+    travail bloquant à `asyncio.to_thread` (voir sa docstring) ; avant ce
+    fix, `max_concurrency` n'avait aucun effet réel malgré sa valeur."""
     if client is None:
         from langfuse import Langfuse
 
