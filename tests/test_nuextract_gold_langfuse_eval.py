@@ -55,6 +55,7 @@ def test_build_task_reads_the_referenced_pdf_and_extracts_selected_fields(tmp_pa
         {
             "field_title": "Numéro de devis",
             "value": "n°6952",
+            "evidence": None,
             "source": "nuextract",
             "page_number": None,
             "text_position": None,
